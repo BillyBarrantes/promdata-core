@@ -1,0 +1,3 @@
+SELECT
+  SUM(`t0`.`a`) OVER (ROWS BETWEEN 1 following AND UNBOUNDED FOLLOWING) AS `tmp`
+FROM `t` AS `t0`

@@ -1,0 +1,10 @@
+r0 := UnboundTable: t
+  col int64
+
+r1 := Aggregate[r0]
+  metrics:
+    agged_struct: ReductionVectorizedUDF(func=multi_output_udf, func_args=[r0.col], input_type=[int64], return_type={'sum': int64, 'mean': float64})
+
+Project[r1]
+  sum:  StructField(r1.agged_struct, field='sum')
+  mean: StructField(r1.agged_struct, field='mean')

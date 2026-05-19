@@ -1,0 +1,2 @@
+SELECT
+  EXTRACT(hour FROM TIME(4, 55, 59)) AS `tmp`

@@ -1,0 +1,3 @@
+SELECT
+  CAST(CAST(`t0`.`i` AS TIMESTAMP) + INTERVAL 5 MINUTE AS TIMESTAMP) AS `TimestampAdd(i, 5m)`
+FROM `alltypes` AS `t0`

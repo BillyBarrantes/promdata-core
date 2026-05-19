@@ -1,0 +1,3 @@
+SELECT
+  CAST(TO_TIMESTAMP_LTZ(`t0`.`d`, 3) AS TIMESTAMP) AS `TimestampFromUNIX(d, MILLISECOND)`
+FROM `table` AS `t0`

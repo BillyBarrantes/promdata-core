@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS `tname`
+STORED AS AVRO
+AS
+SELECT
+  *
+FROM `functional_alltypes`

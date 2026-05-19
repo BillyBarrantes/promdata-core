@@ -1,0 +1,2569 @@
+{
+  "selection": {
+    "task_limit": 12,
+    "max_tasks_per_file": 4,
+    "allowlist_team_id": "72936d63-e550-4acf-b492-b5368718214b"
+  },
+  "canary_health": {
+    "status": "ready",
+    "summary": "Canary tabular listo para activación funcional controlada.",
+    "router_enabled": true,
+    "functional_switch_enabled": true,
+    "fail_open_enabled": true,
+    "prerequisites_ready": true,
+    "shadow_evidence_required": true,
+    "shadow_evidence_ready": true,
+    "shadow_evidence_reason": "shadow_evidence_healthy",
+    "ready_for_functional_canary": true,
+    "component_checks": {
+      "canonical_native_tabular_extraction": true,
+      "canonical_ibis_preview_runtime": true,
+      "canonical_analytical_contract_adapter": true,
+      "canonical_shadow_metric_validity_gate": true,
+      "canonical_shadow_query_runtime": true
+    },
+    "shadow_evidence": {
+      "report_path": "/code/.shadow_runtime_report.json",
+      "observed_count": 18,
+      "alignment_counts": {
+        "high_alignment": 18
+      },
+      "alignment_rate": 1.0,
+      "max_divergence_score": 0.0,
+      "latest_observed_at": "2026-05-09T04:49:11.238388+00:00",
+      "stability_by_window": [
+        {
+          "window_days": 1,
+          "observed_count": 18,
+          "alignment_counts": {
+            "high_alignment": 18
+          },
+          "avg_shadow_duration_ms": 1506.0,
+          "avg_shadow_over_live_ratio": null,
+          "divergence_by_prompt_type": [
+            {
+              "prompt_type": "chart_request",
+              "observed_count": 5,
+              "alignment_counts": {
+                "high_alignment": 5
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 5
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1375.4,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "generic_analysis",
+              "observed_count": 4,
+              "alignment_counts": {
+                "high_alignment": 4
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 4
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 261.25,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "dimension_analysis",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 890.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "funnel_request",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "prompt_type": "complete_analysis",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1047.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "prompt_type": "comparative_analysis",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 4461.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_visual_family": [
+            {
+              "requested_visual_family": "bar_chart",
+              "observed_count": 9,
+              "alignment_counts": {
+                "high_alignment": 9
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 9
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1188.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 8
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "funnel_chart",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "pie_chart",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 190.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "scatter_plot",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1771.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "line_chart",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1127.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "treemap",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1408.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_file_name": [
+            {
+              "file_name": "API-DatosPrueba_Final.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 2993.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "Prueba Power Bi2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1285.8333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "base_productos_nuevo2.2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 238.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "window_days": 7,
+          "observed_count": 18,
+          "alignment_counts": {
+            "high_alignment": 18
+          },
+          "avg_shadow_duration_ms": 1506.0,
+          "avg_shadow_over_live_ratio": null,
+          "divergence_by_prompt_type": [
+            {
+              "prompt_type": "chart_request",
+              "observed_count": 5,
+              "alignment_counts": {
+                "high_alignment": 5
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 5
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1375.4,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "generic_analysis",
+              "observed_count": 4,
+              "alignment_counts": {
+                "high_alignment": 4
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 4
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 261.25,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "dimension_analysis",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 890.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "funnel_request",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "prompt_type": "complete_analysis",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1047.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "prompt_type": "comparative_analysis",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 4461.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_visual_family": [
+            {
+              "requested_visual_family": "bar_chart",
+              "observed_count": 9,
+              "alignment_counts": {
+                "high_alignment": 9
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 9
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1188.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 8
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "funnel_chart",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "pie_chart",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 190.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "scatter_plot",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1771.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "line_chart",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1127.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "treemap",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1408.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_file_name": [
+            {
+              "file_name": "API-DatosPrueba_Final.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 2993.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "Prueba Power Bi2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1285.8333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "base_productos_nuevo2.2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 238.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "window_days": 30,
+          "observed_count": 18,
+          "alignment_counts": {
+            "high_alignment": 18
+          },
+          "avg_shadow_duration_ms": 1506.0,
+          "avg_shadow_over_live_ratio": null,
+          "divergence_by_prompt_type": [
+            {
+              "prompt_type": "chart_request",
+              "observed_count": 5,
+              "alignment_counts": {
+                "high_alignment": 5
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 5
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1375.4,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "generic_analysis",
+              "observed_count": 4,
+              "alignment_counts": {
+                "high_alignment": 4
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 4
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 261.25,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "dimension_analysis",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 890.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 2
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "prompt_type": "funnel_request",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "prompt_type": "complete_analysis",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1047.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "prompt_type": "comparative_analysis",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 4461.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_visual_family": [
+            {
+              "requested_visual_family": "bar_chart",
+              "observed_count": 9,
+              "alignment_counts": {
+                "high_alignment": 9
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 9
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1188.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 9
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 8
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "funnel_chart",
+              "observed_count": 3,
+              "alignment_counts": {
+                "high_alignment": 3
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 3
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 3319.3333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "pie_chart",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 190.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "scatter_plot",
+              "observed_count": 2,
+              "alignment_counts": {
+                "high_alignment": 2
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 2
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1771.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "line_chart",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1127.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "line_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "kpi_card",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "requested_visual_family": "treemap",
+              "observed_count": 1,
+              "alignment_counts": {
+                "high_alignment": 1
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 1
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1408.0,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            }
+          ],
+          "divergence_by_file_name": [
+            {
+              "file_name": "API-DatosPrueba_Final.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 2993.6667,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "funnel_chart",
+                  "count": 3
+                },
+                {
+                  "key": "scatter_plot",
+                  "count": 2
+                },
+                {
+                  "key": "bar_chart",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "Prueba Power Bi2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 1285.8333,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "line_chart",
+                  "count": 1
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 3
+                },
+                {
+                  "key": "kpi_card",
+                  "count": 2
+                },
+                {
+                  "key": "treemap",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "file_name": "base_productos_nuevo2.2.xlsx",
+              "observed_count": 6,
+              "alignment_counts": {
+                "high_alignment": 6
+              },
+              "shadow_query_status_counts": {
+                "query_executed": 6
+              },
+              "divergence_score": 0.0,
+              "avg_mismatch_count": 0.0,
+              "avg_shadow_duration_ms": 238.5,
+              "avg_shadow_over_live_ratio": null,
+              "top_requested_visual_families": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_live_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ],
+              "top_shadow_primary_visuals": [
+                {
+                  "key": "bar_chart",
+                  "count": 4
+                },
+                {
+                  "key": "pie_chart",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "thresholds": {
+      "min_observed_tasks": 12,
+      "min_alignment_rate": 0.98,
+      "max_divergence_score": 0.02
+    }
+  },
+  "task_count": 12,
+  "alignment_counts": {
+    "high_alignment": 12
+  },
+  "fallback_count": 0,
+  "executions": [
+    {
+      "task_id": "a392ecaf-6d73-45ea-bb03-0835f2461463",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "dimension_analysis",
+      "route": {
+        "task_id": "a392ecaf-6d73-45ea-bb03-0835f2461463",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "dame un analisis por ubicacion",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 42,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_dimension_parity_bundle",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 3,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 3,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "5c3cdffc-787d-4d82-b7c7-721b59cfd047",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "dimension_analysis",
+      "route": {
+        "task_id": "5c3cdffc-787d-4d82-b7c7-721b59cfd047",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Dame un grafico por tipo de almacen",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 73,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_dimension_parity_bundle",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 1,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 1,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 2,
+        "live_visual_types": [
+          "bar_chart"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "470b448e-03cf-424f-8b90-e70817e398f3",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "complete_analysis",
+      "route": {
+        "task_id": "470b448e-03cf-424f-8b90-e70817e398f3",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Realiza un análisis completo del stock",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 8,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "custom_prompt",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 2,
+      "canary_chart_count": 2,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 2,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 2,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "treemap"
+        ],
+        "shadow_visual_types": [
+          "kpi_card",
+          "bar_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "0e997b82-765e-467d-98ce-7c90d646c0fe",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "complete_analysis",
+      "route": {
+        "task_id": "0e997b82-765e-467d-98ce-7c90d646c0fe",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Realiza un análisis completo del stock",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 95,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "custom_prompt",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 2,
+      "canary_chart_count": 2,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 2,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 2,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "line_chart",
+          "treemap"
+        ],
+        "shadow_visual_types": [
+          "kpi_card",
+          "bar_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "ba2ae085-9e55-4bca-8bf7-8cbc07400fda",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "funnel_request",
+      "route": {
+        "task_id": "ba2ae085-9e55-4bca-8bf7-8cbc07400fda",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 98,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "custom_prompt",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 1,
+      "canary_chart_count": 1,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 1,
+        "shadow_chart_count": 1,
+        "shadow_comparable_chart_count": 1,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "funnel_chart"
+        ],
+        "shadow_visual_types": [
+          "funnel_chart"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "fa05d055-6b42-44bf-86e2-798af177eb8c",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "comparative_analysis",
+      "route": {
+        "task_id": "fa05d055-6b42-44bf-86e2-798af177eb8c",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "compara. el stock del 31-07-2021 con el stock 30-06-2021",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 37,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_comparative_parity_bundle",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 3,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 3,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "857ccc8a-5c3e-40ab-9acb-2f39e4dfaf1f",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "funnel_request",
+      "route": {
+        "task_id": "857ccc8a-5c3e-40ab-9acb-2f39e4dfaf1f",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 11,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "custom_prompt",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 1,
+      "canary_chart_count": 1,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 1,
+        "shadow_chart_count": 1,
+        "shadow_comparable_chart_count": 1,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "funnel_chart"
+        ],
+        "shadow_visual_types": [
+          "funnel_chart"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "8d892bd6-b3a5-49e6-b922-e098db94eeb9",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "chart_request",
+      "route": {
+        "task_id": "8d892bd6-b3a5-49e6-b922-e098db94eeb9",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color ",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 50,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_scatter_visual_parity_bundle",
+      "candidate_id": "primary__sheet::Hoja1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 1,
+      "canary_chart_count": 1,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 1,
+        "shadow_chart_count": 1,
+        "shadow_comparable_chart_count": 1,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "scatter_plot"
+        ],
+        "shadow_visual_types": [
+          "scatter_plot"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "snapshot",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha_de_stock"
+      }
+    },
+    {
+      "task_id": "9d3e291a-a855-434d-9c92-6ec62c86fd68",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "generic_analysis",
+      "route": {
+        "task_id": "9d3e291a-a855-434d-9c92-6ec62c86fd68",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "realiza un analisis de TOP 10 de productos de la categoria electronica",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 82,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_generic_visual_parity_bundle",
+      "candidate_id": "primary__sheet::Sheet1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 3,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 3,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "pie_chart"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "pie_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "flow",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha"
+      }
+    },
+    {
+      "task_id": "b0a20742-643f-4e9c-9012-1a22fcceb86d",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "dimension_analysis",
+      "route": {
+        "task_id": "b0a20742-643f-4e9c-9012-1a22fcceb86d",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "realiza un analisis de la categoria Electrónica. por cantidad vendida  y Total venta",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 87,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_dimension_visual_parity_bundle",
+      "candidate_id": "primary__sheet::Sheet1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 2,
+      "canary_chart_count": 2,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 2,
+        "shadow_chart_count": 2,
+        "shadow_comparable_chart_count": 2,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "pie_chart"
+        ],
+        "shadow_visual_types": [
+          "pie_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "flow",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha"
+      }
+    },
+    {
+      "task_id": "f9bbc634-bc92-4613-a193-1b14d64ea29c",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "dimension_analysis",
+      "route": {
+        "task_id": "f9bbc634-bc92-4613-a193-1b14d64ea29c",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "realiza un analisis por  Nombre de producto",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 1,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_dimension_parity_bundle",
+      "candidate_id": "primary__sheet::Sheet1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 3,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 3,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "treemap"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "line_chart",
+          "treemap"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "flow",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha"
+      }
+    },
+    {
+      "task_id": "7cd74be4-260d-44b7-962f-c2a72266705a",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+      "prompt_type": "generic_analysis",
+      "route": {
+        "task_id": "7cd74be4-260d-44b7-962f-c2a72266705a",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "user_id": "30aeadaa-4977-4173-8c65-de12140ba353",
+        "team_id": "72936d63-e550-4acf-b492-b5368718214b",
+        "prompt_preview": "realiza una analisis de ventas en S/",
+        "router_enabled": true,
+        "functional_switch_enabled": true,
+        "fail_open_enabled": true,
+        "eligible": true,
+        "file_extension": "xlsx",
+        "traffic_percent": 0,
+        "bucket_value": 64,
+        "allowlist_match": "team_id",
+        "requested_runtime": "universal_tabular",
+        "effective_runtime": "universal_tabular",
+        "fallback_runtime": "legacy",
+        "decision_mode": "allowlist_team",
+        "decision_reason": "canary_health_gate_passed",
+        "health_status": "ready",
+        "health_ready_for_functional_canary": true
+      },
+      "execution_status": "completed",
+      "prompt_strategy": "shadow_generic_visual_parity_bundle",
+      "candidate_id": "primary__sheet::Sheet1",
+      "shadow_query_status": "query_executed",
+      "live_chart_count": 3,
+      "canary_chart_count": 3,
+      "divergence": {
+        "alignment_grade": "high_alignment",
+        "mismatches": [],
+        "live_chart_count": 3,
+        "shadow_chart_count": 3,
+        "shadow_comparable_chart_count": 3,
+        "shadow_additive_chart_overage": 0,
+        "live_visual_types": [
+          "bar_chart",
+          "pie_chart"
+        ],
+        "shadow_visual_types": [
+          "bar_chart",
+          "treemap",
+          "pie_chart"
+        ],
+        "live_dataset_mode": null,
+        "shadow_dataset_mode": "flow",
+        "live_time_axis": null,
+        "shadow_time_axis": "fecha"
+      }
+    }
+  ]
+}

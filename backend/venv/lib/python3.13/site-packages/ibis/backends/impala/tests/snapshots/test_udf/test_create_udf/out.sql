@@ -1,0 +1,1 @@
+CREATE FUNCTION `test_name`(STRING, STRING) returns BIGINT location '/foo/bar.so' symbol='testFunc'

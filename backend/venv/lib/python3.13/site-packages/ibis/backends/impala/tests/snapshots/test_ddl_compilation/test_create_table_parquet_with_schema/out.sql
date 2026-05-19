@@ -1,0 +1,6 @@
+CREATE EXTERNAL TABLE IF NOT EXISTS `foo`.`new_table`
+(`foo` STRING,
+ `bar` TINYINT,
+ `baz` SMALLINT)
+STORED AS PARQUET
+LOCATION '/path/to/'

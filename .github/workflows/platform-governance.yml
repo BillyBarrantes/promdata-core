@@ -1,0 +1,125 @@
+name: Platform Governance
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - ".env.example"
+      - ".env.staging.example"
+      - ".env.production.example"
+      - "backend/.env.example"
+      - "backend/.env.staging.example"
+      - "backend/.env.production.example"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "backend/Dockerfile"
+      - "backend/docker-compose.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "backend/requirements.txt"
+      - "backend/run_phase6_governance_tests.sh"
+      - "backend/app/main.py"
+      - "backend/app/core/config.py"
+      - "backend/app/services/runtime_governance.py"
+      - "backend/app/services/cloud_connectors.py"
+      - "backend/app/services/enterprise_telemetry.py"
+      - "backend/test_phase6_platform_env_contract.py"
+      - "backend/test_phase6_runtime_governance_contract.py"
+      - "backend/test_phase6_watchdog_runtime_status_contract.py"
+      - "backend/test_phase6_enterprise_telemetry_contract.py"
+      - "next.config.mjs"
+      - "playwright.config.ts"
+      - ".dockerignore"
+      - ".github/workflows/platform-governance.yml"
+  pull_request:
+    paths:
+      - ".env.example"
+      - ".env.staging.example"
+      - ".env.production.example"
+      - "backend/.env.example"
+      - "backend/.env.staging.example"
+      - "backend/.env.production.example"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "backend/Dockerfile"
+      - "backend/docker-compose.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "backend/requirements.txt"
+      - "backend/run_phase6_governance_tests.sh"
+      - "backend/app/main.py"
+      - "backend/app/core/config.py"
+      - "backend/app/services/runtime_governance.py"
+      - "backend/app/services/cloud_connectors.py"
+      - "backend/app/services/enterprise_telemetry.py"
+      - "backend/test_phase6_platform_env_contract.py"
+      - "backend/test_phase6_runtime_governance_contract.py"
+      - "backend/test_phase6_watchdog_runtime_status_contract.py"
+      - "backend/test_phase6_enterprise_telemetry_contract.py"
+      - "next.config.mjs"
+      - "playwright.config.ts"
+      - ".dockerignore"
+      - ".github/workflows/platform-governance.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: platform-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-governance-contracts:
+    name: Backend Governance Contracts
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal test dependency
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Validate phase 6 governance contracts
+        run: bash ./run_phase6_governance_tests.sh
+
+  frontend-platform-build:
+    name: Frontend Platform Build Smoke
+    runs-on: ubuntu-latest
+    needs: backend-governance-contracts
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      NEXT_PUBLIC_API_BASE_URL: https://ci-api.promdata.local
+      NEXT_PUBLIC_DEBUG_MIDDLEWARE: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend from platform contract
+        run: pnpm build

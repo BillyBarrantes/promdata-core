@@ -1,0 +1,4746 @@
+{
+  "selection": {
+    "task_limit": 36,
+    "max_tasks_per_file": 6,
+    "telemetry_window_days": 30,
+    "stability_windows_days": [
+      1,
+      7,
+      30
+    ]
+  },
+  "task_count": 18,
+  "file_count": 3,
+  "files": [
+    {
+      "task_id": "a392ecaf-6d73-45ea-bb03-0835f2461463",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-06T00:00:28.833314+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "a392ecaf-6d73-45ea-bb03-0835f2461463",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "dame un analisis por ubicacion",
+        "prompt_type": "dimension_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "dame un analisis por ubicacion",
+          "analysis_length": 2430,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 2,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "dame un analisis por ubicacion",
+          "prompt_strategy": "shadow_dimension_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Top 6 Tipo Almacen por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Stock Disponible por Lote",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Top 6 Tipo Almacen por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "line_chart",
+              "data_points": 31,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Stock Disponible por Lote",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 2286,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "5c3cdffc-787d-4d82-b7c7-721b59cfd047",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-05T23:59:42.249813+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "5c3cdffc-787d-4d82-b7c7-721b59cfd047",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "Dame un grafico por tipo de almacen",
+        "prompt_type": "chart_request",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Dame un grafico por tipo de almacen",
+          "analysis_length": 843,
+          "chart_count": 1,
+          "visual_types": [
+            "bar_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Dame un grafico por tipo de almacen",
+          "prompt_strategy": "shadow_chart_visual_parity_bundle",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart"
+          ],
+          "shadow_visual_types": [
+            "bar_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1078,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "470b448e-03cf-424f-8b90-e70817e398f3",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-05T23:58:59.050449+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "470b448e-03cf-424f-8b90-e70817e398f3",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "Realiza un análisis completo del stock",
+        "prompt_type": "complete_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Realiza un análisis completo del stock",
+          "analysis_length": 2644,
+          "chart_count": 2,
+          "visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "metric_keys": [
+            "stock_disponible"
+          ],
+          "metric_count": 1,
+          "recommendation_count": 0,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Realiza un análisis completo del stock",
+          "prompt_strategy": "custom_prompt",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible Total (Corte Actual)",
+              "intent_type": "descriptive",
+              "visual_protocol": "kpi_card",
+              "column_alias_count": 1,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Top 10 Texto Breve De Material por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible Total (Corte Actual)",
+              "intent_type": "descriptive",
+              "visual_protocol": "kpi_card",
+              "status": "success",
+              "result_type": "kpi",
+              "chart_type": "kpi_card",
+              "data_points": 1,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Top 10 Texto Breve De Material por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 2,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 2,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "kpi_card",
+            "bar_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 968,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "0e997b82-765e-467d-98ce-7c90d646c0fe",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-05T22:59:30.144009+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "0e997b82-765e-467d-98ce-7c90d646c0fe",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "Realiza un análisis completo del stock",
+        "prompt_type": "complete_analysis",
+        "requested_visual_family": "line_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Realiza un análisis completo del stock",
+          "analysis_length": 2378,
+          "chart_count": 2,
+          "visual_types": [
+            "line_chart",
+            "treemap"
+          ],
+          "metric_keys": [
+            "stock_disponible"
+          ],
+          "metric_count": 1,
+          "recommendation_count": 2,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Realiza un análisis completo del stock",
+          "prompt_strategy": "custom_prompt",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible Total (Corte Actual)",
+              "intent_type": "descriptive",
+              "visual_protocol": "kpi_card",
+              "column_alias_count": 1,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Top 10 Texto Breve De Material por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible Total (Corte Actual)",
+              "intent_type": "descriptive",
+              "visual_protocol": "kpi_card",
+              "status": "success",
+              "result_type": "kpi",
+              "chart_type": "kpi_card",
+              "data_points": 1,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Top 10 Texto Breve De Material por Stock Disponible",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 2,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 2,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "line_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "kpi_card",
+            "bar_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1127,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "1a9bbe68-7601-4d92-981a-4b3b4399da44",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-05T22:58:16.279321+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "1a9bbe68-7601-4d92-981a-4b3b4399da44",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "Dame un grafico por tipo de almacen",
+        "prompt_type": "chart_request",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Dame un grafico por tipo de almacen",
+          "analysis_length": 818,
+          "chart_count": 1,
+          "visual_types": [
+            "bar_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Dame un grafico por tipo de almacen",
+          "prompt_strategy": "shadow_chart_visual_parity_bundle",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart"
+          ],
+          "shadow_visual_types": [
+            "bar_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 848,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "a1ecb180-c645-4527-869c-db2236afb72c",
+      "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+      "file_name": "Prueba Power Bi2.xlsx",
+      "created_at": "2026-05-05T22:13:33.444854+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "a1ecb180-c645-4527-869c-db2236afb72c",
+        "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+        "file_name": "Prueba Power Bi2.xlsx",
+        "prompt": "Dame un grafico por tipo de almacen",
+        "prompt_type": "chart_request",
+        "requested_visual_family": "treemap",
+        "live": {
+          "status": "completed",
+          "prompt": "Dame un grafico por tipo de almacen",
+          "analysis_length": 915,
+          "chart_count": 1,
+          "visual_types": [
+            "treemap"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "4c6aee2d-111a-4a55-8be4-a42b876a8202",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Dame un grafico por tipo de almacen",
+          "prompt_strategy": "shadow_chart_visual_parity_bundle",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_4c6aee2d_111a_4a55_8be4_a42b876a8202_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 6,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1408,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "ba2ae085-9e55-4bca-8bf7-8cbc07400fda",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-05T21:44:04.894832+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "ba2ae085-9e55-4bca-8bf7-8cbc07400fda",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+        "prompt_type": "funnel_request",
+        "requested_visual_family": "funnel_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "analysis_length": 784,
+          "chart_count": 1,
+          "visual_types": [
+            "funnel_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "prompt_strategy": "custom_prompt",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "funnel",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "funnel_chart"
+          ],
+          "shadow_visual_types": [
+            "funnel_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 6202,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "fa05d055-6b42-44bf-86e2-798af177eb8c",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-05T21:40:48.678829+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "fa05d055-6b42-44bf-86e2-798af177eb8c",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "compara. el stock del 31-07-2021 con el stock 30-06-2021",
+        "prompt_type": "comparative_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "compara. el stock del 31-07-2021 con el stock 30-06-2021",
+          "analysis_length": 2391,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 2,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "compara. el stock del 31-07-2021 con el stock 30-06-2021",
+          "prompt_strategy": "shadow_comparative_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Comparativa de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Stock Disponible por Texto Breve De Material",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Comparativa de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 2,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Stock Disponible por Fecaduc Feprefercons",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "line_chart",
+              "data_points": 1,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Stock Disponible por Texto Breve De Material",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 4461,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "857ccc8a-5c3e-40ab-9acb-2f39e4dfaf1f",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-05T21:25:05.393351+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "857ccc8a-5c3e-40ab-9acb-2f39e4dfaf1f",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+        "prompt_type": "funnel_request",
+        "requested_visual_family": "funnel_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "analysis_length": 865,
+          "chart_count": 1,
+          "visual_types": [
+            "funnel_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "prompt_strategy": "custom_prompt",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "funnel",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "funnel_chart"
+          ],
+          "shadow_visual_types": [
+            "funnel_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 2136,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "8d892bd6-b3a5-49e6-b922-e098db94eeb9",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-05T21:23:51.624418+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "8d892bd6-b3a5-49e6-b922-e098db94eeb9",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+        "prompt_type": "chart_request",
+        "requested_visual_family": "scatter_plot",
+        "live": {
+          "status": "completed",
+          "prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+          "analysis_length": 817,
+          "chart_count": 1,
+          "visual_types": [
+            "scatter_plot"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+          "prompt_strategy": "shadow_scatter_visual_parity_bundle",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Dispersión de Stock Disponible vs. Días al Vencimiento por Tipo Almacen",
+              "intent_type": "diagnostic",
+              "visual_protocol": "scatter_plot",
+              "column_alias_count": 4,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Dispersión de Stock Disponible vs. Días al Vencimiento por Tipo Almacen",
+              "intent_type": "diagnostic",
+              "visual_protocol": "scatter_plot",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "scatter",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "scatter_plot"
+          ],
+          "shadow_visual_types": [
+            "scatter_plot"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1852,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "6fb3305e-5c8e-4b3d-8cf4-f3a80aba6040",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-04T23:42:58.347928+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "6fb3305e-5c8e-4b3d-8cf4-f3a80aba6040",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+        "prompt_type": "chart_request",
+        "requested_visual_family": "scatter_plot",
+        "live": {
+          "status": "completed",
+          "prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+          "analysis_length": 1052,
+          "chart_count": 1,
+          "visual_types": [
+            "scatter_plot"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Crea un scatter donde X sea días a vencimiento (Fecaduc Feprefercons - Fecha de stock), Y sea stock disponible, y color por Tipo almacén.",
+          "prompt_strategy": "shadow_scatter_visual_parity_bundle",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Dispersión de Stock Disponible vs. Días al Vencimiento por Tipo Almacen",
+              "intent_type": "diagnostic",
+              "visual_protocol": "scatter_plot",
+              "column_alias_count": 4,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Dispersión de Stock Disponible vs. Días al Vencimiento por Tipo Almacen",
+              "intent_type": "diagnostic",
+              "visual_protocol": "scatter_plot",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "scatter",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "scatter_plot"
+          ],
+          "shadow_visual_types": [
+            "scatter_plot"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1691,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "7051f988-67d3-4906-b557-126547cb9ddb",
+      "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+      "file_name": "API-DatosPrueba_Final.xlsx",
+      "created_at": "2026-05-04T22:19:02.64082+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "7051f988-67d3-4906-b557-126547cb9ddb",
+        "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+        "prompt_type": "funnel_request",
+        "requested_visual_family": "funnel_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "analysis_length": 804,
+          "chart_count": 1,
+          "visual_types": [
+            "funnel_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 0,
+          "explainability_count": 1,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "06d713f2-f413-4ce0-89f7-be6add621255",
+          "candidate_id": "primary__sheet::Hoja1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "Muéstrame un embudo con los 10 tipos de almacén/ubicaciones que concentran más stock disponible.",
+          "prompt_strategy": "custom_prompt",
+          "plan_count": 1,
+          "successful_plan_count": 1,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_06d713f2_f413_4ce0_89f7_be6add621255_primary_sheet_hoja1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Stock Disponible por Tipo Almacen",
+              "intent_type": "distribution",
+              "visual_protocol": "funnel_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "funnel",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "snapshot",
+            "time_axis": "fecha_de_stock",
+            "metric_column_count": 2,
+            "dimension_column_count": 1
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 1,
+          "shadow_chart_count": 1,
+          "shadow_comparable_chart_count": 1,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "funnel_chart"
+          ],
+          "shadow_visual_types": [
+            "funnel_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "snapshot",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha_de_stock"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 1620,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "9d3e291a-a855-434d-9c92-6ec62c86fd68",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T22:37:42.687962+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "9d3e291a-a855-434d-9c92-6ec62c86fd68",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza un analisis de TOP 10 de productos de la categoria electronica",
+        "prompt_type": "generic_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza un analisis de TOP 10 de productos de la categoria electronica",
+          "analysis_length": 2355,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "pie_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 2,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza un analisis de TOP 10 de productos de la categoria electronica",
+          "prompt_strategy": "shadow_generic_visual_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "pie_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "pie_chart"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "pie_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 410,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "b0a20742-643f-4e9c-9012-1a22fcceb86d",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T22:11:10.800378+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "b0a20742-643f-4e9c-9012-1a22fcceb86d",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza un analisis de la categoria Electrónica. por cantidad vendida  y Total venta",
+        "prompt_type": "dimension_analysis",
+        "requested_visual_family": "pie_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza un analisis de la categoria Electrónica. por cantidad vendida  y Total venta",
+          "analysis_length": 2180,
+          "chart_count": 2,
+          "visual_types": [
+            "pie_chart"
+          ],
+          "metric_keys": [
+            "cantidad_vendida",
+            "total_venta_pen"
+          ],
+          "metric_count": 2,
+          "recommendation_count": 2,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza un analisis de la categoria Electrónica. por cantidad vendida  y Total venta",
+          "prompt_strategy": "shadow_dimension_visual_parity_bundle",
+          "plan_count": 2,
+          "successful_plan_count": 2,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Composición de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Id",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Composición de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "pie_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Id",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 2,
+          "shadow_chart_count": 2,
+          "shadow_comparable_chart_count": 2,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "pie_chart"
+          ],
+          "shadow_visual_types": [
+            "pie_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 184,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "f9bbc634-bc92-4613-a193-1b14d64ea29c",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T19:48:34.577886+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "f9bbc634-bc92-4613-a193-1b14d64ea29c",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza un analisis por  Nombre de producto",
+        "prompt_type": "dimension_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza un analisis por  Nombre de producto",
+          "analysis_length": 2624,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 3,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza un analisis por  Nombre de producto",
+          "prompt_strategy": "shadow_dimension_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Top 5 Categoria por Cantidad Vendida",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Cantidad Vendida por Fecha",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Cantidad Vendida por Nombre",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Top 5 Categoria por Cantidad Vendida",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Evolución de Cantidad Vendida por Fecha",
+              "intent_type": "trend",
+              "visual_protocol": "line_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "line_chart",
+              "data_points": 4,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Distribución de Cantidad Vendida por Nombre",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "line_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 202,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "7cd74be4-260d-44b7-962f-c2a72266705a",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T19:28:26.601589+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "7cd74be4-260d-44b7-962f-c2a72266705a",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza una analisis de ventas en S/",
+        "prompt_type": "generic_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza una analisis de ventas en S/",
+          "analysis_length": 2083,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "pie_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 3,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza una analisis de ventas en S/",
+          "prompt_strategy": "shadow_generic_visual_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "pie_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "pie_chart"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "treemap",
+            "pie_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 214,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "e5ee65d9-dbd8-44d9-b14b-3ca4ff4d2e05",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T18:01:00.548887+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "e5ee65d9-dbd8-44d9-b14b-3ca4ff4d2e05",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza un analisis sobre las ventas",
+        "prompt_type": "generic_analysis",
+        "requested_visual_family": "bar_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza un analisis sobre las ventas",
+          "analysis_length": 2421,
+          "chart_count": 3,
+          "visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 3,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza un analisis sobre las ventas",
+          "prompt_strategy": "shadow_generic_visual_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "pie_chart",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "bar_chart",
+            "treemap"
+          ],
+          "shadow_visual_types": [
+            "bar_chart",
+            "treemap",
+            "pie_chart"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 225,
+          "shadow_over_live_ratio": null
+        }
+      }
+    },
+    {
+      "task_id": "a0243d24-f762-402a-b1e9-0f4c4034bb44",
+      "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+      "file_name": "base_productos_nuevo2.2.xlsx",
+      "created_at": "2026-04-28T16:50:33.833558+00:00",
+      "observer": {
+        "observer_status": "observed",
+        "task_id": "a0243d24-f762-402a-b1e9-0f4c4034bb44",
+        "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "prompt": "realiza un analisis sobre las ventas",
+        "prompt_type": "generic_analysis",
+        "requested_visual_family": "pie_chart",
+        "live": {
+          "status": "completed",
+          "prompt": "realiza un analisis sobre las ventas",
+          "analysis_length": 2447,
+          "chart_count": 3,
+          "visual_types": [
+            "pie_chart",
+            "bar_chart"
+          ],
+          "metric_keys": [],
+          "metric_count": 0,
+          "recommendation_count": 3,
+          "explainability_count": 3,
+          "has_json_data": false,
+          "has_arrow_data": false,
+          "has_snapshot_data": true,
+          "dataset_mode": null,
+          "time_axis": null,
+          "date_column_count": 0,
+          "dimension_column_count": 0,
+          "contract_metric_count": 0,
+          "live_duration_ms": 0
+        },
+        "shadow": {
+          "file_id": "c8cb2572-466c-4fa2-ab9e-0861a2e0e701",
+          "candidate_id": "primary__sheet::Sheet1",
+          "readiness_grade": "pilot_candidate",
+          "readiness_score": 1.0,
+          "query_prompt": "realiza un analisis sobre las ventas",
+          "prompt_strategy": "shadow_generic_visual_parity_bundle",
+          "plan_count": 3,
+          "successful_plan_count": 3,
+          "shadow_query_status": "query_executed",
+          "shadow_parquet_path": "/tmp/promdata_cache/shadow_query_c8cb2572_466c_4fa2_ab9e_0861a2e0e701_primary_sheet_sheet1.parquet",
+          "plans": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "column_alias_count": 2,
+              "glossary_hint": null
+            }
+          ],
+          "executions": [
+            {
+              "plan_index": 1,
+              "title": "Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "pie_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "pie_chart",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 2,
+              "title": "Distribución de Cantidad Vendida por Provincia De Venta",
+              "intent_type": "distribution",
+              "visual_protocol": "bar_chart",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "bar_chart",
+              "data_points": 10,
+              "has_filtered_granular_df": true,
+              "error": null
+            },
+            {
+              "plan_index": 3,
+              "title": "Composición de Cantidad Vendida por Categoria",
+              "intent_type": "distribution",
+              "visual_protocol": "treemap",
+              "status": "success",
+              "result_type": "echarts",
+              "chart_type": "treemap",
+              "data_points": 5,
+              "has_filtered_granular_df": true,
+              "error": null
+            }
+          ],
+          "candidate_contract": {
+            "dataset_mode": "flow",
+            "time_axis": "fecha",
+            "metric_column_count": 2,
+            "dimension_column_count": 2
+          }
+        },
+        "divergence": {
+          "alignment_grade": "high_alignment",
+          "mismatches": [],
+          "live_chart_count": 3,
+          "shadow_chart_count": 3,
+          "shadow_comparable_chart_count": 3,
+          "shadow_additive_chart_overage": 0,
+          "live_visual_types": [
+            "pie_chart",
+            "bar_chart"
+          ],
+          "shadow_visual_types": [
+            "pie_chart",
+            "bar_chart",
+            "treemap"
+          ],
+          "live_dataset_mode": null,
+          "shadow_dataset_mode": "flow",
+          "live_time_axis": null,
+          "shadow_time_axis": "fecha"
+        },
+        "latency": {
+          "live_duration_ms": 0,
+          "shadow_duration_ms": 196,
+          "shadow_over_live_ratio": null
+        }
+      }
+    }
+  ],
+  "telemetry_shadow_runtime": {
+    "observed_count": 18,
+    "alignment_counts": {
+      "high_alignment": 18
+    },
+    "avg_shadow_duration_ms": 1506.0,
+    "avg_shadow_over_live_ratio": null,
+    "divergence_by_prompt_type": [
+      {
+        "prompt_type": "chart_request",
+        "observed_count": 5,
+        "alignment_counts": {
+          "high_alignment": 5
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 5
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1375.4,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "prompt_type": "generic_analysis",
+        "observed_count": 4,
+        "alignment_counts": {
+          "high_alignment": 4
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 4
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 261.25,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 3
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 3
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 3
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "prompt_type": "dimension_analysis",
+        "observed_count": 3,
+        "alignment_counts": {
+          "high_alignment": 3
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 3
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 890.6667,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 2
+          },
+          {
+            "key": "pie_chart",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "prompt_type": "funnel_request",
+        "observed_count": 3,
+        "alignment_counts": {
+          "high_alignment": 3
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 3
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 3319.3333,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "prompt_type": "complete_analysis",
+        "observed_count": 2,
+        "alignment_counts": {
+          "high_alignment": 2
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 2
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1047.5,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 1
+          },
+          {
+            "key": "line_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 1
+          },
+          {
+            "key": "line_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "kpi_card",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "prompt_type": "comparative_analysis",
+        "observed_count": 1,
+        "alignment_counts": {
+          "high_alignment": 1
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 1
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 4461.0,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "divergence_by_visual_family": [
+      {
+        "requested_visual_family": "bar_chart",
+        "observed_count": 9,
+        "alignment_counts": {
+          "high_alignment": 9
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 9
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1188.0,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 9
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 9
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 8
+          },
+          {
+            "key": "kpi_card",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "requested_visual_family": "funnel_chart",
+        "observed_count": 3,
+        "alignment_counts": {
+          "high_alignment": 3
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 3
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 3319.3333,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "requested_visual_family": "pie_chart",
+        "observed_count": 2,
+        "alignment_counts": {
+          "high_alignment": 2
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 2
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 190.0,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "requested_visual_family": "scatter_plot",
+        "observed_count": 2,
+        "alignment_counts": {
+          "high_alignment": 2
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 2
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1771.5,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "scatter_plot",
+            "count": 2
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "scatter_plot",
+            "count": 2
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "scatter_plot",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "requested_visual_family": "line_chart",
+        "observed_count": 1,
+        "alignment_counts": {
+          "high_alignment": 1
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 1
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1127.0,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "line_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "line_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "kpi_card",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "requested_visual_family": "treemap",
+        "observed_count": 1,
+        "alignment_counts": {
+          "high_alignment": 1
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 1
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1408.0,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "divergence_by_file_name": [
+      {
+        "file_name": "API-DatosPrueba_Final.xlsx",
+        "observed_count": 6,
+        "alignment_counts": {
+          "high_alignment": 6
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 6
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 2993.6667,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "funnel_chart",
+            "count": 3
+          },
+          {
+            "key": "scatter_plot",
+            "count": 2
+          },
+          {
+            "key": "bar_chart",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "file_name": "Prueba Power Bi2.xlsx",
+        "observed_count": 6,
+        "alignment_counts": {
+          "high_alignment": 6
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 6
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 1285.8333,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 4
+          },
+          {
+            "key": "line_chart",
+            "count": 1
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 4
+          },
+          {
+            "key": "line_chart",
+            "count": 1
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 3
+          },
+          {
+            "key": "kpi_card",
+            "count": 2
+          },
+          {
+            "key": "treemap",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "file_name": "base_productos_nuevo2.2.xlsx",
+        "observed_count": 6,
+        "alignment_counts": {
+          "high_alignment": 6
+        },
+        "shadow_query_status_counts": {
+          "query_executed": 6
+        },
+        "divergence_score": 0.0,
+        "avg_mismatch_count": 0.0,
+        "avg_shadow_duration_ms": 238.5,
+        "avg_shadow_over_live_ratio": null,
+        "top_requested_visual_families": [
+          {
+            "key": "bar_chart",
+            "count": 4
+          },
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ],
+        "top_live_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 4
+          },
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ],
+        "top_shadow_primary_visuals": [
+          {
+            "key": "bar_chart",
+            "count": 4
+          },
+          {
+            "key": "pie_chart",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "observed_prompt_type_count": 6,
+    "observed_file_count": 3,
+    "observed_task_count": 18,
+    "earliest_observed_at": "2026-05-09T04:48:22.650619+00:00",
+    "latest_observed_at": "2026-05-09T04:49:11.238388+00:00",
+    "stability_by_window": [
+      {
+        "window_days": 1,
+        "observed_count": 18,
+        "alignment_counts": {
+          "high_alignment": 18
+        },
+        "avg_shadow_duration_ms": 1506.0,
+        "avg_shadow_over_live_ratio": null,
+        "divergence_by_prompt_type": [
+          {
+            "prompt_type": "chart_request",
+            "observed_count": 5,
+            "alignment_counts": {
+              "high_alignment": 5
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 5
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1375.4,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "generic_analysis",
+            "observed_count": 4,
+            "alignment_counts": {
+              "high_alignment": 4
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 4
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 261.25,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "dimension_analysis",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 890.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "funnel_request",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "prompt_type": "complete_analysis",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1047.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "prompt_type": "comparative_analysis",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 4461.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_visual_family": [
+          {
+            "requested_visual_family": "bar_chart",
+            "observed_count": 9,
+            "alignment_counts": {
+              "high_alignment": 9
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 9
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1188.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 8
+              },
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "funnel_chart",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "pie_chart",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 190.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "scatter_plot",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1771.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "line_chart",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1127.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "treemap",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1408.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_file_name": [
+          {
+            "file_name": "API-DatosPrueba_Final.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 2993.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "Prueba Power Bi2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1285.8333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "kpi_card",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "base_productos_nuevo2.2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 238.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "window_days": 7,
+        "observed_count": 18,
+        "alignment_counts": {
+          "high_alignment": 18
+        },
+        "avg_shadow_duration_ms": 1506.0,
+        "avg_shadow_over_live_ratio": null,
+        "divergence_by_prompt_type": [
+          {
+            "prompt_type": "chart_request",
+            "observed_count": 5,
+            "alignment_counts": {
+              "high_alignment": 5
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 5
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1375.4,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "generic_analysis",
+            "observed_count": 4,
+            "alignment_counts": {
+              "high_alignment": 4
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 4
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 261.25,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "dimension_analysis",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 890.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "funnel_request",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "prompt_type": "complete_analysis",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1047.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "prompt_type": "comparative_analysis",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 4461.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_visual_family": [
+          {
+            "requested_visual_family": "bar_chart",
+            "observed_count": 9,
+            "alignment_counts": {
+              "high_alignment": 9
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 9
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1188.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 8
+              },
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "funnel_chart",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "pie_chart",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 190.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "scatter_plot",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1771.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "line_chart",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1127.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "treemap",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1408.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_file_name": [
+          {
+            "file_name": "API-DatosPrueba_Final.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 2993.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "Prueba Power Bi2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1285.8333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "kpi_card",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "base_productos_nuevo2.2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 238.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "window_days": 30,
+        "observed_count": 18,
+        "alignment_counts": {
+          "high_alignment": 18
+        },
+        "avg_shadow_duration_ms": 1506.0,
+        "avg_shadow_over_live_ratio": null,
+        "divergence_by_prompt_type": [
+          {
+            "prompt_type": "chart_request",
+            "observed_count": 5,
+            "alignment_counts": {
+              "high_alignment": 5
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 5
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1375.4,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "generic_analysis",
+            "observed_count": 4,
+            "alignment_counts": {
+              "high_alignment": 4
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 4
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 261.25,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "dimension_analysis",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 890.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 2
+              },
+              {
+                "key": "pie_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "prompt_type": "funnel_request",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "prompt_type": "complete_analysis",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1047.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "prompt_type": "comparative_analysis",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 4461.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_visual_family": [
+          {
+            "requested_visual_family": "bar_chart",
+            "observed_count": 9,
+            "alignment_counts": {
+              "high_alignment": 9
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 9
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1188.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 9
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 8
+              },
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "funnel_chart",
+            "observed_count": 3,
+            "alignment_counts": {
+              "high_alignment": 3
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 3
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 3319.3333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "pie_chart",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 190.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "scatter_plot",
+            "observed_count": 2,
+            "alignment_counts": {
+              "high_alignment": 2
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 2
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1771.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "scatter_plot",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "line_chart",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1127.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "line_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "kpi_card",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "requested_visual_family": "treemap",
+            "observed_count": 1,
+            "alignment_counts": {
+              "high_alignment": 1
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 1
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1408.0,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "divergence_by_file_name": [
+          {
+            "file_name": "API-DatosPrueba_Final.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 2993.6667,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "funnel_chart",
+                "count": 3
+              },
+              {
+                "key": "scatter_plot",
+                "count": 2
+              },
+              {
+                "key": "bar_chart",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "Prueba Power Bi2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 1285.8333,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "line_chart",
+                "count": 1
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 3
+              },
+              {
+                "key": "kpi_card",
+                "count": 2
+              },
+              {
+                "key": "treemap",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "file_name": "base_productos_nuevo2.2.xlsx",
+            "observed_count": 6,
+            "alignment_counts": {
+              "high_alignment": 6
+            },
+            "shadow_query_status_counts": {
+              "query_executed": 6
+            },
+            "divergence_score": 0.0,
+            "avg_mismatch_count": 0.0,
+            "avg_shadow_duration_ms": 238.5,
+            "avg_shadow_over_live_ratio": null,
+            "top_requested_visual_families": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_live_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ],
+            "top_shadow_primary_visuals": [
+              {
+                "key": "bar_chart",
+                "count": 4
+              },
+              {
+                "key": "pie_chart",
+                "count": 2
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+r0 := UnboundTable: t
+  a int64
+
+r1 := Filter[r0]
+  r0.a < 42
+  r0.a >= 42
+
+r2 := Project[r1]
+  a: r1.a
+  x: r1.a + 42
+
+r3 := Aggregate[r2]
+  groups:
+    x: r2.x
+  metrics:
+    y: Sum(r2.a)
+
+Limit[r3, n=10]

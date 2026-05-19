@@ -1,0 +1,61 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/code/app
+      - ./.shadow_runtime_report.json:/code/.shadow_runtime_report.json:ro
+    environment:
+      - PYTHONPATH=/code
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    mem_limit: 1536m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import sys, urllib.request; resp = urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3); sys.exit(0 if resp.getcode() == 200 else 1)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./app:/code/app
+      - ./.shadow_runtime_report.json:/code/.shadow_runtime_report.json:ro
+    environment:
+      - PYTHONPATH=/code
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.celery_app worker --loglevel=info
+    mem_limit: 3072m
+    mem_reservation: 1024m
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME -t 5 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 4
+      start_period: 40s
+
+  redis:
+    image: "redis:alpine"
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    mem_limit: 256m
+    mem_reservation: 64m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

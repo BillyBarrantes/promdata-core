@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.pnpm-store
+.venv
+node_modules
+backend
+test-results
+playwright-report
+.DS_Store
+*.log
+*.sqlite
+*.sqlite3
+coverage

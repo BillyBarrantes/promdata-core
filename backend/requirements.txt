@@ -1,0 +1,22 @@
+fastapi
+uvicorn[standard]
+celery[redis]
+python-dotenv
+supabase
+pandas>=2.0,<3.0
+openpyxl
+python-jose[cryptography]
+requests
+google-generativeai
+tabulate
+scikit-learn
+statsmodels
+numpy
+plotly
+pyarrow
+# --- FASE 1.2: Motor Semantic Kernel ---
+ibis-framework[duckdb]
+duckdb>=0.9.0
+pypdf
+python-multipart
+pytest
