@@ -1099,8 +1099,8 @@ def planificar_estrategia(model, prompt, data_info, adn, glossary_context, gen_c
 
 def generar_analisis(dfs: dict, prompt: str, audit_log: list, user_token: str, supabase_client, user_id, parent_context: str, glossary_map: dict, topology_rules: dict, cleaning_notes: str, currency_meta: dict = {}, prev_code_override=None):
     
-    # ... (Tus configs de modelo model_name = 'gemini-3-pro-preview' se mantienen igual) ...
-    model_name = 'gemini-3-pro-preview' 
+    # Modelo centralizado desde config.py (settings.AI_MODEL_NAME)
+    model_name = settings.AI_MODEL_NAME
     config_json = { "temperature": 0.2, "top_p": 0.95, "max_output_tokens": 8192, "response_mime_type": "application/json" }
     config_code = { "temperature": 0.1, "top_p": 0.95, "max_output_tokens": 8192 }
 

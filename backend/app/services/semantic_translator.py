@@ -2487,7 +2487,7 @@ class SemanticTranslator:
         schema_json = json.dumps(AnalysisPlan.model_json_schema(), indent=2)
         router_context_json = json.dumps(router_decision, ensure_ascii=False, sort_keys=True)
         model = genai.GenerativeModel(
-            model_name='gemini-3-flash-preview', # Potencia para entender protocolos
+            model_name=settings.AI_MODEL_NAME,  # Centralizado desde config.py
             generation_config={"response_mime_type": "application/json", "temperature": 0.0}
         )
 

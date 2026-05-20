@@ -86,7 +86,7 @@ class AutoAnalyst:
                 currency_instruction = f"IMPORTANT: The file uses the currency '{currency_meta['symbol']}' ({currency_meta['code']}). Use this symbol in your text."
             
             model = genai.GenerativeModel(
-                model_name='gemini-3-flash-preview', # Rápido y barato para esta inferencia
+                model_name=settings.AI_MODEL_NAME,  # Centralizado desde config.py
                 generation_config={"response_mime_type": "application/json", "temperature": 0.0}
             )
 

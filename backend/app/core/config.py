@@ -74,7 +74,7 @@ class Settings:
     CELERY_RESULT_BACKEND: str = _normalize_redis_url_for_runtime(
         os.getenv("CELERY_RESULT_BACKEND", _LOCAL_REDIS_URL)
     )
-    AI_MODEL_NAME= os.getenv("AI_MODEL_NAME", "gemini-3-pro-preview")
+    AI_MODEL_NAME= os.getenv("AI_MODEL_NAME", "gemini-3.5-flash")
     BACKEND_PUBLIC_URL: str = os.getenv("BACKEND_PUBLIC_URL", "http://localhost:8000")
     FRONTEND_APP_URL: str = os.getenv("FRONTEND_APP_URL", "http://localhost:3000")
     OAUTH_STATE_TTL_SECONDS: int = int(os.getenv("OAUTH_STATE_TTL_SECONDS", "900"))
@@ -262,7 +262,7 @@ class Settings:
         "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED",
         False,
     )
-    NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "gemini-3-flash-preview")
-    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3-pro-preview")
+    NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
+    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3.1-pro")
 
 settings = Settings()
