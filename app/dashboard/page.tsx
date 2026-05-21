@@ -23,6 +23,7 @@ import {
 } from '@/lib/dashboard-narrative';
 import { exportDashboardAsImage, exportDashboardAsPdf } from '@/lib/dashboard-export';
 import { getScopedLocalPerfAverage } from '@/lib/local-performance';
+import { API_BASE_URL } from '@/lib/api-config';
 
 const ResponsiveGridLayout = dynamic(
   () => import('react-grid-layout/legacy').then(mod => (mod as any).WidthProvider((mod as any).Responsive)),
@@ -366,7 +367,7 @@ function DashboardPageClient() {
     try {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return [];
-      const res = await fetch(`http://localhost:8000/api/v1/presentations?_t=${Date.now()}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/presentations?_t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate'
@@ -416,7 +417,7 @@ function DashboardPageClient() {
           return;
         }
 
-        let url = 'http://localhost:8000/api/v1/reports';
+        let url = `${API_BASE_URL}/api/v1/reports`;
         if (targetPresentationId) url += `?presentation_id=${targetPresentationId}`;
 
         const response = await fetch(url, {
@@ -493,7 +494,7 @@ function DashboardPageClient() {
     try {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
-      let url = 'http://localhost:8000/api/v1/reports';
+      let url = `${API_BASE_URL}/api/v1/reports`;
       if (targetPresentationId) url += `?presentation_id=${targetPresentationId}`;
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -522,7 +523,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      let url = 'http://localhost:8000/api/v1/reports';
+      let url = `${API_BASE_URL}/api/v1/reports`;
       if (presentationId && presentationId !== '__all__') {
         url += `?presentation_id=${encodeURIComponent(presentationId)}`;
       }
@@ -622,7 +623,7 @@ function DashboardPageClient() {
         || buildExecutiveWidgetSnapshot({ report })
       ));
 
-      const response = await fetch('http://localhost:8000/api/v1/presentations/executive-summary', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations/executive-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -688,7 +689,7 @@ function DashboardPageClient() {
     const accessToken = await getDashboardAccessToken();
     if (!accessToken) return null;
 
-    const createResponse = await fetch('http://localhost:8000/api/v1/presentations', {
+    const createResponse = await fetch(`${API_BASE_URL}/api/v1/presentations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -745,7 +746,7 @@ function DashboardPageClient() {
       }
 
       const contentPayload = sanitizeClonedReportContent(sourceReport.content);
-      const saveResponse = await fetch('http://localhost:8000/api/v1/reports', {
+      const saveResponse = await fetch(`${API_BASE_URL}/api/v1/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -826,7 +827,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch('http://localhost:8000/api/v1/presentations', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -870,7 +871,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`http://localhost:8000/api/v1/presentations/${activePresentationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations/${activePresentationId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -917,7 +918,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      const createResponse = await fetch('http://localhost:8000/api/v1/presentations', {
+      const createResponse = await fetch(`${API_BASE_URL}/api/v1/presentations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -942,7 +943,7 @@ function DashboardPageClient() {
           ? structuredClone(sourceReport.content ?? {})
           : JSON.parse(JSON.stringify(sourceReport.content ?? {}));
 
-        const saveResponse = await fetch('http://localhost:8000/api/v1/reports', {
+        const saveResponse = await fetch(`${API_BASE_URL}/api/v1/reports`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1000,7 +1001,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`http://localhost:8000/api/v1/reports/${reportId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/reports/${reportId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
@@ -1079,7 +1080,7 @@ function DashboardPageClient() {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`http://localhost:8000/api/v1/presentations/${activePresentationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations/${activePresentationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
@@ -1178,7 +1179,7 @@ function DashboardPageClient() {
       if (!accessToken) return;
 
       const requestBody = JSON.stringify({ items: persistedItems });
-      let response = await fetch('http://localhost:8000/api/v1/reports/layout', {
+      let response = await fetch(`${API_BASE_URL}/api/v1/reports/layout`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1189,7 +1190,7 @@ function DashboardPageClient() {
 
       if (!response.ok && response.status >= 500 && response.status < 600) {
         await new Promise((resolve) => setTimeout(resolve, 220));
-        response = await fetch('http://localhost:8000/api/v1/reports/layout', {
+        response = await fetch(`${API_BASE_URL}/api/v1/reports/layout`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

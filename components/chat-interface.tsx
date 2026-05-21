@@ -18,6 +18,7 @@ import * as duckdbEngine from "@/lib/duckdb-engine"
 import { getScopedLocalPerfAverage } from "@/lib/local-performance"
 import { Database, Paperclip, SendHorizonal, X, Trash2, Square, Mic, MicOff, LayoutDashboard } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { API_BASE_URL } from "@/lib/api-config"
 import { toast } from "sonner"
 import { useSupabase } from '@/lib/supabase-provider'
 import {
@@ -456,7 +457,7 @@ export function ChatInterface() {
       const accessToken = await getChatAccessToken();
       if (!accessToken) return;
 
-      const res = await fetch(`http://localhost:8000/api/v1/chat/messages/${messageId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/messages/${messageId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
@@ -482,7 +483,7 @@ export function ChatInterface() {
       const accessToken = await getChatAccessToken();
       if (!accessToken) return;
 
-      await fetch('http://localhost:8000/api/v1/chat', {
+      await fetch(`${API_BASE_URL}/api/v1/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -505,7 +506,7 @@ export function ChatInterface() {
       const accessToken = await getChatAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`http://localhost:8000/api/v1/presentations?_t=${Date.now()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations?_t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate'
@@ -550,7 +551,7 @@ export function ChatInterface() {
       if (!accessToken) return;
 
       const destinationPresentationId = selectedSavePresentationId.trim();
-      const reportResponse = await fetch('http://localhost:8000/api/v1/reports', {
+      const reportResponse = await fetch(`${API_BASE_URL}/api/v1/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -669,7 +670,7 @@ export function ChatInterface() {
         const accessToken = await getChatAccessToken();
         if (!accessToken) return;
 
-        const res = await fetch(`http://localhost:8000/api/v1/chat/${analysisFileId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/chat/${analysisFileId}`, {
           headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
@@ -794,7 +795,7 @@ export function ChatInterface() {
       pollingAbortRef.current = controller;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
           signal: controller.signal,
           cache: 'no-store',
         });
@@ -1162,7 +1163,7 @@ export function ChatInterface() {
       });
 
       // 3. Enviamos el paquete enriquecido al backend
-      const response = await fetch('http://localhost:8000/api/v1/analyze', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
         body: JSON.stringify({ file_id: analysisFileId, prompt: enrichedPrompt })
@@ -1420,7 +1421,7 @@ export function ChatInterface() {
 
           const accessToken = await getChatAccessToken();
           if (accessToken) {
-            fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}/cancel`, {
+            fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}/cancel`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${accessToken}` }
             });

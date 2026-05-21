@@ -11,6 +11,7 @@ import { ChartsReport } from "@/components/charts-report"
 import { SmartTable } from "@/components/smart-table"
 import { AnalysisReport } from "@/components/analysis-report"
 import { useSupabase } from "@/lib/supabase-provider"
+import { API_BASE_URL } from "@/lib/api-config"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 
@@ -96,7 +97,7 @@ export function WorkspaceCanvas() {
       const accessToken = await getWorkspaceAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`http://localhost:8000/api/v1/presentations?_t=${Date.now()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/presentations?_t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate'
@@ -139,7 +140,7 @@ export function WorkspaceCanvas() {
       if (!accessToken) return;
 
       const destinationPresentationId = selectedSavePresentationId.trim();
-      const response = await fetch('http://localhost:8000/api/v1/reports', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

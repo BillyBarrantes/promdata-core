@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSupabase } from '@/lib/supabase-provider';
 import { toast } from "sonner"; // Usaremos toast para notificaciones
 import { AlertTriangle, RefreshCw, Search, ShieldAlert, ShieldCheck, Table2, Trash2, Unplug, X } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api-config";
 
 // El tipo de archivo que esperamos de la base de datos
 interface UploadedFile {
@@ -369,7 +370,7 @@ function CargarDatosPageContent() {
     }
 
     try {
-      const providersResponse = await fetch('http://localhost:8000/api/v1/connectors/providers', {
+      const providersResponse = await fetch(`${API_BASE_URL}/api/v1/connectors/providers`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
 
@@ -389,7 +390,7 @@ function CargarDatosPageContent() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/connectors/watchdog/status', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/watchdog/status`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       if (!response.ok) return;
@@ -558,7 +559,7 @@ function CargarDatosPageContent() {
         throw new Error("Debes iniciar sesión para ver la vista previa.");
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/files/${file.id}/preview`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/files/${file.id}/preview`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       const payload: FilePreviewResponse | { detail?: string } = await response.json().catch(() => ({}));
@@ -602,7 +603,7 @@ function CargarDatosPageContent() {
 
       const query = new URLSearchParams({ limit: '50' });
       if (searchTerm.trim()) query.set('search', searchTerm.trim());
-      const response = await fetch(`http://localhost:8000/api/v1/connectors/${provider.id}/files?${query.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/${provider.id}/files?${query.toString()}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       if (!response.ok) {
@@ -626,7 +627,7 @@ function CargarDatosPageContent() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return null;
 
-      const response = await fetch(`http://localhost:8000/api/v1/connectors/${provider.id}/watch-targets`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/${provider.id}/watch-targets`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       if (!response.ok) {
@@ -761,7 +762,7 @@ function CargarDatosPageContent() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), WATCHDOG_POLL_REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch('http://localhost:8000/api/v1/connectors/watchdog/poll', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/watchdog/poll`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -1003,7 +1004,7 @@ function CargarDatosPageContent() {
         throw new Error("El proveedor no expone una ruta OAuth válida.");
       }
       const response = await fetch(
-        `http://localhost:8000${provider.auth_start_path}?redirect_to=${encodeURIComponent(redirectTo)}`,
+        `${API_BASE_URL}${provider.auth_start_path}?redirect_to=${encodeURIComponent(redirectTo)}`,
         {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         }
@@ -1029,7 +1030,7 @@ function CargarDatosPageContent() {
       if (!session?.access_token) {
         throw new Error("Debes iniciar sesión para desconectar una cuenta cloud.");
       }
-      const response = await fetch(`http://localhost:8000/api/v1/connectors/${provider.id}/connection`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/${provider.id}/connection`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
@@ -1065,7 +1066,7 @@ function CargarDatosPageContent() {
         throw new Error("Debes iniciar sesión para importar archivos cloud.");
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/connectors/${activeExplorerProvider.id}/import`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/connectors/${activeExplorerProvider.id}/import`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -1112,7 +1113,7 @@ function CargarDatosPageContent() {
 
       if (existingTarget) {
         const response = await fetch(
-          `http://localhost:8000/api/v1/connectors/${activeExplorerProvider.id}/watch-targets/${existingTarget.id}`,
+          `${API_BASE_URL}/api/v1/connectors/${activeExplorerProvider.id}/watch-targets/${existingTarget.id}`,
           {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${session.access_token}` },
@@ -1124,7 +1125,7 @@ function CargarDatosPageContent() {
         }
         toast.success(`Vigilancia desactivada: ${item.name}`);
       } else {
-        const response = await fetch(`http://localhost:8000/api/v1/connectors/${activeExplorerProvider.id}/watch-targets`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/connectors/${activeExplorerProvider.id}/watch-targets`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,

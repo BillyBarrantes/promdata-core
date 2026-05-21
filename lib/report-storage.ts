@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-client";
+import { API_BASE_URL } from "@/lib/api-config";
 
 const supabase = createClient();
 
@@ -18,7 +19,7 @@ export const getSavedReports = async (): Promise<SavedReport[]> => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return [];
 
-        const response = await fetch('http://localhost:8000/api/v1/reports', {
+        const response = await fetch(`${API_BASE_URL}/api/v1/reports`, {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
 
@@ -36,7 +37,7 @@ export const getReportById = async (id: number): Promise<SavedReport | null> => 
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return null;
 
-        const response = await fetch(`http://localhost:8000/api/v1/reports/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/reports/${id}`, {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
 
@@ -54,7 +55,7 @@ export const deleteReport = async (id: number): Promise<boolean> => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return false;
 
-        const response = await fetch(`http://localhost:8000/api/v1/reports/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/reports/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${session.access_token}` }
         });

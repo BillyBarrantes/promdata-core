@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { useSupabase } from "@/lib/supabase-provider";
 import { cn } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/api-config";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -99,7 +100,7 @@ interface KnowledgeAskResponse {
   insufficient_evidence: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// API_BASE_URL importado desde @/lib/api-config
 const KNOWLEDGE_STATUS_POLL_MS = 5000;
 const ACCEPTED_DOCUMENT_EXTENSIONS = [".pdf", ".txt", ".md"];
 const ACCEPTED_DOCUMENT_MIME_TYPES = [
