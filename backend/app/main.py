@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,9 +13,22 @@ from app.services.runtime_governance import get_runtime_governance_payload
 
 app = FastAPI(title="PromData API")
 
+# ---------------------------------------------------------------------------
+# CORS: Fuente única de orígenes permitidos
+# Se leen de ALLOWED_ORIGINS (comma-separated) + FRONTEND_APP_URL (legacy).
+# Ejemplo en .env / Cloud Run:
+#   ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat
+# ---------------------------------------------------------------------------
+_extra_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+
 origins = sorted({
     "http://localhost:3000",
     settings.FRONTEND_APP_URL.strip() if settings.FRONTEND_APP_URL else "",
+    *_extra_origins,
 } - {""})
 
 app.add_middleware(
