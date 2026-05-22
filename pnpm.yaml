@@ -1,0 +1,8 @@
+# pnpm.yaml — Configuración para pnpm v11+
+# (En pnpm v10 esta config vivía en package.json#pnpm, ahora vive aquí)
+# Autoriza los scripts de post-instalación de dependencias nativas.
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - "sharp"
+  - "apache-arrow"
+  - "@duckdb/duckdb-wasm"
