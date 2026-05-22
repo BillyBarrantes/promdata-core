@@ -1254,6 +1254,7 @@ def generar_analisis(dfs: dict, prompt: str, audit_log: list, user_token: str, s
 
     results = {"status": "error", "message": "No iniciado"}
     code = None
+    error_msg = None
     
     for attempt in range(max_retries):
         try:
@@ -1261,7 +1262,7 @@ def generar_analisis(dfs: dict, prompt: str, audit_log: list, user_token: str, s
             
             # Si estamos en el segundo intento (attempt > 0), le damos una pista del error a la IA
             current_prompt = code_prompt
-            if attempt > 0 and 'error_msg' in locals():
+            if attempt > 0 and error_msg:
                 current_prompt += f"\n\nATENCIÓN: El intento anterior falló con este error: {error_msg}. CORRIGE EL CÓDIGO."
 
             # Generación
