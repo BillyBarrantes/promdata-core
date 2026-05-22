@@ -16,25 +16,36 @@ app = FastAPI(title="PromData API")
 # ---------------------------------------------------------------------------
 # CORS: Fuente única de orígenes permitidos
 # Se leen de ALLOWED_ORIGINS (comma-separated) + FRONTEND_APP_URL (legacy).
-# Ejemplo en .env / Cloud Run:
+# Si ninguno está configurado, se permite * como fallback de emergencia.
+#
+# Configura en Cloud Run:
 #   ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat
+#   FRONTEND_APP_URL=https://livion.lat
 # ---------------------------------------------------------------------------
-_extra_origins = [
-    o.strip()
-    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
-    if o.strip()
-]
+_raw_allowed = os.getenv("ALLOWED_ORIGINS", "")
+_extra_origins = [o.strip() for o in _raw_allowed.split(",") if o.strip()]
 
-origins = sorted({
-    "http://localhost:3000",
-    settings.FRONTEND_APP_URL.strip() if settings.FRONTEND_APP_URL else "",
-    *_extra_origins,
-} - {""})
+_frontend_url = (settings.FRONTEND_APP_URL or "").strip()
+
+_origins_set = {"http://localhost:3000"}
+if _frontend_url:
+    _origins_set.add(_frontend_url)
+_origins_set.update(_extra_origins)
+_origins_set.discard("")
+
+# Si no hay orígenes de producción configurados → fallback a wildcard
+if len(_origins_set) == 1 and "http://localhost:3000" in _origins_set:
+    origins: list = ["*"]
+else:
+    origins = sorted(_origins_set)
+
+# Log explícito para verificar en Cloud Run
+print(f"[CORS] allow_origins configurados: {origins}", flush=True)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=True if origins != ["*"] else False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
