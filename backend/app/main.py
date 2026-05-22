@@ -36,8 +36,10 @@ _origins_set.discard("")
 # Si no hay orígenes de producción configurados → fallback a wildcard
 if len(_origins_set) == 1 and "http://localhost:3000" in _origins_set:
     origins: list = ["*"]
+    _allow_credentials = False
 else:
     origins = sorted(_origins_set)
+    _allow_credentials = True
 
 # Log explícito para verificar en Cloud Run
 print(f"[CORS] allow_origins configurados: {origins}", flush=True)
@@ -45,24 +47,41 @@ print(f"[CORS] allow_origins configurados: {origins}", flush=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True if origins != ["*"] else False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=_allow_credentials,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-Request-ID",
+        "Cache-Control",
+    ],
+    expose_headers=["X-Request-ID"],
+    max_age=600,
 )
-
-app.include_router(api_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------
 # [ENTERPRISE v1] Sanitización global de errores HTTP
-# ---------------------------------------------------------------------------
-# Intercepta TODOS los HTTPException antes de llegar al cliente.
-# - 4xx: pasan tal cual (contienen mensajes intencionales para el usuario).
-# - 5xx: el detail interno se reemplaza con un mensaje genérico seguro.
-#   El error real se loguea vía structured logging para diagnóstico interno.
+# IMPORTANTE: Registrar ANTES de include_router para que no interfiera
+# con las respuestas internas de preflight OPTIONS del CORSMiddleware.
 # ---------------------------------------------------------------------------
 @app.exception_handler(HTTPException)
 async def _sanitize_http_errors(request: FastAPIRequest, exc: HTTPException) -> JSONResponse:
+    # Dejar pasar las respuestas de OPTIONS sin modificar
+    if request.method == "OPTIONS":
+        return JSONResponse(
+            status_code=200,
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With, Cache-Control",
+                "Access-Control-Max-Age": "600",
+            },
+        )
     if exc.status_code >= 500:
         emit_structured_log(
             "api_internal_error_sanitized",
@@ -81,6 +100,10 @@ async def _sanitize_http_errors(request: FastAPIRequest, exc: HTTPException) -> 
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+
+
+app.include_router(api_router, prefix="/api/v1")
+
 
 
 @app.on_event("startup")
