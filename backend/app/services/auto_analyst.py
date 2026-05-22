@@ -4,7 +4,6 @@ import warnings
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.linear_model import LinearRegression
 from app.core.config import settings
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -16,7 +15,6 @@ class AutoAnalyst:
     def analyze(df: pd.DataFrame, top_n: int = 5, currency_meta: dict = {}) -> dict:
         # A. INFERENCIA DE CONTEXTO (DYNAMIC DOMAIN)
         context = AutoAnalyst._analyze_data_context(df, currency_meta)
-        intent = context.get('strategic_intent', 'General Analysis')
         rec_chart = context.get('recommended_chart', 'bar')
         
         currency_symbol = currency_meta.get('symbol', '')
@@ -268,7 +266,7 @@ class AutoAnalyst:
                     "detalle": f"El nivel actual de {context.get('quantity_term', 'unidades')} ({current_stock:,.0f}) es alto, pero la variación es casi nula ({variation:,.0f}). Posible {risk_concept.lower()}."
                 })
                 
-        except Exception as e:
+        except Exception:
             pass # Diagnóstico es "nice to have", no debe romper el flujo
 
         return diagnostics

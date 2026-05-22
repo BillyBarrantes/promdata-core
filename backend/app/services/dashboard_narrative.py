@@ -77,7 +77,6 @@ def _fallback_summary(
     widgets: list[dict[str, Any]],
 ) -> dict[str, Any]:
     widget_titles = [_normalize_text(widget.get("title")) for widget in widgets]
-    normalized_titles = [title for title in widget_titles if title]
     overview_parts = [
         f"El lienzo {presentation_name or 'actual'} consolida {len(widgets)} widgets listos para lectura ejecutiva."
     ]

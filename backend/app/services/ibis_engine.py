@@ -1,6 +1,4 @@
 import ibis
-from ibis import _
-import json
 import pandas as pd
 import datetime
 from app.services.data_engine import DataEngine
@@ -57,7 +55,7 @@ class IbisEngine:
                 # Test if this string column can be cast to numeric
                 try:
                     # Try casting a sample to verify
-                    test = t.select(col_name).limit(5).mutate(
+                    _ = t.select(col_name).limit(5).mutate(
                         _test=t[col_name].cast('float64')
                     ).execute()
                     

@@ -1,7 +1,6 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
-import uuid
 
 class AnalysisRequest(BaseModel):
     """Modelo para la solicitud de un nuevo análisis."""

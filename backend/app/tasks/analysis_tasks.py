@@ -58,7 +58,6 @@ from app.services.smart_table_builder import (
     echarts_to_smart_table,
 )
 from app.core.arrow_utils import (
-    should_use_arrow,
     evaluate_records_arrow_transport,
     evaluate_dataframe_arrow_transport,
     records_to_arrow_base64,
@@ -1463,7 +1462,6 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
     runtime_route = convert_keys_to_str(runtime_route or {})
 
     # 1. INICIALIZACIÓN SEGURA DE VARIABLES
-    facts_json_strategy = None
     code_dna = None
     parent_analysis_summary = None  # 🧠 [FASE 3F] Huella del análisis anterior para memoria Ibis
     parent_task_id = None

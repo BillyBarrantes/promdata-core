@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Dict, List
 import warnings
 
 # Suppress statsmodels warnings about frequency/index

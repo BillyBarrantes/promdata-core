@@ -210,24 +210,6 @@ def should_enable_visual_probe_mode(
     if any(term in normalized_prompt for term in analysis_override_terms):
         return False
 
-    visual_probe_terms = [
-        "grafico",
-        "grafica",
-        "chart",
-        "dashboard",
-        "visual",
-        "heatmap",
-        "scatter",
-        "dispersion",
-        "treemap",
-        "histograma",
-        "histogram",
-        "funnel",
-        "embudo",
-        "waterfall",
-        "cascada",
-        "boxplot",
-    ]
     if requested_visuals:
         return True
 

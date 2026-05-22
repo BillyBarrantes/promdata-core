@@ -183,7 +183,6 @@ def _build_series_semantics(series: pd.Series, row_count: int) -> dict[str, Any]
     digit_tokens = compact_tokens[integer_like_mask.fillna(False)].str.lstrip("+-")
     digit_lengths = digit_tokens.str.len()
     median_digit_length = float(digit_lengths.median()) if len(digit_lengths) else 0.0
-    digit_length_span = int(digit_lengths.max() - digit_lengths.min()) if len(digit_lengths) else 0
     dominant_digit_length_ratio = (
         float(digit_lengths.value_counts(normalize=True).iloc[0])
         if len(digit_lengths)

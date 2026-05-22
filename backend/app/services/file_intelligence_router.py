@@ -1,5 +1,4 @@
 import io
-import os
 import zipfile
 from typing import Any
 
