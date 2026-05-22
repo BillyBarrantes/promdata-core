@@ -81,6 +81,7 @@ import google.generativeai as genai
 import re
 import unicodedata
 import warnings
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime
 from time import perf_counter
 from typing import Any
@@ -2788,7 +2789,18 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                                 )
                                 try:
                                     narrative_model = genai.GenerativeModel(narrative_model_name)
-                                    narrative_resp = narrative_model.generate_content(narrative_prompt)
+                                    # ⚡️ [PARALLEL NARRATIVE] Ejecutamos generate_content en un hilo
+                                    # para no bloquear el event-loop. Timeout de 45s por narrativa.
+                                    _narrative_executor = ThreadPoolExecutor(max_workers=1)
+                                    _future = _narrative_executor.submit(
+                                        narrative_model.generate_content, narrative_prompt
+                                    )
+                                    try:
+                                        narrative_resp = _future.result(timeout=45)
+                                    except FuturesTimeoutError:
+                                        raise ValueError("Narrativa timeout (45s) — se usará fallback.")
+                                    finally:
+                                        _narrative_executor.shutdown(wait=False)
                                     narrative_text = str(narrative_resp.text or "").strip()
                                     if not narrative_text and narrative_model_name != settings.NARRATIVE_STRICT_MODEL_NAME:
                                         raise ValueError("Narrativa vacía con modelo rápido.")
