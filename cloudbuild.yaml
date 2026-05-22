@@ -1,0 +1,72 @@
+# =============================================================================
+# cloudbuild.yaml — PromData Backend CI/CD Pipeline
+# =============================================================================
+# Contexto: Este monorepo contiene frontend (raíz) y backend (/backend).
+# Este archivo le indica a Cloud Build que SOLO construya y despliegue
+# el servicio Python/FastAPI ubicado en /backend.
+#
+# Referencia: https://cloud.google.com/build/docs/configuring-builds/create-basic-configuration
+# =============================================================================
+
+steps:
+  # ---------------------------------------------------------------------------
+  # Paso 1: Construir la imagen Docker desde /backend exclusivamente
+  # ---------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args:
+      - 'build'
+      - '--file=backend/Dockerfile'
+      - '--tag=gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+      - '--tag=gcr.io/$PROJECT_ID/promdata-backend:latest'
+      - 'backend'  # El contexto Docker es SOLO /backend, no la raíz
+
+  # ---------------------------------------------------------------------------
+  # Paso 2: Subir la imagen al Container Registry
+  # ---------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/promdata-backend'
+    waitFor: ['build-backend']
+
+  # ---------------------------------------------------------------------------
+  # Paso 3: Desplegar en Cloud Run
+  #
+  # Nota sobre ALLOWED_ORIGINS:
+  # El valor contiene comas (separador de múltiples dominios), por eso usamos
+  # el prefijo ^|^ para indicarle a gcloud que el separador de variables es "|"
+  # y no la coma por defecto. Esto evita que parsee mal el valor.
+  #
+  # Documentación: https://cloud.google.com/sdk/gcloud/reference/run/deploy
+  # ---------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'promdata-backend'
+      - '--image=gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+      - '--region=us-east4'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - >-
+        --update-env-vars=^|^ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat|FRONTEND_APP_URL=https://livion.lat
+    waitFor: ['push-backend']
+
+# ---------------------------------------------------------------------------
+# Imágenes publicadas al Container Registry como artefactos del build
+# ---------------------------------------------------------------------------
+images:
+  - 'gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/promdata-backend:latest'
+
+# ---------------------------------------------------------------------------
+# Opciones globales del build
+# ---------------------------------------------------------------------------
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
