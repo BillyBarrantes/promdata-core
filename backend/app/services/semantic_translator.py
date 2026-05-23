@@ -1,4 +1,5 @@
 import google.generativeai as genai
+from app.core.langfuse_client import record_llm_call
 import json
 import re
 import unicodedata
@@ -330,7 +331,16 @@ class SemanticTranslator:
                 model_name=settings.NARRATIVE_FAST_MODEL_NAME,
                 generation_config={"response_mime_type": "application/json", "temperature": 0.0},
             )
-            response = model.generate_content(f"{router_instruction}\n\nPROMPT: {prompt}")
+            _router_input = f"{router_instruction}\n\nPROMPT: {prompt}"
+            with record_llm_call(
+                "semantic_routing",
+                model_name=settings.NARRATIVE_FAST_MODEL_NAME,
+                prompt=_router_input,
+                trace_id=None,
+                trace_name="semantic_router",
+            ) as lf_span:
+                response = model.generate_content(_router_input)
+                lf_span["output"] = response.text
             parsed_decision = SemanticTranslator._parse_translator_payload(response.text.strip())
             normalized_decision = SemanticTranslator._normalize_semantic_router_decision(parsed_decision)
             set_cached_json(
@@ -2679,7 +2689,16 @@ class SemanticTranslator:
         """
         
         try:
-            response = model.generate_content(f"{system_instruction}\n\nUSUARIO: {prompt}")
+            _translator_input = f"{system_instruction}\n\nUSUARIO: {prompt}"
+            with record_llm_call(
+                "semantic_translation",
+                model_name=settings.AI_MODEL_NAME,
+                prompt=_translator_input,
+                trace_id=None,
+                trace_name="semantic_translator",
+            ) as lf_span:
+                response = model.generate_content(_translator_input)
+                lf_span["output"] = response.text
             clean_json = response.text.strip()
             print(f"🕵️ [SEMANTIC STRATEGIST] Protocolo Activado: {clean_json[:200]}...") 
             # 🎯 [FASE 3B] Multi-Plan: Aceptamos Dict o Lista, retornamos SIEMPRE lista.

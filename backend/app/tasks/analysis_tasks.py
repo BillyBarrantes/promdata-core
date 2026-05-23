@@ -77,6 +77,7 @@ import json
 import traceback
 import numpy as np
 import google.generativeai as genai
+from app.core.langfuse_client import record_llm_call, record_llm_event
 import re
 import unicodedata
 import warnings
@@ -1081,7 +1082,15 @@ def planificar_estrategia(model, prompt, data_info, adn, glossary_context, gen_c
     Responde SOLO un JSON: {{ "intencion": "...", "pasos_tacticos": [...] }}
     """
     try:
-        response = model.generate_content(planning_prompt, generation_config=gen_config)
+        with record_llm_call(
+            "planning",
+            model_name=str(getattr(model, "model_name", settings.AI_MODEL_NAME)),
+            prompt=planning_prompt,
+            trace_id=None,
+            trace_name="planificar_estrategia",
+        ) as lf_span:
+            response = model.generate_content(planning_prompt, generation_config=gen_config)
+            lf_span["output"] = response.text
         text = response.text.replace('```json', '').replace('```', '').strip()
         start, end = text.find('{'), text.rfind('}') + 1
         plan_json = json.loads(text[start:end]) 
@@ -1266,7 +1275,17 @@ def generar_analisis(dfs: dict, prompt: str, audit_log: list, user_token: str, s
                 current_prompt += f"\n\nATENCIÓN: El intento anterior falló con este error: {error_msg}. CORRIGE EL CÓDIGO."
 
             # Generación
-            resp_code = model.generate_content(current_prompt, generation_config=config_code)
+            resp_code = None
+            with record_llm_call(
+                "code_generation",
+                model_name=model_name,
+                prompt=current_prompt,
+                trace_id=None,
+                trace_name="generar_analisis",
+                metadata={"attempt": attempt + 1},
+            ) as lf_span:
+                resp_code = model.generate_content(current_prompt, generation_config=config_code)
+                lf_span["output"] = resp_code.text
             text_response = resp_code.text
             match = re.search(r'```python(.*?)```', text_response, re.DOTALL)
             code = match.group(1).strip() if match else text_response.replace('```python','').replace('```','').strip()
@@ -1412,7 +1431,15 @@ def generar_analisis(dfs: dict, prompt: str, audit_log: list, user_token: str, s
     """
     
     try:
-        final = model.generate_content(syn_prompt, generation_config=config_json)
+        with record_llm_call(
+            "synthesis",
+            model_name=model_name,
+            prompt=syn_prompt,
+            trace_id=None,
+            trace_name="generar_analisis",
+        ) as lf_span:
+            final = model.generate_content(syn_prompt, generation_config=config_json)
+            lf_span["output"] = final.text
         text = final.text[final.text.find('['):final.text.rfind(']')+1]
         final_json = json.loads(text)
         
@@ -2801,6 +2828,16 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                                     finally:
                                         _narrative_executor.shutdown(wait=False)
                                     narrative_text = str(narrative_resp.text or "").strip()
+                                    # [LANGFUSE] fire-and-forget post-thread (no podemos usar context manager cross-thread)
+                                    record_llm_event(
+                                        "narrative_parallel",
+                                        model_name=narrative_model_name,
+                                        prompt=narrative_prompt,
+                                        output=narrative_text,
+                                        trace_id=task_id,
+                                        trace_name="perform_analysis_task",
+                                        metadata={"intent_type": intent_type, "plan_title": plan.title},
+                                    )
                                     if not narrative_text and narrative_model_name != settings.NARRATIVE_STRICT_MODEL_NAME:
                                         raise ValueError("Narrativa vacía con modelo rápido.")
                                 except Exception as primary_narrative_error:
@@ -2821,6 +2858,16 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                                     narrative_model = genai.GenerativeModel(settings.NARRATIVE_STRICT_MODEL_NAME)
                                     narrative_resp = narrative_model.generate_content(narrative_prompt)
                                     narrative_text = str(narrative_resp.text or "").strip()
+                                    # [LANGFUSE] Registrar el fallback al modelo estricto
+                                    record_llm_event(
+                                        "narrative_fallback",
+                                        model_name=settings.NARRATIVE_STRICT_MODEL_NAME,
+                                        prompt=narrative_prompt,
+                                        output=narrative_text,
+                                        trace_id=task_id,
+                                        trace_name="perform_analysis_task",
+                                        metadata={"intent_type": intent_type, "plan_title": plan.title, "fallback": True},
+                                    )
 
                                 if mandated_action:
                                     narrative_text = _force_markdown_action_block(narrative_text, mandated_action)

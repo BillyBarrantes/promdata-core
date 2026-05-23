@@ -6,6 +6,8 @@ from typing import Any
 
 import google.generativeai as genai
 
+from app.core.langfuse_client import record_llm_call
+
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 
@@ -195,7 +197,16 @@ def generate_dashboard_executive_summary(
                 "temperature": 0.1,
             },
         )
-        response = model.generate_content(prompt)
+        with record_llm_call(
+            "dashboard_executive_summary",
+            model_name=settings.AI_MODEL_NAME,
+            prompt=prompt,
+            trace_id=None,
+            trace_name="dashboard_narrative",
+            metadata={"presentation_name": normalized_presentation_name},
+        ) as lf_span:
+            response = model.generate_content(prompt)
+            lf_span["output"] = response.text
         payload = json.loads(response.text)
     except Exception as exc:
         emit_structured_log(
