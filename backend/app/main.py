@@ -7,9 +7,16 @@ from redis import Redis
 
 from app.api.routes import router as api_router
 from app.core.config import settings
+from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
 from app.services.canonical_canary_health import build_canonical_tabular_canary_health
 from app.services.runtime_governance import get_runtime_governance_payload
+
+# ---------------------------------------------------------------------------
+# Sentry: inicializar ANTES que cualquier middleware o router.
+# Si SENTRY_DSN no está configurado, es un no-op silencioso.
+# ---------------------------------------------------------------------------
+init_sentry()
 
 app = FastAPI(title="PromData API")
 

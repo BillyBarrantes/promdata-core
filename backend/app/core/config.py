@@ -262,6 +262,7 @@ class Settings:
         "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED",
         False,
     )
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
     NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
     NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3.1-pro")
 
