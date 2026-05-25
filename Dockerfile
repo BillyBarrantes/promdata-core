@@ -13,8 +13,8 @@ RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 FROM base AS builder
 
-ARG NEXT_PUBLIC_SUPABASE_URL=""
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=""
+ARG NEXT_PUBLIC_SUPABASE_URL="https://dummy.supabase.co"
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY="llave-de-mentira"
 ARG NEXT_PUBLIC_API_BASE_URL="http://api:8000"
 ARG NEXT_PUBLIC_DEBUG_MIDDLEWARE="0"
 
