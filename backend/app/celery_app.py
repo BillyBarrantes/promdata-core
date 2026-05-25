@@ -11,6 +11,15 @@ celery_app = Celery(
 
 celery_app.conf.update(
     task_track_started=True,
+    # [REDIS CLOUD TLS] Configuración SSL requerida para conexiones externas
+    # desde Google Cloud Run hacia Redis Cloud (db.redis.io).
+    # ssl_cert_reqs=None evita errores de verificación de certificado.
+    broker_use_ssl={
+        "ssl_cert_reqs": None,
+    } if (settings.CELERY_BROKER_URL or "").startswith("rediss://") else None,
+    redis_backend_use_ssl={
+        "ssl_cert_reqs": None,
+    } if (settings.CELERY_RESULT_BACKEND or "").startswith("rediss://") else None,
 )
 
 # --- LA SOLUCIÓN DEFINITIVA ---
