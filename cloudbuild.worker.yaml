@@ -9,8 +9,8 @@ steps:
       - promdata-worker
       - --project=promdata-enterprise
       - --region=us-east4
-      - --source=.
-      - --scaling=1
+      - --source=backend
+      - --instances=1
       - --memory=2Gi
       - --command=celery
       - --args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=4,-Ofair,--prefetch-multiplier=1
