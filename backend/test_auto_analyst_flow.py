@@ -30,7 +30,7 @@ def test_waterfall_flow():
     }
     
     # 3. Patch GenerativeModel to avoid API calls and force intent
-    with patch('google.generativeai.GenerativeModel') as MockModel:
+    with patch('app.services.auto_analyst.genai.GenerativeModel') as MockModel:
         mock_instance = MockModel.return_value
         mock_instance.generate_content.return_value.text = json.dumps(mock_response_json)
         
@@ -70,7 +70,7 @@ def test_heatmap_flow():
         "entity_name": "Hour"
     }
     
-    with patch('google.generativeai.GenerativeModel') as MockModel:
+    with patch('app.services.auto_analyst.genai.GenerativeModel') as MockModel:
         mock_instance = MockModel.return_value
         mock_instance.generate_content.return_value.text = json.dumps(mock_response_json)
         

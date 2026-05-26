@@ -58,6 +58,7 @@ def test_platform_examples_expose_required_surface_area() -> None:
         "SUPABASE_ANON_KEY",
         "SUPABASE_JWT_SECRET",
         "GEMINI_API_KEY",
+        "GEMINI_CLIENT_PROVIDER",
         "CELERY_BROKER_URL",
         "CELERY_RESULT_BACKEND",
         "BACKEND_PUBLIC_URL",

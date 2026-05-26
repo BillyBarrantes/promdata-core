@@ -121,11 +121,13 @@ def get_runtime_governance_payload() -> dict[str, Any]:
         )
 
     gemini_ready = bool(str(settings.GEMINI_API_KEY or "").strip())
+    gemini_provider = str(getattr(settings, "GEMINI_CLIENT_PROVIDER", "genai") or "genai").strip().lower()
     checks["gemini"] = _build_check(
         "healthy" if gemini_ready else "critical",
         "Modelo generativo configurado." if gemini_ready else "Falta GEMINI_API_KEY.",
         configured=gemini_ready,
         model_name=str(settings.AI_MODEL_NAME or "").strip(),
+        provider=gemini_provider,
     )
     if not gemini_ready:
         criticals.append("gemini_missing_api_key")

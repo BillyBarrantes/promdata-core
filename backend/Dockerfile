@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 # Copiar todo el código de la aplicación
 COPY ./app /code/app
 
-# El comando por defecto para correr la API (esto puede ser sobreescrito en docker-compose)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Arrancar la API leyendo el puerto del entorno (Cloud Run inyecta 8080, local usa 8000)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

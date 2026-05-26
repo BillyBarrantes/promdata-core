@@ -1,7 +1,7 @@
 from app.services.semantic_translator import SemanticTranslator
 from app.core.config import settings
 import json
-import google.generativeai as genai
+from app.core.gemini_client import genai
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 

@@ -4,12 +4,13 @@ import json
 import re
 from typing import Any
 
-import google.generativeai as genai
+from app.core.gemini_client import genai
 
 from app.core.langfuse_client import record_llm_call
 
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
+from app.services.ai_response_cache import build_cache_key, get_cached_json, set_cached_json
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
@@ -119,6 +120,45 @@ def _fallback_summary(
     }
 
 
+def _select_summary_models() -> tuple[str, str | None]:
+    primary_model = (
+        _normalize_text(settings.NARRATIVE_FAST_MODEL_NAME)
+        or _normalize_text(settings.AI_MODEL_NAME)
+        or "gemini-3.5-flash"
+    )
+    strict_model = _normalize_text(settings.NARRATIVE_STRICT_MODEL_NAME)
+    fallback_model = strict_model if strict_model and strict_model != primary_model else None
+    return primary_model, fallback_model
+
+
+def _build_summary_result(
+    *,
+    payload: dict[str, Any],
+    presentation_name: str,
+    widget_count: int,
+    mixed_sources: bool,
+    filter_scope: list[str],
+) -> dict[str, Any]:
+    result = {
+        "headline": _normalize_text(payload.get("headline")) or f"Resumen ejecutivo de {presentation_name}",
+        "overview": _normalize_text(payload.get("overview")) or f"El dashboard {presentation_name} contiene {widget_count} widgets ejecutivos.",
+        "key_findings": _normalize_string_list(payload.get("key_findings"), limit=3),
+        "risks": _normalize_string_list(payload.get("risks"), limit=2),
+        "actions": _normalize_string_list(payload.get("actions"), limit=3),
+        "caveats": _normalize_string_list(payload.get("caveats"), limit=2),
+        "widget_count": widget_count,
+        "mixed_sources": mixed_sources,
+        "filter_scope": filter_scope,
+    }
+
+    if mixed_sources and not any("archivo" in caveat.lower() for caveat in result["caveats"]):
+        result["caveats"].append("El lienzo combina widgets de múltiples archivos; interpreta comparaciones con ese alcance.")
+
+    if filter_scope and not result["overview"]:
+        result["overview"] = f"El análisis está acotado por {', '.join(filter_scope)}."
+    return result
+
+
 def generate_dashboard_executive_summary(
     *,
     presentation_name: str,
@@ -154,6 +194,32 @@ def generate_dashboard_executive_summary(
     }
     mixed_sources = len(unique_file_ids) > 1
     widgets_context = _build_widgets_context(normalized_widgets)
+    cache_key = build_cache_key(
+        "dashboard_executive_summary",
+        {
+            "presentation_name": normalized_presentation_name,
+            "filter_scope": filter_scope,
+            "mixed_sources": mixed_sources,
+            "widgets_context": widgets_context,
+            "widget_count": len(normalized_widgets),
+        },
+    )
+    cached_summary = get_cached_json("dashboard_executive_summary", cache_key)
+    if isinstance(cached_summary, dict) and _normalize_text(cached_summary.get("headline")):
+        emit_structured_log(
+            "dashboard_executive_summary_cache_hit",
+            presentation_name=normalized_presentation_name,
+            widget_count=len(normalized_widgets),
+            filter_count=len(filter_scope),
+            mixed_sources=mixed_sources,
+        )
+        return _build_summary_result(
+            payload=cached_summary,
+            presentation_name=normalized_presentation_name,
+            widget_count=len(normalized_widgets),
+            mixed_sources=mixed_sources,
+            filter_scope=filter_scope,
+        )
 
     prompt = f"""
     ACTUA COMO DIRECTOR DE ANALISIS EJECUTIVO DE PROMDATA.
@@ -189,32 +255,56 @@ def generate_dashboard_executive_summary(
     - Maximos: 3 hallazgos, 2 riesgos, 3 acciones, 2 caveats.
     """
 
-    try:
-        model = genai.GenerativeModel(
-            model_name=settings.AI_MODEL_NAME,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.1,
-            },
-        )
-        with record_llm_call(
-            "dashboard_executive_summary",
-            model_name=settings.AI_MODEL_NAME,
-            prompt=prompt,
-            trace_id=None,
-            trace_name="dashboard_narrative",
-            metadata={"presentation_name": normalized_presentation_name},
-        ) as lf_span:
-            response = model.generate_content(prompt)
-            lf_span["output"] = response.text
-        payload = json.loads(response.text)
-    except Exception as exc:
+    payload: dict[str, Any] | None = None
+    primary_model, fallback_model = _select_summary_models()
+    model_candidates = [primary_model] + ([fallback_model] if fallback_model else [])
+    generation_error: Exception | None = None
+
+    for model_name in model_candidates:
+        try:
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "temperature": 0.1,
+                },
+            )
+            with record_llm_call(
+                "dashboard_executive_summary",
+                model_name=model_name,
+                prompt=prompt,
+                trace_id=None,
+                trace_name="dashboard_narrative",
+                metadata={"presentation_name": normalized_presentation_name},
+            ) as lf_span:
+                response = model.generate_content(prompt)
+                lf_span["output"] = response.text
+            payload = json.loads(response.text)
+            emit_structured_log(
+                "dashboard_executive_summary_model_used",
+                presentation_name=normalized_presentation_name,
+                model_name=model_name,
+                is_fallback=model_name != primary_model,
+            )
+            break
+        except Exception as exc:
+            generation_error = exc
+            emit_structured_log(
+                "dashboard_executive_summary_model_error",
+                level="warning",
+                presentation_name=normalized_presentation_name,
+                model_name=model_name,
+                is_fallback=model_name != primary_model,
+                error=str(exc)[:240],
+            )
+
+    if not isinstance(payload, dict):
         emit_structured_log(
             "dashboard_executive_summary_generation_error",
             level="warning",
             presentation_name=normalized_presentation_name,
             widget_count=len(normalized_widgets),
-            error=str(exc)[:240],
+            error=str(generation_error)[:240] if generation_error else "unknown",
         )
         return _fallback_summary(
             presentation_name=normalized_presentation_name,
@@ -222,23 +312,19 @@ def generate_dashboard_executive_summary(
             widgets=normalized_widgets,
         )
 
-    result = {
-        "headline": _normalize_text(payload.get("headline")) or f"Resumen ejecutivo de {normalized_presentation_name}",
-        "overview": _normalize_text(payload.get("overview")) or f"El dashboard {normalized_presentation_name} contiene {len(normalized_widgets)} widgets ejecutivos.",
-        "key_findings": _normalize_string_list(payload.get("key_findings"), limit=3),
-        "risks": _normalize_string_list(payload.get("risks"), limit=2),
-        "actions": _normalize_string_list(payload.get("actions"), limit=3),
-        "caveats": _normalize_string_list(payload.get("caveats"), limit=2),
-        "widget_count": len(normalized_widgets),
-        "mixed_sources": mixed_sources,
-        "filter_scope": filter_scope,
-    }
-
-    if mixed_sources and not any("archivo" in caveat.lower() for caveat in result["caveats"]):
-        result["caveats"].append("El lienzo combina widgets de múltiples archivos; interpreta comparaciones con ese alcance.")
-
-    if filter_scope and not result["overview"]:
-        result["overview"] = f"El análisis está acotado por {', '.join(filter_scope)}."
+    result = _build_summary_result(
+        payload=payload,
+        presentation_name=normalized_presentation_name,
+        widget_count=len(normalized_widgets),
+        mixed_sources=mixed_sources,
+        filter_scope=filter_scope,
+    )
+    set_cached_json(
+        "dashboard_executive_summary",
+        cache_key,
+        result,
+        settings.NARRATIVE_CACHE_TTL_SECONDS,
+    )
 
     emit_structured_log(
         "dashboard_executive_summary_generated",

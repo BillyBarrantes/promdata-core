@@ -37,7 +37,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    command: celery -A app.celery_app worker --loglevel=info
+    command: celery -A app.celery_app worker --loglevel=info --pool=prefork --concurrency=4 -Ofair --prefetch-multiplier=1
     mem_limit: 3072m
     mem_reservation: 1024m
     healthcheck:

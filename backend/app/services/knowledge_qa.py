@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-import google.generativeai as genai
+from app.core.gemini_client import genai
 
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log

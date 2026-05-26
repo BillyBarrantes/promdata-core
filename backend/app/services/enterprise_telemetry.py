@@ -121,15 +121,15 @@ def _normalize_dimensions(dimensions: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _persist_enterprise_metric_event(
+def _build_enterprise_metric_payload(
     *,
     metric_domain: str,
     metric_name: str,
     metric_value: int | float,
     metric_unit: str,
     dimensions: dict[str, Any],
-) -> None:
-    payload = {
+) -> dict[str, Any]:
+    return {
         "telemetry_version": TELEMETRY_VERSION,
         "event_source": TELEMETRY_EVENT_SOURCE,
         "metric_domain": _normalize_text(metric_domain) or "unknown",
@@ -141,6 +141,23 @@ def _persist_enterprise_metric_event(
         "dimensions": dimensions,
     }
 
+
+def _persist_enterprise_metric_event(
+    *,
+    metric_domain: str,
+    metric_name: str,
+    metric_value: int | float,
+    metric_unit: str,
+    dimensions: dict[str, Any],
+) -> None:
+    payload = _build_enterprise_metric_payload(
+        metric_domain=metric_domain,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        metric_unit=metric_unit,
+        dimensions=dimensions,
+    )
+
     try:
         get_supabase_service_client().table(TELEMETRY_TABLE).insert(payload).execute()
     except Exception as exc:
@@ -151,6 +168,32 @@ def _persist_enterprise_metric_event(
             metric_name=payload["metric_name"],
             error=str(exc)[:240],
         )
+
+
+def _persist_enterprise_metric_events_batch(payloads: list[dict[str, Any]]) -> None:
+    if not payloads:
+        return
+    try:
+        get_supabase_service_client().table(TELEMETRY_TABLE).insert(payloads).execute()
+        return
+    except Exception as exc:
+        emit_structured_log(
+            "enterprise_metric_batch_persist_error",
+            level="warning",
+            batch_size=len(payloads),
+            error=str(exc)[:240],
+        )
+    for payload in payloads:
+        try:
+            get_supabase_service_client().table(TELEMETRY_TABLE).insert(payload).execute()
+        except Exception as fallback_exc:
+            emit_structured_log(
+                "enterprise_metric_persist_error",
+                level="warning",
+                metric_domain=_normalize_text(payload.get("metric_domain")) or "unknown",
+                metric_name=_normalize_text(payload.get("metric_name")) or "unknown",
+                error=str(fallback_exc)[:240],
+            )
 
 
 def _round_ratio(value: float | None, digits: int = 4) -> float | None:
@@ -238,6 +281,25 @@ def _top_count_items(counts: dict[str, int], *, limit: int = 5) -> list[dict[str
     return [
         {"key": key, "count": count}
         for key, count in ordered[:limit]
+    ]
+
+
+def _top_average_items(
+    averages: dict[str, float],
+    *,
+    limit: int = 5,
+) -> list[dict[str, float | str]]:
+    ordered = sorted(
+        (
+            (key, value)
+            for key, value in averages.items()
+            if value is not None
+        ),
+        key=lambda item: (-float(item[1]), item[0]),
+    )
+    return [
+        {"key": key, "avg_ms": float(value)}
+        for key, value in ordered[:limit]
     ]
 
 
@@ -798,6 +860,41 @@ def emit_enterprise_metric(
     )
 
 
+def emit_enterprise_metrics_batch(
+    *,
+    metric_events: list[dict[str, Any]],
+) -> None:
+    payloads: list[dict[str, Any]] = []
+    for event in metric_events:
+        metric_domain = _normalize_text(event.get("metric_domain")) or "unknown"
+        metric_name = _normalize_text(event.get("metric_name")) or "unknown"
+        metric_value = _coerce_metric_float(event.get("metric_value"))
+        metric_unit = _normalize_text(event.get("metric_unit")) or "count"
+        dimensions = _normalize_dimensions(_safe_dict(event.get("dimensions")))
+
+        emit_structured_log(
+            "enterprise_metric_observed",
+            telemetry_version=TELEMETRY_VERSION,
+            metric_domain=metric_domain,
+            metric_name=metric_name,
+            metric_value=metric_value,
+            metric_unit=metric_unit,
+            **dimensions,
+        )
+
+        payloads.append(
+            _build_enterprise_metric_payload(
+                metric_domain=metric_domain,
+                metric_name=metric_name,
+                metric_value=metric_value,
+                metric_unit=metric_unit,
+                dimensions=dimensions,
+            )
+        )
+
+    _persist_enterprise_metric_events_batch(payloads)
+
+
 def track_analysis_requested(
     *,
     task_id: str,
@@ -906,6 +1003,64 @@ def track_analysis_completed(
             user_id=user_id,
             dataset_mode=summary["dataset_mode"],
         )
+
+
+def track_analysis_stage_latency(
+    *,
+    task_id: str,
+    file_id: str,
+    user_id: str | None,
+    stage_name: str,
+    duration_ms: int,
+    status: str | None = None,
+    runtime: str | None = None,
+    prompt_type: str | None = None,
+) -> None:
+    emit_enterprise_metric(
+        metric_domain="latency",
+        metric_name="analysis_stage_duration_ms",
+        metric_value=max(int(duration_ms), 0),
+        metric_unit="ms",
+        task_id=task_id,
+        file_id=file_id,
+        user_id=user_id,
+        stage_name=_normalize_text(stage_name) or "unknown",
+        status=_normalize_text(status) or None,
+        runtime=_normalize_text(runtime) or None,
+        prompt_type=_normalize_text(prompt_type) or None,
+    )
+
+
+def track_analysis_stage_latency_batch(
+    *,
+    task_id: str,
+    file_id: str,
+    user_id: str | None,
+    runtime: str | None,
+    prompt_type: str | None,
+    stage_metrics: list[dict[str, Any]],
+) -> None:
+    metric_events: list[dict[str, Any]] = []
+    for row in stage_metrics:
+        stage_name = _normalize_text(row.get("stage_name")) or "unknown"
+        metric_events.append(
+            {
+                "metric_domain": "latency",
+                "metric_name": "analysis_stage_duration_ms",
+                "metric_value": max(_coerce_int(row.get("duration_ms")), 0),
+                "metric_unit": "ms",
+                "dimensions": {
+                    "task_id": task_id,
+                    "file_id": file_id,
+                    "user_id": user_id,
+                    "stage_name": stage_name,
+                    "status": _normalize_text(row.get("status")) or None,
+                    "runtime": _normalize_text(runtime) or None,
+                    "prompt_type": _normalize_text(prompt_type) or None,
+                },
+            }
+        )
+    emit_enterprise_metrics_batch(metric_events=metric_events)
 
 
 def track_shadow_runtime_observed(
@@ -1421,6 +1576,16 @@ def summarize_enterprise_telemetry_events(
         for row in cloud_sync_completed
         if _normalize_text(_safe_dict(row.get("dimensions")).get("status")) == "succeeded"
     )
+    stage_latency_by_stage = _average_metric_value_by_dimension(
+        metric_rows,
+        "analysis_stage_duration_ms",
+        dimension_key="stage_name",
+    )
+    stage_latency_by_runtime = _average_metric_value_by_dimension(
+        metric_rows,
+        "analysis_stage_duration_ms",
+        dimension_key="runtime",
+    )
 
     return {
         "telemetry_ready": telemetry_ready,
@@ -1479,6 +1644,10 @@ def summarize_enterprise_telemetry_events(
         "latency": {
             "avg_analysis_duration_ms": _average_metric_value(metric_rows, "analysis_duration_ms"),
             "avg_cloud_sync_duration_ms": _average_metric_value(metric_rows, "cloud_sync_duration_ms"),
+            "avg_analysis_queue_wait_ms": stage_latency_by_stage.get("queue_wait"),
+            "avg_analysis_stage_duration_ms_by_stage": stage_latency_by_stage,
+            "avg_analysis_stage_duration_ms_by_runtime": stage_latency_by_runtime,
+            "slowest_analysis_stages": _top_average_items(stage_latency_by_stage, limit=5),
         },
         "shadow_runtime": summarize_shadow_runtime_telemetry(metric_rows=metric_rows),
         "canary_routing": summarize_canary_route_telemetry(metric_rows=metric_rows),

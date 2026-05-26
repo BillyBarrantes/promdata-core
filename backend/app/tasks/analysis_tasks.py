@@ -30,6 +30,7 @@ from app.services.visual_recommendation_engine import (
 from app.services.metric_semantics import align_plan_metrics_with_prompt
 from app.services.enterprise_telemetry import (
     track_analysis_completed,
+    track_analysis_stage_latency_batch,
     track_canary_runtime_execution_fallback,
     track_canary_runtime_execution_observed,
     track_canary_runtime_route_fallback,
@@ -76,13 +77,13 @@ import io
 import json
 import traceback
 import numpy as np
-import google.generativeai as genai
+from app.core.gemini_client import genai
 from app.core.langfuse_client import record_llm_call, record_llm_event
 import re
 import unicodedata
 import warnings
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from datetime import datetime
+from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
 
@@ -96,6 +97,34 @@ except ImportError:
 
 # Suprimir advertencias
 warnings.filterwarnings("ignore")
+
+
+def _parse_utc_datetime(raw_value: Any) -> datetime | None:
+    if not raw_value:
+        return None
+    if isinstance(raw_value, datetime):
+        dt = raw_value
+    else:
+        candidate = str(raw_value).strip()
+        if not candidate:
+            return None
+        if candidate.endswith("Z"):
+            candidate = f"{candidate[:-1]}+00:00"
+        try:
+            dt = datetime.fromisoformat(candidate)
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _compute_queue_wait_ms(task_created_at: Any) -> int | None:
+    created_at_utc = _parse_utc_datetime(task_created_at)
+    if created_at_utc is None:
+        return None
+    now_utc = datetime.now(timezone.utc)
+    return max(int((now_utc - created_at_utc).total_seconds() * 1000), 0)
 
 def clean_business_terms(text_data: str) -> str:
     """
@@ -3205,23 +3234,38 @@ def observe_canonical_shadow_runtime_task(task_id, file_id, prompt, live_summary
 
 
 def _save_analysis_task_result_with_payload_shedding(sb, task_id: str, runtime_result) -> None:
+    def _strip_heavy_payload_fields(final_struct: dict[str, Any]) -> list[str]:
+        stripped: list[str] = []
+        for key in ("snapshot_arrow", "arrow_data"):
+            if key in final_struct:
+                del final_struct[key]
+                stripped.append(key)
+        for chart_opt in final_struct.get("chart_options", []):
+            if isinstance(chart_opt, dict) and "granular_arrow" in chart_opt:
+                del chart_opt["granular_arrow"]
+                stripped.append("granular_arrow")
+        return stripped
+
     json_output = json.dumps(runtime_result.final_struct, cls=CustomEncoder)
+    soft_limit_bytes = max(int(getattr(settings, "UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", 0) or 0), 0)
+    if soft_limit_bytes and len(json_output) > soft_limit_bytes:
+        stripped = _strip_heavy_payload_fields(runtime_result.final_struct)
+        if stripped:
+            json_output = json.dumps(runtime_result.final_struct, cls=CustomEncoder)
+            emit_structured_log(
+                "analysis_result_payload_soft_shedding_applied",
+                task_id=task_id,
+                soft_limit_bytes=soft_limit_bytes,
+                stripped_fields=sorted(set(stripped)),
+                resulting_bytes=len(json_output),
+            )
     try:
         sb.table('analysis_tasks').update(
             {'status': runtime_result.status, 'results_json': json_output}
         ).eq('id', task_id).execute()
         return
     except Exception as save_error:
-        _heavy_keys = ("snapshot_arrow", "arrow_data")
-        _stripped = []
-        for key in _heavy_keys:
-            if key in runtime_result.final_struct:
-                del runtime_result.final_struct[key]
-                _stripped.append(key)
-        for chart_opt in runtime_result.final_struct.get("chart_options", []):
-            if isinstance(chart_opt, dict) and "granular_arrow" in chart_opt:
-                del chart_opt["granular_arrow"]
-                _stripped.append("granular_arrow")
+        _stripped = _strip_heavy_payload_fields(runtime_result.final_struct)
         if not _stripped:
             raise
         print(
@@ -3318,8 +3362,74 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
     prompt_visual_requests = extract_prompt_visual_requests(prompt)
     requested_visual_family = normalize_visual_id(prompt_visual_requests[0]) if prompt_visual_requests else None
     production_executor_enabled = bool(settings.UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED)
+    runtime_label = "universal_tabular_production" if production_executor_enabled else "universal_tabular"
+    user_id_for_metrics = ""
+    stage_latency_buffer: list[dict[str, Any]] = []
+
+    def _record_stage_latency(
+        stage_name: str,
+        *,
+        started_at: float | None = None,
+        duration_ms: int | None = None,
+        status: str = "processing",
+    ) -> None:
+        measured_duration = duration_ms if duration_ms is not None else int((perf_counter() - float(started_at)) * 1000)
+        stage_latency_buffer.append(
+            {
+                "stage_name": stage_name,
+                "duration_ms": max(int(measured_duration), 0),
+                "status": status,
+            }
+        )
+
+    def _flush_stage_latency_buffer() -> None:
+        if not stage_latency_buffer:
+            return
+        try:
+            track_analysis_stage_latency_batch(
+                task_id=task_id,
+                file_id=file_id,
+                user_id=user_id_for_metrics or None,
+                runtime=runtime_label,
+                prompt_type=prompt_type,
+                stage_metrics=list(stage_latency_buffer),
+            )
+        except Exception as stage_metric_error:
+            emit_structured_log(
+                "analysis_stage_latency_batch_track_error",
+                level="warning",
+                task_id=task_id,
+                file_id=file_id,
+                stage_count=len(stage_latency_buffer),
+                error=str(stage_metric_error)[:240],
+            )
+        finally:
+            stage_latency_buffer.clear()
     try:
+        task_metadata_started_at = perf_counter()
+        task_metadata_row = (
+            sb.table("analysis_tasks")
+            .select("created_at, user_id")
+            .eq("id", task_id)
+            .single()
+            .execute()
+        )
+        task_metadata = dict(task_metadata_row.data or {})
+        user_id_for_metrics = str(task_metadata.get("user_id") or "")
+        queue_wait_ms = _compute_queue_wait_ms(task_metadata.get("created_at"))
+        if queue_wait_ms is not None:
+            _record_stage_latency(
+                "queue_wait",
+                duration_ms=queue_wait_ms,
+                status="processing",
+            )
+        _record_stage_latency("task_metadata_lookup", started_at=task_metadata_started_at)
+
+        mark_processing_started_at = perf_counter()
         sb.table('analysis_tasks').update({'status': 'processing'}).eq('id', task_id).execute()
+        _record_stage_latency("mark_processing_status", started_at=mark_processing_started_at)
+
+        uploaded_file_lookup_started_at = perf_counter()
         uploaded_file_row = (
             sb.table("uploaded_files")
             .select("id, user_id, team_id, file_name, storage_path, created_at")
@@ -3328,6 +3438,11 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
             .execute()
         )
         uploaded_row_data = dict(uploaded_file_row.data or {})
+        if not user_id_for_metrics:
+            user_id_for_metrics = str(uploaded_row_data.get("user_id") or "")
+        _record_stage_latency("uploaded_file_lookup", started_at=uploaded_file_lookup_started_at)
+
+        analysis_execution_started_at = perf_counter()
         if production_executor_enabled:
             canary_result = execute_canonical_tabular_production_analysis(
                 file_id=file_id,
@@ -3354,16 +3469,25 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
                 requested_visual_family=requested_visual_family,
                 max_plans=max(int(settings.CANONICAL_SHADOW_TRAFFIC_MIRROR_MAX_PLANS or 3), 1),
             )
+        _record_stage_latency("analysis_execution", started_at=analysis_execution_started_at)
 
         # --- Payload-shedding save: si el JSON es demasiado grande para PostgREST,
         # stripeamos los blobs binarios pesados y reintentamos. Los charts se renderizan
         # con data agregada; el snapshot es un nice-to-have para cross-filter.
+        persist_result_started_at = perf_counter()
         _save_analysis_task_result_with_payload_shedding(sb, task_id, canary_result)
+        _record_stage_latency(
+            "persist_analysis_result",
+            started_at=persist_result_started_at,
+            status=canary_result.status,
+        )
+
+        telemetry_started_at = perf_counter()
         try:
             track_analysis_completed(
                 task_id=task_id,
                 file_id=file_id,
-                user_id=str((uploaded_file_row.data or {}).get("user_id") or ""),
+                user_id=user_id_for_metrics,
                 status=canary_result.status,
                 duration_ms=int((perf_counter() - task_started_at) * 1000),
                 final_struct=canary_result.final_struct,
@@ -3411,19 +3535,32 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
                 chart_count=len(list(canary_result.final_struct.get("chart_options") or [])),
                 duration_ms=int((perf_counter() - task_started_at) * 1000),
             )
+        _record_stage_latency(
+            "emit_telemetry",
+            started_at=telemetry_started_at,
+            status=canary_result.status,
+        )
+        _record_stage_latency(
+            "worker_task_total",
+            started_at=task_started_at,
+            status=canary_result.status,
+        )
+        _flush_stage_latency_buffer()
         emit_structured_log(
             "canonical_tabular_production_task_completed"
             if production_executor_enabled
             else "canonical_tabular_canary_task_completed",
             task_id=task_id,
             file_id=file_id,
-            runtime="universal_tabular_production" if production_executor_enabled else "universal_tabular",
+            runtime=runtime_label,
             chart_count=len(list(canary_result.final_struct.get("chart_options") or [])),
             candidate_id=canary_result.execution.metadata.get("candidate_id"),
             prompt_strategy=canary_result.execution.prompt_strategy,
         )
         return canary_result.status
     except Exception as canary_error:
+        _record_stage_latency("worker_task_failed", started_at=task_started_at, status="failed")
+        _flush_stage_latency_buffer()
         try:
             uploaded_row_data = dict((uploaded_file_row.data or {})) if 'uploaded_file_row' in locals() else {}
             track_canary_runtime_execution_fallback(

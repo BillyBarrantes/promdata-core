@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from app.core.gemini_client import genai
 from app.core.langfuse_client import record_llm_call
 import json
 import re

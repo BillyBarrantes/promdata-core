@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from app.core.gemini_client import genai
 import json
 import warnings
 import pandas as pd
