@@ -1,18 +1,42 @@
 steps:
-  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-worker-image'
+    args:
+      - 'build'
+      - '--file=backend/Dockerfile'
+      - '--tag=gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+      - '--tag=gcr.io/$PROJECT_ID/promdata-backend:latest'
+      - 'backend'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-worker-image'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/promdata-backend'
+    waitFor: ['build-worker-image']
+
+  - name: 'gcr.io/google.com/cloudsdktool/google-cloud-cli:stable'
+    id: 'deploy-worker-pool'
     entrypoint: gcloud
     args:
-      - beta
-      - run
-      - worker-pools
-      - deploy
-      - promdata-worker
-      - --project=promdata-enterprise
-      - --region=us-east4
-      - --source=backend
-      - --instances=1
-      - --memory=2Gi
-      - --command=celery
-      - --args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=4,-Ofair,--prefetch-multiplier=1
+      - 'beta'
+      - 'run'
+      - 'worker-pools'
+      - 'deploy'
+      - 'promdata-worker'
+      - '--project=promdata-enterprise'
+      - '--region=us-east4'
+      - '--image=gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+      - '--instances=1'
+      - '--memory=2Gi'
+      - '--command=celery'
+      - '--args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=4,-Ofair,--prefetch-multiplier=1'
+    waitFor: ['push-worker-image']
+
+images:
+  - 'gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/promdata-backend:latest'
+
 options:
   logging: CLOUD_LOGGING_ONLY
