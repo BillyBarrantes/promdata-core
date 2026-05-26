@@ -1,9 +1,10 @@
 import os
 
-from fastapi import FastAPI, HTTPException, Request as FastAPIRequest
+from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis import Redis
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router as api_router
 from app.core.config import settings
@@ -29,10 +30,17 @@ app = FastAPI(title="PromData API")
 #   ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat
 #   FRONTEND_APP_URL=https://livion.lat
 # ---------------------------------------------------------------------------
-_raw_allowed = os.getenv("ALLOWED_ORIGINS", "")
-_extra_origins = [o.strip() for o in _raw_allowed.split(",") if o.strip()]
+def _normalize_origin(raw: str) -> str:
+    value = str(raw or "").strip().strip("'").strip('"')
+    if value.endswith("/"):
+        value = value[:-1]
+    return value
 
-_frontend_url = (settings.FRONTEND_APP_URL or "").strip()
+
+_raw_allowed = os.getenv("ALLOWED_ORIGINS", "")
+_extra_origins = [_normalize_origin(o) for o in _raw_allowed.split(",") if _normalize_origin(o)]
+
+_frontend_url = _normalize_origin(settings.FRONTEND_APP_URL or "")
 
 _origins_set = {"http://localhost:3000"}
 if _frontend_url:
@@ -75,8 +83,8 @@ app.add_middleware(
 # IMPORTANTE: Registrar ANTES de include_router para que no interfiera
 # con las respuestas internas de preflight OPTIONS del CORSMiddleware.
 # ---------------------------------------------------------------------------
-@app.exception_handler(HTTPException)
-async def _sanitize_http_errors(request: FastAPIRequest, exc: HTTPException) -> JSONResponse:
+@app.exception_handler(StarletteHTTPException)
+async def _sanitize_http_errors(request: FastAPIRequest, exc: StarletteHTTPException) -> JSONResponse:
     # Dejar pasar las respuestas de OPTIONS sin modificar
     if request.method == "OPTIONS":
         return JSONResponse(
@@ -189,7 +197,7 @@ def health_ready():
     }
 
     if not ready:
-        raise HTTPException(status_code=503, detail=payload)
+        raise StarletteHTTPException(status_code=503, detail=payload)
     return payload
 
 

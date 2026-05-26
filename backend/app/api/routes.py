@@ -448,6 +448,7 @@ def _handle_oauth_callback(
         )
 
 @router.post("/analyze", response_model=AnalysisTaskResponse, status_code=202)
+@router.post("/analyze/", response_model=AnalysisTaskResponse, status_code=202, include_in_schema=False)
 def start_analysis(
     request: Request,
     request_body: AnalysisRequest,
@@ -1720,6 +1721,7 @@ def get_chat_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat", status_code=201)
+@router.post("/chat/", status_code=201, include_in_schema=False)
 def save_chat_message(
     request: Request,
     message: ChatMessage,
