@@ -1,0 +1,16 @@
+steps:
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: gcloud
+    args:
+      - beta
+      - run
+      - worker-pools
+      - deploy
+      - promdata-worker
+      - --project=promdata-enterprise
+      - --region=us-east4
+      - --source=.
+      - --scaling=1
+      - --memory=2Gi
+      - --command=celery
+      - --args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=4,-Ofair,--prefetch-multiplier=1
