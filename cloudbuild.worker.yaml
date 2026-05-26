@@ -14,3 +14,5 @@ steps:
       - --memory=2Gi
       - --command=celery
       - --args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=4,-Ofair,--prefetch-multiplier=1
+options:
+  logging: CLOUD_LOGGING_ONLY
