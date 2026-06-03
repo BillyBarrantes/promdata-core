@@ -12,8 +12,6 @@ from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 from app.services.ai_response_cache import build_cache_key, get_cached_json, set_cached_json
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 
 def _normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
@@ -180,7 +178,7 @@ def generate_dashboard_executive_summary(
             widgets=[],
         )
 
-    if not settings.GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY and not settings.GEMINI_VERTEX_PROJECT:
         return _fallback_summary(
             presentation_name=normalized_presentation_name,
             filter_scope=filter_scope,

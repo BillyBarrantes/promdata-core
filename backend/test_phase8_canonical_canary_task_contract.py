@@ -42,6 +42,29 @@ class _FakeSupabase:
         return _FakeQuery({})
 
 
+class _CaptureUpdateQuery:
+    def __init__(self, capture):
+        self._capture = capture
+
+    def update(self, payload):
+        self._capture["payload"] = payload
+        return self
+
+    def eq(self, *_args, **_kwargs):
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self._capture.get("payload"))
+
+
+class _CaptureSupabase:
+    def __init__(self):
+        self.capture = {}
+
+    def table(self, _name):
+        return _CaptureUpdateQuery(self.capture)
+
+
 def test_canary_task_falls_back_to_legacy_on_executor_error(monkeypatch):
     captured = {}
 
@@ -134,3 +157,29 @@ def test_universal_tabular_task_uses_production_executor_and_async_canary(monkey
         "file-1",
         "Realiza un gráfico de evolución mensual",
     )
+
+
+def test_payload_shedding_preserves_granular_arrow_when_snapshot_strip_is_enough(monkeypatch):
+    sb = _CaptureSupabase()
+    runtime_result = SimpleNamespace(
+        status="completed",
+        final_struct={
+            "analysis": "ok",
+            "snapshot_arrow": "S" * 5000,
+            "arrow_data": "A" * 40,
+            "chart_options": [{"title": {"text": "Chart"}, "granular_arrow": "G" * 40}],
+        },
+    )
+
+    monkeypatch.setattr(analysis_tasks.settings, "UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", 1000)
+
+    analysis_tasks._save_analysis_task_result_with_payload_shedding(
+        sb,
+        "task-1",
+        runtime_result,
+    )
+
+    saved = analysis_tasks.json.loads(sb.capture["payload"]["results_json"])
+    assert "snapshot_arrow" not in saved
+    assert saved["arrow_data"] == "A" * 40
+    assert saved["chart_options"][0]["granular_arrow"] == "G" * 40

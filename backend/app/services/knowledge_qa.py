@@ -10,8 +10,6 @@ from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 from app.services.document_rag import KnowledgeSnippet
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 
 def _normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()

@@ -6,8 +6,6 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from app.core.config import settings
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 warnings.filterwarnings("ignore")
 
 class AutoAnalyst:

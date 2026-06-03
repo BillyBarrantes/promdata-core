@@ -22,6 +22,12 @@ from app.services.canonical_shadow_query_runner import (
     _summarize_plan,
 )
 from app.services.canonical_tabular_canary_executor import _build_final_struct
+from app.services.analysis_memory_context import (
+    apply_parent_context_to_placeholder_filters,
+    build_parent_memory_context_text,
+    load_parent_analysis_context,
+    unwrap_prompt_payload,
+)
 from app.services.semantic_translator import SemanticTranslator
 
 
@@ -62,6 +68,7 @@ def build_canonical_tabular_production_execution(
     file_id: str,
     pipeline_result: Any,
     prompt: str | None = None,
+    service_client: Any | None = None,
     max_plans: int = 3,
 ) -> CanonicalShadowQueryExecution:
     """Execute the user-facing tabular path without Canary/Shadow strategy bundles.
@@ -92,16 +99,28 @@ def build_canonical_tabular_production_execution(
             },
         )
 
+    actual_prompt, parent_task_id = unwrap_prompt_payload(prompt)
     schema_profile = dict((getattr(candidate_df, "attrs", {}) or {}).get("schema_profile", {}) or {})
     dataset_contract = dict((getattr(candidate_df, "attrs", {}) or {}).get("semantic_contract", {}) or {})
+    parent_context = load_parent_analysis_context(
+        service_client=service_client,
+        parent_task_id=parent_task_id,
+        file_id=file_id,
+        columns=list(candidate_df.columns),
+    )
     plans = SemanticTranslator.translate(
-        prompt,
+        actual_prompt,
         list(candidate_df.columns),
         _build_glossary_context(candidate_df),
         _build_topology_context(candidate_df),
+        memory_context=build_parent_memory_context_text(parent_context),
         schema_profile=schema_profile,
         dataset_contract=dataset_contract,
     ) or []
+    plans = apply_parent_context_to_placeholder_filters(
+        plans=plans,
+        parent_context=parent_context,
+    )
 
     # ═══════════════════════════════════════════════════════════════════════════
     # [V3] LITERAL FILTER INDEXER — Corrección de filtros contra el dataset real
@@ -115,10 +134,10 @@ def build_canonical_tabular_production_execution(
     _literal_filter_catalog: dict[str, list[str]] = dict(
         (getattr(candidate_df, "attrs", {}) or {}).get("literal_filter_catalog", {}) or {}
     )
-    if _literal_filter_catalog and plans and prompt:
+    if _literal_filter_catalog and plans and actual_prompt:
         try:
             _detected_literals = SemanticTranslator._detect_literal_filters(
-                str(prompt), _literal_filter_catalog
+                str(actual_prompt), _literal_filter_catalog
             )
             if _detected_literals:
                 _SUPPORTED_IBIS_OPS = {
@@ -239,7 +258,7 @@ def build_canonical_tabular_production_execution(
     return CanonicalShadowQueryExecution(
         pipeline_result=pipeline_result,
         readiness_summary=readiness_summary,
-        query_prompt=prompt,
+        query_prompt=actual_prompt,
         prompt_strategy="production_semantic_translator",
         plans=bounded_plans,
         plan_summaries=plan_summaries,
@@ -252,6 +271,8 @@ def build_canonical_tabular_production_execution(
             "shadow_parquet_path": parquet_path,
             "shadow_query_status": production_query_status,
             "production_query_status": production_query_status,
+            "parent_task_id": parent_task_id,
+            "parent_context_filter_count": len(list((parent_context or {}).get("filters") or [])),
         },
     )
 
@@ -275,6 +296,7 @@ def execute_canonical_tabular_production_analysis(
         file_id=file_id,
         pipeline_result=pipeline_result,
         prompt=prompt,
+        service_client=service_client,
         max_plans=max_plans,
     )
     successful_count = sum(1 for row in execution.execution_summaries if row.get("status") == "success")

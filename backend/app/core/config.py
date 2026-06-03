@@ -68,6 +68,8 @@ class Settings:
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_CLIENT_PROVIDER: str = (os.getenv("GEMINI_CLIENT_PROVIDER", "genai") or "genai").strip().lower()
+    GEMINI_VERTEX_PROJECT: str = os.getenv("GEMINI_VERTEX_PROJECT", "promdata-enterprise")
+    GEMINI_VERTEX_LOCATION: str = os.getenv("GEMINI_VERTEX_LOCATION", "global")
     CELERY_BROKER_URL: str = _normalize_redis_url_for_runtime(
         os.getenv("CELERY_BROKER_URL", _LOCAL_REDIS_URL)
     )
@@ -268,7 +270,7 @@ class Settings:
     LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
     NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
-    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3.1-pro")
+    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3.1-pro-preview")
     UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES: int = int(
         os.getenv("UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", "1500000")
     )

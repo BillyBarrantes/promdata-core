@@ -23,8 +23,6 @@ from app.services.ai_response_cache import build_cache_key, get_cached_json, set
 from app.services.metric_semantics import infer_metric_unit_from_column_name, normalize_semantic_text
 from app.services.visual_recommendation_engine import extract_prompt_visual_requests
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
 # @deprecated("Eliminado por cirugía de sesgos domain-agnostic — mayo 2026")
 # Las agrupaciones semánticas hardcodeadas generaban favoritismo hacia
 # dominios logísticos (almacen, warehouse, lote) y penalizaban otros
@@ -107,6 +105,151 @@ class SemanticTranslator:
             if len(docs) == 1:
                 return docs[0]
             return docs
+
+    @staticmethod
+    def _is_recoverable_translator_model_error(error: Exception) -> bool:
+        """
+        Identifica cancelaciones/timeouts del proveedor LLM que justifican retry.
+        """
+        error_text = str(error or "").lower()
+        recoverable_markers = (
+            "499",
+            "cancelled",
+            "canceled",
+            "deadline",
+            "timeout",
+            "timed out",
+            "504",
+            "503",
+            "429",
+            "resource_exhausted",
+            "quota",
+            "rate limit",
+            "rate_limit",
+            "temporarily unavailable",
+            "unavailable",
+        )
+        return any(marker in error_text for marker in recoverable_markers)
+
+    @staticmethod
+    def _is_quota_translator_model_error(error: Exception) -> bool:
+        error_text = str(error or "").lower()
+        quota_markers = (
+            "429",
+            "resource_exhausted",
+            "quota",
+            "rate limit",
+            "rate_limit",
+        )
+        return any(marker in error_text for marker in quota_markers)
+
+    @staticmethod
+    def _select_translator_fallback_model(primary_model_name: str) -> str | None:
+        fallback_model_name = str(settings.NARRATIVE_FAST_MODEL_NAME or "").strip()
+        primary_model_name = str(primary_model_name or "").strip()
+        if not fallback_model_name or fallback_model_name == primary_model_name:
+            return None
+        return fallback_model_name
+
+    @staticmethod
+    def _sanitize_translator_payload_item(
+        item: dict[str, Any],
+        columns: list[str],
+        payload_mode: str,
+    ) -> dict[str, Any]:
+        available_columns = set(columns or [])
+        if 'main_intent' in item:
+            intent = item['main_intent']
+            if isinstance(intent, dict):
+                if 'group_by' in intent and isinstance(intent['group_by'], list):
+                    intent['group_by'] = [c for c in intent['group_by'] if c in available_columns]
+
+                if 'metrics' in intent and isinstance(intent['metrics'], list):
+                    intent['metrics'] = [c for c in intent['metrics'] if c in available_columns]
+                elif 'primary_metric' in intent and isinstance(intent['primary_metric'], str):
+                    if payload_mode == "multi" and intent['primary_metric'] not in available_columns:
+                        intent['primary_metric'] = None
+
+                if 'filters' in intent and isinstance(intent['filters'], list):
+                    intent['filters'] = [
+                        f for f in intent['filters']
+                        if isinstance(f, dict) and f.get('column') in available_columns
+                    ]
+
+                if 'negative_filters' in intent and isinstance(intent['negative_filters'], list):
+                    intent['negative_filters'] = [
+                        f for f in intent['negative_filters']
+                        if isinstance(f, dict) and f.get('column') in available_columns
+                    ]
+
+                scalar_metric_fields = ['plot_metric', 'ranking_metric']
+                if payload_mode == "single":
+                    scalar_metric_fields.extend(['value_column', 'metric', 'dimension', 'date_column'])
+
+                for metric_field in scalar_metric_fields:
+                    if metric_field in intent and isinstance(intent[metric_field], str):
+                        if intent[metric_field] not in available_columns:
+                            intent[metric_field] = None
+
+                if 'time_dimension' in intent and isinstance(intent['time_dimension'], str):
+                    if payload_mode == "multi" and intent['time_dimension'] not in available_columns:
+                        intent['time_dimension'] = None
+
+                if 'value_column' in intent and isinstance(intent['value_column'], str):
+                    if payload_mode == "multi" and intent['value_column'] not in available_columns:
+                        intent['value_column'] = None
+
+        if 'filters' in item and isinstance(item['filters'], list):
+            item['filters'] = [
+                f for f in item['filters']
+                if isinstance(f, dict) and f.get('column') in available_columns
+            ]
+
+        return item
+
+    @staticmethod
+    def _plans_from_translator_payload(parsed_data: Any, columns: list[str]) -> list[AnalysisPlan]:
+        plans: list[AnalysisPlan] = []
+        if isinstance(parsed_data, list):
+            for i, item in enumerate(parsed_data[:5]):
+                try:
+                    if isinstance(item, dict):
+                        item = SemanticTranslator._sanitize_translator_payload_item(item, columns, "multi")
+                    plans.append(AnalysisPlan.model_validate(item))
+                    title_preview = item.get('title', 'Sin título') if isinstance(item, dict) else 'Sin título'
+                    print(f"✅ [MULTI-PLAN] Plan {i+1} validado: {title_preview[:60]}")
+                except Exception as val_e:
+                    print(f"⚠️ [MULTI-PLAN] Plan {i+1} inválido (Alucinación bloqueada o schema roto): {val_e}")
+        else:
+            if isinstance(parsed_data, dict):
+                parsed_data = SemanticTranslator._sanitize_translator_payload_item(parsed_data, columns, "single")
+            plans.append(AnalysisPlan.model_validate(parsed_data))
+
+        return plans
+
+    @staticmethod
+    def _generate_translator_plans_with_model(
+        model_name: str,
+        translator_input: str,
+        columns: list[str],
+    ) -> list[AnalysisPlan]:
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.0},
+        )
+        with record_llm_call(
+            "semantic_translation",
+            model_name=model_name,
+            prompt=translator_input,
+            trace_id=None,
+            trace_name="semantic_translator",
+        ) as lf_span:
+            response = model.generate_content(translator_input)
+            lf_span["output"] = response.text
+        clean_json = response.text.strip()
+        print(f"🕵️ [SEMANTIC STRATEGIST] Protocolo Activado: {clean_json[:200]}...")
+        parsed_data = SemanticTranslator._parse_translator_payload(clean_json)
+        return SemanticTranslator._plans_from_translator_payload(parsed_data, columns)
 
     @staticmethod
     def _schema_fingerprint(
@@ -2496,10 +2639,7 @@ class SemanticTranslator:
         # 1. Configuración: Usamos el modelo más potente para que entienda la estrategia compleja
         schema_json = json.dumps(AnalysisPlan.model_json_schema(), indent=2)
         router_context_json = json.dumps(router_decision, ensure_ascii=False, sort_keys=True)
-        model = genai.GenerativeModel(
-            model_name=settings.AI_MODEL_NAME,  # Centralizado desde config.py
-            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
-        )
+        primary_model_name = str(settings.AI_MODEL_NAME or "").strip()
 
         # 2. PROMPT DE PROTOCOLOS DINÁMICOS (CEREBRO V8 — Schema-Agnostic + Glossary Intelligence)
         system_instruction = f"""
@@ -2690,97 +2830,11 @@ class SemanticTranslator:
         
         try:
             _translator_input = f"{system_instruction}\n\nUSUARIO: {prompt}"
-            with record_llm_call(
-                "semantic_translation",
-                model_name=settings.AI_MODEL_NAME,
-                prompt=_translator_input,
-                trace_id=None,
-                trace_name="semantic_translator",
-            ) as lf_span:
-                response = model.generate_content(_translator_input)
-                lf_span["output"] = response.text
-            clean_json = response.text.strip()
-            print(f"🕵️ [SEMANTIC STRATEGIST] Protocolo Activado: {clean_json[:200]}...") 
-            # 🎯 [FASE 3B] Multi-Plan: Aceptamos Dict o Lista, retornamos SIEMPRE lista.
-            parsed_data = SemanticTranslator._parse_translator_payload(clean_json)
-            plans: List[AnalysisPlan] = []
-            
-            if isinstance(parsed_data, list):
-                # Triple Vista / Multi-Plan: Validar cada plan individualmente
-                for i, item in enumerate(parsed_data[:5]):  # Max 5 planes [FASE 3C: subido de 3]
-                    try:
-                        # 🛡️ [FASE 4] ANTI-ALUCINACIÓN (Pre-Flight Filter)
-                        # Filtramos cualquier columna inventada por Gemini antes de intentar validarla
-                        if 'main_intent' in item:
-                            intent = item['main_intent']
-                            
-                            # Limpieza de Group By
-                            if 'group_by' in intent and isinstance(intent['group_by'], list):
-                                intent['group_by'] = [c for c in intent['group_by'] if c in columns]
-                                
-                            # Limpieza de Metrics
-                            if 'metrics' in intent and isinstance(intent['metrics'], list):
-                                intent['metrics'] = [c for c in intent['metrics'] if c in columns]
-                            elif 'primary_metric' in intent and isinstance(intent['primary_metric'], str):
-                                if intent['primary_metric'] not in columns:
-                                    intent['primary_metric'] = None
-                                    
-                            # Limpieza de Filtros
-                            if 'filters' in intent and isinstance(intent['filters'], list):
-                                intent['filters'] = [f for f in intent['filters'] if isinstance(f, dict) and f.get('column') in columns]
-
-                            if 'negative_filters' in intent and isinstance(intent['negative_filters'], list):
-                                intent['negative_filters'] = [
-                                    f for f in intent['negative_filters']
-                                    if isinstance(f, dict) and f.get('column') in columns
-                                ]
-
-                            for metric_field in ('plot_metric', 'ranking_metric'):
-                                if metric_field in intent and isinstance(intent[metric_field], str):
-                                    if intent[metric_field] not in columns:
-                                        intent[metric_field] = None
-                                
-                            # Limpieza Predictiva Temporal
-                            if 'time_dimension' in intent and isinstance(intent['time_dimension'], str):
-                                if intent['time_dimension'] not in columns:
-                                    intent['time_dimension'] = None
-                                    
-                            # Limpieza Diagnóstica (value_column)
-                            if 'value_column' in intent and isinstance(intent['value_column'], str):
-                                if intent['value_column'] not in columns:
-                                    intent['value_column'] = None
-
-                            # Validaciones restrictivas: Si Pydantic exige al menos un elemento o falla, se descartará el plan automáticamente en Pydantic.
-                            
-                        # Limpieza de Filters Globales de Charting
-                        if 'filters' in item and isinstance(item['filters'], list):
-                            item['filters'] = [f for f in item['filters'] if isinstance(f, dict) and f.get('column') in columns]
-
-                        plans.append(AnalysisPlan.model_validate(item))
-                        print(f"✅ [MULTI-PLAN] Plan {i+1} validado: {item.get('title', 'Sin título')[:60]}")
-                    except Exception as val_e:
-                        print(f"⚠️ [MULTI-PLAN] Plan {i+1} inválido (Alucinación bloqueada o schema roto): {val_e}")
-            else:
-                # Plan único (caso más común)
-                if isinstance(parsed_data, dict) and 'main_intent' in parsed_data:
-                    intent = parsed_data['main_intent']
-                    if isinstance(intent, dict):
-                        if 'filters' in intent and isinstance(intent['filters'], list):
-                            intent['filters'] = [f for f in intent['filters'] if isinstance(f, dict) and f.get('column') in columns]
-                        if 'negative_filters' in intent and isinstance(intent['negative_filters'], list):
-                            intent['negative_filters'] = [
-                                f for f in intent['negative_filters']
-                                if isinstance(f, dict) and f.get('column') in columns
-                            ]
-                        if 'group_by' in intent and isinstance(intent['group_by'], list):
-                            intent['group_by'] = [c for c in intent['group_by'] if c in columns]
-                        if 'metrics' in intent and isinstance(intent['metrics'], list):
-                            intent['metrics'] = [c for c in intent['metrics'] if c in columns]
-                        for metric_field in ('plot_metric', 'ranking_metric', 'value_column', 'metric', 'dimension', 'date_column'):
-                            if metric_field in intent and isinstance(intent[metric_field], str):
-                                if intent[metric_field] not in columns:
-                                    intent[metric_field] = None
-                plans.append(AnalysisPlan.model_validate(parsed_data))
+            plans = SemanticTranslator._generate_translator_plans_with_model(
+                primary_model_name,
+                _translator_input,
+                list(columns or []),
+            )
             
             if not plans:
                 print("⚠️ [TRANSLATOR] No se pudo validar ningún plan.")
@@ -2796,6 +2850,98 @@ class SemanticTranslator:
             return plans
             
         except Exception as e:
+            if SemanticTranslator._is_recoverable_translator_model_error(e):
+                emit_structured_log(
+                    "semantic_translator_primary_model_recoverable_error",
+                    level="warning",
+                    error=str(e)[:300],
+                    primary_model=primary_model_name,
+                    fallback_model=SemanticTranslator._select_translator_fallback_model(primary_model_name),
+                    reason_codes=router_decision.get("reason_codes"),
+                )
+                fallback_model_name = SemanticTranslator._select_translator_fallback_model(primary_model_name)
+                quota_error = SemanticTranslator._is_quota_translator_model_error(e)
+                router_contract_plans = None
+                if quota_error:
+                    router_contract_plans = SemanticTranslator._build_plan_from_router_contract(
+                        router_decision,
+                        list(columns or []),
+                        schema_profile=schema_profile,
+                        dataset_contract=dataset_contract,
+                    )
+                    if router_contract_plans:
+                        set_cached_json(
+                            "semantic_translator",
+                            translator_cache_key,
+                            [plan.model_dump(mode="json") for plan in router_contract_plans],
+                            settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
+                        )
+                        emit_structured_log(
+                            "semantic_translator_router_contract_fallback_accepted",
+                            prompt=prompt[:200],
+                            primary_model=primary_model_name,
+                            fallback_model=fallback_model_name,
+                            plan_count=len(router_contract_plans),
+                            reason_codes=router_decision.get("reason_codes"),
+                            fallback_priority="quota_first",
+                        )
+                        return router_contract_plans
+
+                if fallback_model_name:
+                    try:
+                        fallback_plans = SemanticTranslator._generate_translator_plans_with_model(
+                            fallback_model_name,
+                            _translator_input,
+                            list(columns or []),
+                        )
+                        if fallback_plans:
+                            set_cached_json(
+                                "semantic_translator",
+                                translator_cache_key,
+                                [plan.model_dump(mode="json") for plan in fallback_plans],
+                                settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
+                            )
+                            emit_structured_log(
+                                "semantic_translator_model_fallback_accepted",
+                                prompt=prompt[:200],
+                                primary_model=primary_model_name,
+                                fallback_model=fallback_model_name,
+                                plan_count=len(fallback_plans),
+                            )
+                            return fallback_plans
+                    except Exception as fallback_error:
+                        emit_structured_log(
+                            "semantic_translator_model_fallback_error",
+                            level="warning",
+                            error=str(fallback_error)[:300],
+                            primary_model=primary_model_name,
+                            fallback_model=fallback_model_name,
+                        )
+
+                if router_contract_plans is None:
+                    router_contract_plans = SemanticTranslator._build_plan_from_router_contract(
+                        router_decision,
+                        list(columns or []),
+                        schema_profile=schema_profile,
+                        dataset_contract=dataset_contract,
+                    )
+                if router_contract_plans:
+                    set_cached_json(
+                        "semantic_translator",
+                        translator_cache_key,
+                        [plan.model_dump(mode="json") for plan in router_contract_plans],
+                        settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
+                    )
+                    emit_structured_log(
+                        "semantic_translator_router_contract_fallback_accepted",
+                        prompt=prompt[:200],
+                        primary_model=primary_model_name,
+                        fallback_model=fallback_model_name,
+                        plan_count=len(router_contract_plans),
+                        reason_codes=router_decision.get("reason_codes"),
+                    )
+                    return router_contract_plans
+
             print(f"⚠️ [TRANSLATOR ERROR]: {e}")
             return None
 

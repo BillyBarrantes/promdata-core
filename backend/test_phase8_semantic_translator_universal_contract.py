@@ -1,3 +1,6 @@
+import json
+
+import app.services.semantic_translator as semantic_translator_module
 from app.services.semantic_translator import SemanticTranslator
 from app.core.semantic_grammar import AnalysisPlan
 
@@ -346,6 +349,126 @@ def test_phase8_semantic_router_simple_route_prioritizes_temporal_total_products
     assert not getattr(intent, "split_dimension", None)
 
 
+def test_phase8_semantic_translator_retries_cancelled_deep_planner_with_fast_model(monkeypatch) -> None:
+    class _DummySpan(dict):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeResponse:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+    class _FakeGenerativeModel:
+        calls: list[str] = []
+
+        def __init__(self, model_name: str, generation_config: dict | None = None) -> None:
+            self.model_name = model_name
+            self.generation_config = generation_config or {}
+
+        def generate_content(self, prompt: str) -> _FakeResponse:
+            self.calls.append(self.model_name)
+            if self.model_name == "gemini-3.1-pro-preview":
+                raise RuntimeError(
+                    "499 CANCELLED. {'error': {'code': 499, 'status': 'CANCELLED'}}"
+                )
+            return _FakeResponse(
+                json.dumps(
+                    {
+                        "main_intent": {
+                            "type": "trend",
+                            "rationale": "Compara la evolución mensual por placa solicitada.",
+                            "filters": [
+                                {
+                                    "column": "placa_unidad",
+                                    "operator": "in",
+                                    "value": ["F3B-144", "F3B-197"],
+                                }
+                            ],
+                            "metric_unit": "currency",
+                            "visual_protocol": "line_chart",
+                            "date_column": "fecha_operacion",
+                            "value_column": "gasto_combustible_s",
+                            "grain": "month",
+                            "fill_missing": True,
+                            "split_dimension": "placa_unidad",
+                            "split_limit": 2,
+                            "top_n_aggregation_mode": "split",
+                        },
+                        "title": "Evolución de gasto combustible por placa",
+                        "column_aliases": {
+                            "fecha_operacion": "Fecha Operacion",
+                            "gasto_combustible_s": "Gasto Combustible",
+                            "placa_unidad": "Placa Unidad",
+                        },
+                        "metric_polarity": "neutral",
+                    }
+                )
+            )
+
+    monkeypatch.setattr(
+        SemanticTranslator,
+        "_route_prompt_with_semantic_router",
+        staticmethod(
+            lambda *args, **kwargs: {
+                "route": "COMPLEJO",
+                "confidence": 0.98,
+                "detected_intent": "trend",
+                "requires_time": True,
+                "reason_codes": ["explicit_split_instruction", "multi_value_filter"],
+                "semantic_contract": {
+                    "intent": "trend",
+                    "metric": "gasto_combustible_s",
+                    "time_axis": "fecha_operacion",
+                    "dimension": "placa_unidad",
+                    "positive_filters": [
+                        {
+                            "column": "placa_unidad",
+                            "operator": "in",
+                            "value": ["F3B-144", "F3B-197"],
+                        }
+                    ],
+                    "top_n": 2,
+                    "series_mode": "split",
+                    "grain": "month",
+                    "aggregation": "sum",
+                    "visual_protocol": "line_chart",
+                    "requires_time": True,
+                },
+                "original_route": "COMPLEJO",
+            }
+        ),
+    )
+    monkeypatch.setattr(semantic_translator_module.genai, "GenerativeModel", _FakeGenerativeModel)
+    monkeypatch.setattr(semantic_translator_module, "record_llm_call", lambda *args, **kwargs: _DummySpan())
+    monkeypatch.setattr(semantic_translator_module, "get_cached_json", lambda *args, **kwargs: None)
+    monkeypatch.setattr(semantic_translator_module, "set_cached_json", lambda *args, **kwargs: None)
+    monkeypatch.setattr(semantic_translator_module.settings, "AI_MODEL_NAME", "gemini-3.1-pro-preview")
+    monkeypatch.setattr(semantic_translator_module.settings, "NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
+
+    plans = SemanticTranslator.translate(
+        "realiza un gráfico con detallando la evolución de gasto de combustible de la placa F3B-144 y F3B-197. las lineas de evolucion deben estar por separado",
+        ["fecha_operacion", "placa_unidad", "gasto_combustible_s"],
+        glossary_context="",
+        topology_context="",
+        schema_profile={
+            "fecha_operacion": {"type": "temporal", "role": "date", "cardinality": 60},
+            "placa_unidad": {"type": "categorical", "role": "identifier", "cardinality": 120},
+            "gasto_combustible_s": {"type": "numeric", "role": "metric", "cardinality": 1000},
+        },
+        dataset_contract={"dataset_mode": "hybrid", "time_axis": "fecha_operacion"},
+    )
+
+    assert _FakeGenerativeModel.calls == ["gemini-3.1-pro-preview", "gemini-3.5-flash"]
+    assert plans
+    intent = plans[0].main_intent
+    assert getattr(intent, "type", None) == "trend"
+    assert getattr(intent, "split_dimension", None) == "placa_unidad"
+    assert getattr(intent, "split_limit", None) == 2
+
+
 def test_phase8_advanced_contract_preserves_exclusions_and_ranking_metric() -> None:
     plan = AnalysisPlan.model_validate(
         {
@@ -407,3 +530,12 @@ def test_phase8_semantic_router_contract_normalizes_advanced_fields() -> None:
     assert contract["plot_metric"] == "ingreso_total"
     assert contract["ranking_metric"] == "cantidad"
     assert contract["negative_filters"][0]["operator"] == "not_in"
+
+
+def test_phase8_semantic_translator_treats_quota_errors_as_recoverable() -> None:
+    error = RuntimeError(
+        "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'status': 'RESOURCE_EXHAUSTED'}}"
+    )
+
+    assert SemanticTranslator._is_recoverable_translator_model_error(error)
+    assert SemanticTranslator._is_quota_translator_model_error(error)

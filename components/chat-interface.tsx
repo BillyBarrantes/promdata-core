@@ -256,6 +256,22 @@ const collectArrowPreloadsFromVisuals = (visuals: AnalysisComponent[]): duckdbEn
   })
 }
 
+const normalizeAnalysisPromptKey = (value: string): string => {
+  return value.trim().replace(/\s+/g, " ").toLowerCase()
+}
+
+const buildAnalysisRequestKey = (
+  fileId: string,
+  prompt: string,
+  parentTaskId: string | null
+): string => {
+  return [
+    fileId,
+    normalizeAnalysisPromptKey(prompt),
+    parentTaskId || "root",
+  ].join("::")
+}
+
 export function ChatInterface() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -341,6 +357,27 @@ export function ChatInterface() {
 
     const primaryVisuals = prioritizedVisuals.slice(0, 1);
     const secondaryVisuals = prioritizedVisuals.slice(1);
+    workspaceVisualsRef.current = prioritizedVisuals;
+
+    const preloadEntries = collectArrowPreloadsFromVisuals(prioritizedVisuals);
+    if (preloadEntries.length > 0) {
+      const preloadPromise = duckdbEngine
+        .preloadArrowTables(preloadEntries, 1)
+        .then(() => {
+          setIsDuckDBReady(true);
+        })
+        .catch((error) => {
+          console.warn('⚠️ [DuckDB] Preload de visuales no completado:', error);
+        });
+      workspacePreloadPromiseRef.current = preloadPromise;
+      void preloadPromise.finally(() => {
+        if (workspacePreloadPromiseRef.current === preloadPromise) {
+          workspacePreloadPromiseRef.current = null;
+        }
+      });
+    } else {
+      workspacePreloadPromiseRef.current = null;
+    }
 
     startTransition(() => {
       setWorkspaceItems(primaryVisuals);
@@ -353,12 +390,6 @@ export function ChatInterface() {
     });
 
     if (secondaryVisuals.length === 0) {
-      const preloadEntries = collectArrowPreloadsFromVisuals(prioritizedVisuals);
-      if (preloadEntries.length > 0) {
-        void duckdbEngine.preloadArrowTables(preloadEntries, 1).catch((error) => {
-          console.warn('⚠️ [DuckDB] Preload de visuales no completado:', error);
-        });
-      }
       return;
     }
 
@@ -372,15 +403,9 @@ export function ChatInterface() {
           renderedVisuals: prioritizedVisuals.length,
         });
       });
-      const preloadEntries = collectArrowPreloadsFromVisuals(prioritizedVisuals);
-      if (preloadEntries.length > 0) {
-        void duckdbEngine.preloadArrowTables(preloadEntries, 1).catch((error) => {
-          console.warn('⚠️ [DuckDB] Preload diferido de visuales no completado:', error);
-        });
-      }
       workspaceStageTimerRef.current = null;
     }, 240);
-  }, [clearWorkspaceStageTimer, setWorkspaceItems, setWorkspaceRenderState]);
+  }, [clearWorkspaceStageTimer, setIsDuckDBReady, setWorkspaceItems, setWorkspaceRenderState]);
 
   // --- EFFECT: Chat Recovery Logic ---
   useEffect(() => {
@@ -411,6 +436,9 @@ export function ChatInterface() {
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingAbortRef = useRef<AbortController | null>(null);
   const pollingInFlightRef = useRef(false);
+  const activeAnalysisRequestRef = useRef<{ key: string; taskId: string | null } | null>(null);
+  const workspaceVisualsRef = useRef<AnalysisComponent[]>([]);
+  const workspacePreloadPromiseRef = useRef<Promise<void> | null>(null);
   // Ref para controlar el scroll inteligente
   const prevMessagesLengthRef = useRef(0);
 
@@ -1019,6 +1047,9 @@ export function ChatInterface() {
               : msg
           ));
 
+          if (activeAnalysisRequestRef.current?.taskId === activeTaskId) {
+            activeAnalysisRequestRef.current = null;
+          }
           setActiveTaskId(null);
           setIsAnalyzing(false);
           if (data.status === 'failed') {
@@ -1117,6 +1148,27 @@ export function ChatInterface() {
     }
 
     const currentMessage = textToSend.trim();
+    const analysisRequestKey = buildAnalysisRequestKey(
+      analysisFileId,
+      currentMessage,
+      lastCompletedTaskId
+    );
+    const activeRequest = activeAnalysisRequestRef.current;
+    if (activeRequest) {
+      if (activeRequest.key === analysisRequestKey) {
+        return;
+      }
+      if (!customMessage) {
+        toast.info("Ya hay un análisis en curso para este archivo.");
+      }
+      return;
+    }
+
+    activeAnalysisRequestRef.current = {
+      key: analysisRequestKey,
+      taskId: null,
+    };
+
     const isDrillDown = currentMessage.startsWith("🔍 Drill-Down:");
 
     // 1. UI: Mostramos SOLO el texto limpio al usuario (sin el JSON técnico)
@@ -1144,6 +1196,7 @@ export function ChatInterface() {
     const accessToken = await getChatAccessToken();
     if (!accessToken) {
       toast.error("Sesión expirada");
+      activeAnalysisRequestRef.current = null;
       setIsAnalyzing(false);
       setWorkspaceRenderState({
         status: 'idle',
@@ -1171,6 +1224,12 @@ export function ChatInterface() {
 
       if (!response.ok) throw new Error("Error en petición");
       const data = await response.json();
+      if (activeAnalysisRequestRef.current?.key === analysisRequestKey) {
+        activeAnalysisRequestRef.current = {
+          key: analysisRequestKey,
+          taskId: data.task_id,
+        };
+      }
       setActiveTaskId(data.task_id);
 
       // ... (Resto de tu lógica de mensajes de carga) ...
@@ -1192,6 +1251,7 @@ export function ChatInterface() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      activeAnalysisRequestRef.current = null;
       setIsAnalyzing(false);
       setActiveTaskId(null);
       setWorkspaceRenderState({
@@ -1257,6 +1317,9 @@ export function ChatInterface() {
     // If tableName is undefined, probes ALL loaded tables to find the match.
     // NEVER invokes the LLM — this is a pure data-grid operation.
     try {
+      if (workspacePreloadPromiseRef.current) {
+        await workspacePreloadPromiseRef.current.catch(() => {});
+      }
       const loadedTables = duckdbEngine.getTableNames();
 
       // ── Step 1: Resolve the target table ──
@@ -1265,6 +1328,9 @@ export function ChatInterface() {
       if (!tName || !loadedTables.includes(tName)) {
         // tableName missing or not loaded — find it from visual components
         const visualSources: any[] = [];
+        if (Array.isArray(workspaceVisualsRef.current)) {
+          visualSources.push(...workspaceVisualsRef.current);
+        }
         if (Array.isArray(workspaceItems)) {
           visualSources.push(...workspaceItems);
         }
@@ -1432,11 +1498,13 @@ export function ChatInterface() {
             pendingVisuals: 0,
             renderedVisuals: 0,
           });
+          activeAnalysisRequestRef.current = null;
           toast.success("Cancelado.");
         } catch (e) {
           console.error("Error al cancelar tarea:", e);
         }
       }
+      activeAnalysisRequestRef.current = null;
       setActiveTaskId(null);
       return;
     }

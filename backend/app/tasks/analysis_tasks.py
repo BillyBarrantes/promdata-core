@@ -20,6 +20,12 @@ from app.services.analysis_traceability import (
     build_traceability_payload,
     build_traceability_plan_entry,
 )
+from app.services.analysis_memory_context import (
+    apply_parent_context_to_placeholder_filters,
+    build_parent_memory_context_text,
+    build_result_semantic_context,
+    load_parent_analysis_context,
+)
 from app.services.visual_recommendation_engine import (
     build_visual_governance,
     extract_prompt_visual_requests,
@@ -244,6 +250,18 @@ def build_widget_query_contract(plan, schema_profile: dict | None = None) -> dic
         "barmode": getattr(intent, 'barmode', None),
         "title": getattr(plan, 'title', None),
     }
+    filters = []
+    for filter_obj in list(getattr(intent, 'filters', None) or []):
+        column_name = str(getattr(filter_obj, 'column', '') or '').strip()
+        if not column_name or _role(column_name) not in {'dimension', 'identifier', 'date'}:
+            continue
+        filters.append({
+            "column": column_name,
+            "operator": getattr(getattr(filter_obj, 'operator', None), 'value', None) or getattr(filter_obj, 'operator', '=='),
+            "value": getattr(filter_obj, 'value', None),
+        })
+    if filters:
+        contract["filters"] = filters
     normalized_contract = {k: v for k, v in contract.items() if v not in (None, [], {})}
     has_metric = any(normalized_contract.get(key) for key in ('metric', 'value_column', 'metrics'))
     has_dimension = bool(normalized_contract.get('dimension'))
@@ -493,8 +511,6 @@ def coerce_chart_rows_to_table_rows(chart_rows, plan) -> list[dict]:
 
     return table_rows
 
-# --- CONFIGURACIÓN ---
-genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # --- 1. MEMORIA Y RAG ---
 
@@ -1537,6 +1553,7 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
     explicit_visual_requests: list[str] = []
     visual_probe_mode = False
     main_df = None
+    parent_structured_context: dict[str, Any] | None = None
 
     try:
         sb.table('analysis_tasks').update({'status': 'processing'}).eq('id', task_id).execute()
@@ -1911,6 +1928,26 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                         parent_prompt=prev_prompt_text[:160],
                     )
                 
+                parent_structured_context = load_parent_analysis_context(
+                    service_client=sb,
+                    parent_task_id=parent_task_id,
+                    file_id=file_id,
+                    columns=list(main_df.columns),
+                )
+                structured_memory_text = build_parent_memory_context_text(parent_structured_context)
+                if structured_memory_text:
+                    memory_text = (
+                        f"{memory_text}\n\n{structured_memory_text}".strip()
+                        if memory_text else structured_memory_text
+                    )
+                    emit_structured_log(
+                        "analysis_parent_context_injected",
+                        task_id=task_id,
+                        file_id=file_id,
+                        parent_task_id=parent_task_id,
+                        filter_count=len(list((parent_structured_context or {}).get("filters") or [])),
+                    )
+
                 # 🧠 [FASE 3F] COMPONENTE 1: Intent Classifier (determinístico)
                 memory_instruction = SemanticTranslator._classify_memory_intent(actual_prompt, memory_text)
                 if format_override.get('enabled'):
@@ -1974,6 +2011,10 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                     plans_result = []
                 elif not isinstance(plans_result, list):
                     plans_result = [plans_result]
+                plans_result = apply_parent_context_to_placeholder_filters(
+                    plans=plans_result,
+                    parent_context=parent_structured_context,
+                )
 
                 plans_result = align_plan_metrics_with_prompt(
                     plans_result,
@@ -3150,6 +3191,10 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
             institutional_snippets=institutional_snippets,
             plan_entries=traceability_plan_entries,
             final_struct=final_struct,
+            semantic_context=build_result_semantic_context(
+                plans=plans_result if 'plans_result' in locals() else [],
+                schema_profile=schema_profile,
+            ),
             status=status,
             error_message=final_error_message,
         )
@@ -3234,38 +3279,58 @@ def observe_canonical_shadow_runtime_task(task_id, file_id, prompt, live_summary
 
 
 def _save_analysis_task_result_with_payload_shedding(sb, task_id: str, runtime_result) -> None:
-    def _strip_heavy_payload_fields(final_struct: dict[str, Any]) -> list[str]:
+    def _strip_payload_fields(final_struct: dict[str, Any], fields: tuple[str, ...]) -> list[str]:
         stripped: list[str] = []
-        for key in ("snapshot_arrow", "arrow_data"):
+        for key in fields:
             if key in final_struct:
                 del final_struct[key]
                 stripped.append(key)
-        for chart_opt in final_struct.get("chart_options", []):
-            if isinstance(chart_opt, dict) and "granular_arrow" in chart_opt:
-                del chart_opt["granular_arrow"]
-                stripped.append("granular_arrow")
+        if "granular_arrow" in fields:
+            for chart_opt in final_struct.get("chart_options", []):
+                if isinstance(chart_opt, dict) and "granular_arrow" in chart_opt:
+                    del chart_opt["granular_arrow"]
+                    stripped.append("granular_arrow")
         return stripped
 
-    json_output = json.dumps(runtime_result.final_struct, cls=CustomEncoder)
+    def _apply_progressive_soft_shedding(final_struct: dict[str, Any], soft_limit_bytes: int) -> tuple[str, int, list[str]]:
+        original_json = json.dumps(final_struct, cls=CustomEncoder)
+        original_bytes = len(original_json)
+        if not soft_limit_bytes or original_bytes <= soft_limit_bytes:
+            return original_json, original_bytes, []
+
+        stripped: list[str] = []
+        json_output = original_json
+        for fields in (("snapshot_arrow",), ("arrow_data",), ("granular_arrow",)):
+            stripped.extend(_strip_payload_fields(final_struct, fields))
+            json_output = json.dumps(final_struct, cls=CustomEncoder)
+            if len(json_output) <= soft_limit_bytes:
+                break
+        return json_output, original_bytes, stripped
+
     soft_limit_bytes = max(int(getattr(settings, "UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", 0) or 0), 0)
-    if soft_limit_bytes and len(json_output) > soft_limit_bytes:
-        stripped = _strip_heavy_payload_fields(runtime_result.final_struct)
-        if stripped:
-            json_output = json.dumps(runtime_result.final_struct, cls=CustomEncoder)
-            emit_structured_log(
-                "analysis_result_payload_soft_shedding_applied",
-                task_id=task_id,
-                soft_limit_bytes=soft_limit_bytes,
-                stripped_fields=sorted(set(stripped)),
-                resulting_bytes=len(json_output),
-            )
+    json_output, original_bytes, stripped = _apply_progressive_soft_shedding(
+        runtime_result.final_struct,
+        soft_limit_bytes,
+    )
+    if stripped:
+        emit_structured_log(
+            "analysis_result_payload_soft_shedding_applied",
+            task_id=task_id,
+            soft_limit_bytes=soft_limit_bytes,
+            original_bytes=original_bytes,
+            resulting_bytes=len(json_output),
+            stripped_fields=sorted(set(stripped)),
+        )
     try:
         sb.table('analysis_tasks').update(
             {'status': runtime_result.status, 'results_json': json_output}
         ).eq('id', task_id).execute()
         return
     except Exception as save_error:
-        _stripped = _strip_heavy_payload_fields(runtime_result.final_struct)
+        _stripped = _strip_payload_fields(
+            runtime_result.final_struct,
+            ("snapshot_arrow", "arrow_data", "granular_arrow"),
+        )
         if not _stripped:
             raise
         print(
@@ -3594,6 +3659,23 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
             error=str(canary_error)[:240],
         )
 
+        # --- 🔴 ERROR LOG: Excepción real del motor de ejecución (Ibis/Production) ---
+        # Este log es crítico para diagnosticar qué query o paso exacto falló.
+        _real_error_str = str(canary_error)
+        emit_structured_log(
+            "canonical_tabular_execution_real_error",
+            level="error",
+            task_id=task_id,
+            file_id=file_id,
+            error_type=type(canary_error).__name__,
+            error_full=_real_error_str[:500],
+            runtime="production" if production_executor_enabled else "canary",
+        )
+        print(
+            f"🔴 [EXECUTION ERROR] task={task_id} file={file_id} "
+            f"type={type(canary_error).__name__} error={_real_error_str[:300]}"
+        )
+
         # --- 🛡️ BIG DATA SHIELD: Cortacircuito Legacy ---
         # Si el Canary falla en un archivo grande, el legacy runtime
         # 🛡️ [BIG DATA SHIELD V2] — Protección contra OOM en archivos grandes.
@@ -3634,17 +3716,12 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
             except Exception:
                 pass
 
-            # Si no tenemos fila-count del sidecar, usar estimación conservadora por extensión
+            # [V3] Sin evidencia real de fila-count, NO asumir que el archivo es big.
+            # La heurística anterior marcaba TODO .xlsx como "big" ante cualquier error
+            # no-lógico, causando falsos positivos en archivos de tamaño normal.
+            # Ahora solo se activa el shield con evidencia concreta del sidecar.
             if _actual_row_count == 0:
-                _file_name = str(uploaded_row_data.get("file_name") or "") if 'uploaded_row_data' in locals() else ""
-                _file_ext = _file_name.rsplit(".", 1)[-1].lower() if "." in _file_name else ""
-                # Conservador: solo marcamos como big si es .xlsx Y el error no es lógico
-                _is_big_file = (
-                    _file_ext in {"xlsx", "xls"}
-                    and "canary_not_ready" not in _error_str
-                    and not _is_transient_error
-                    and not _is_logical_error
-                )
+                _is_big_file = False
             else:
                 # Tenemos fila-count real: usar umbral empírico de 100K
                 _is_big_file = (
@@ -3696,19 +3773,35 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
             }).eq('id', task_id).execute()
             return "failed"
 
-        fallback_route = dict(runtime_route or {})
-        fallback_route["requested_runtime"] = fallback_route.get("requested_runtime") or "universal_tabular"
-        fallback_route["effective_runtime"] = "legacy"
-        fallback_route["decision_reason"] = (
-            "production_runtime_execution_error"
-            if production_executor_enabled
-            else "canary_runtime_execution_error"
+        # [V3] Legacy runtime eliminado — reportar el error real al usuario
+        # en lugar de intentar ejecutar un runtime que ya no existe.
+        emit_structured_log(
+            "canonical_tabular_execution_failed_no_fallback",
+            level="error",
+            task_id=task_id,
+            file_id=file_id,
+            error=str(canary_error)[:240],
+            reason="production_runtime_failed_legacy_removed",
         )
-        fallback_route["health_status"] = fallback_route.get("health_status") or "blocked"
-        return perform_analysis_task.run(
-            task_id,
-            file_id,
-            prompt,
-            user_token,
-            runtime_route=fallback_route,
-        )
+        sb.table('analysis_tasks').update({
+            'status': 'failed',
+            'results_json': json.dumps({
+                "analysis": (
+                    "## ⚠️ Error en el Análisis\n\n"
+                    "El motor de análisis no pudo procesar tu solicitud en este momento. "
+                    "Esto puede ocurrir por:\n\n"
+                    "- Combinación de filtros que no genera resultados\n"
+                    "- Datos con formato inesperado en alguna columna\n"
+                    "- Solicitud compleja que requiere ajuste de prompt\n\n"
+                    "Intenta reformular tu pregunta o verifica que los filtros aplicados "
+                    "coincidan con valores existentes en tus datos."
+                ),
+                "metrics": {},
+                "chart_options": [],
+                "data": [],
+                "recommendations": [],
+                "explainability": [],
+                "error_trace": str(canary_error)[:300],
+            }, cls=CustomEncoder),
+        }).eq('id', task_id).execute()
+        return "failed"

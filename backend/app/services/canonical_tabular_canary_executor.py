@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 
 from app.core.arrow_utils import dataframe_to_arrow_base64, records_to_arrow_base64
+from app.services.analysis_memory_context import build_plan_query_contract, build_result_semantic_context
 from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe
 from app.services.canonical_shadow_query_runner import (
     CanonicalShadowQueryExecution,
@@ -304,6 +305,7 @@ def _build_chart_option(
     title: str,
     result_payload: dict[str, Any],
     currency_meta: dict[str, Any],
+    schema_profile: dict[str, Any],
 ) -> dict[str, Any] | None:
     chart_type = _normalize_chart_type(result_payload.get("chart_type"))
     ui_chart_type = normalize_visual_id(result_payload.get("chart_type"))
@@ -336,6 +338,9 @@ def _build_chart_option(
         "metric_unit": safe_metric_unit,
     }
     option["visual_governance"] = visual_governance
+    query_contract = build_plan_query_contract(plan, schema_profile)
+    if query_contract:
+        option["query_contract"] = query_contract
 
     filtered_granular_df = result_payload.get("filtered_granular_df")
     if isinstance(filtered_granular_df, pd.DataFrame) and not filtered_granular_df.empty:
@@ -389,6 +394,7 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 title=title,
                 result_payload=result_payload,
                 currency_meta=currency_meta,
+                schema_profile=_safe_dict(attrs.get("schema_profile")),
             )
             if option:
                 final_struct["chart_options"].append(option)
@@ -461,6 +467,10 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
     summary_widgets = _build_summary_widgets(
         execution=execution,
         chart_options=final_struct["chart_options"],
+    )
+    final_struct["traceability"]["semantic_context"] = build_result_semantic_context(
+        plans=list(execution.plans or []),
+        schema_profile=_safe_dict(attrs.get("schema_profile")),
     )
 
     # V6.5: Extract literal filters from ALL plans to inject into narrative context.

@@ -14,9 +14,6 @@ _HAS_GENAI_SDK = False
 _GENAI_SDK = None
 _GENAI_TYPES = None
 
-_HAS_LEGACY_SDK = False
-_LEGACY_GENAI_SDK = None
-
 try:
     from google import genai as _genai_sdk  # type: ignore[import]
     from google.genai import types as _genai_types  # type: ignore[import]
@@ -26,14 +23,6 @@ try:
     _HAS_GENAI_SDK = True
 except Exception:
     _HAS_GENAI_SDK = False
-
-try:
-    import google.generativeai as _legacy_genai_sdk  # type: ignore[import]
-
-    _LEGACY_GENAI_SDK = _legacy_genai_sdk
-    _HAS_LEGACY_SDK = True
-except Exception:
-    _HAS_LEGACY_SDK = False
 
 
 def _normalized_generation_config(value: Any) -> dict[str, Any]:
@@ -152,28 +141,6 @@ class _GenAiModelAdapter:
         return _CompatGenerateResponse(text=_extract_text_from_response(response), raw=response)
 
 
-class _LegacyModelAdapter:
-    def __init__(self, runtime: "_LegacyRuntime", *, model_name: str, generation_config: Any = None) -> None:
-        self._runtime = runtime
-        self.model_name = str(model_name)
-        self._generation_config = generation_config
-        self._runtime._ensure_configured()
-        self._model = self._runtime._sdk.GenerativeModel(
-            model_name=self.model_name,
-            generation_config=self._generation_config,
-        )
-
-    def generate_content(self, contents: Any, generation_config: Any = None, **kwargs: Any) -> _CompatGenerateResponse:
-        merged_config = _merge_generation_config(self._generation_config, generation_config)
-        if kwargs:
-            merged_config.update({str(k): v for k, v in kwargs.items()})
-        if merged_config:
-            response = self._model.generate_content(contents, generation_config=merged_config)
-        else:
-            response = self._model.generate_content(contents)
-        return _CompatGenerateResponse(text=_extract_text_from_response(response), raw=response)
-
-
 class _GenAiRuntime:
     provider = "genai"
 
@@ -183,18 +150,33 @@ class _GenAiRuntime:
         self._sdk = _GENAI_SDK
         self._types = _GENAI_TYPES
         self._api_key = str(settings.GEMINI_API_KEY or "")
+        self._vertex_project = str(settings.GEMINI_VERTEX_PROJECT or "")
+        self._vertex_location = str(settings.GEMINI_VERTEX_LOCATION or "global")
         self._client_lock = threading.Lock()
         self._client = None
 
     def _build_client(self) -> Any:
         kwargs: dict[str, Any] = {}
-        if self._api_key:
+        if self._api_key.strip():
+            # Modo AI Studio — autenticación por API Key
             kwargs["api_key"] = self._api_key
+        else:
+            # Modo Vertex AI Enterprise — autenticación por ADC
+            kwargs["enterprise"] = True
+            if self._vertex_project:
+                kwargs["project"] = self._vertex_project
+            if self._vertex_location:
+                kwargs["location"] = self._vertex_location
         if self._types is not None:
             try:
                 kwargs["http_options"] = self._types.HttpOptions(timeout=_HTTP_TIMEOUT_MS)
             except Exception:
                 pass
+        emit_structured_log(
+            "gemini_client_auth_mode",
+            mode="api_key" if self._api_key.strip() else "vertex_ai_enterprise",
+            project=self._vertex_project if not self._api_key.strip() else None,
+        )
         return self._sdk.Client(**kwargs)
 
     @property
@@ -255,118 +237,13 @@ class _GenAiRuntime:
         return dict(kwargs)
 
 
-class _LegacyRuntime:
-    provider = "legacy"
-
-    def __init__(self) -> None:
-        if _LEGACY_GENAI_SDK is None:
-            raise RuntimeError("Google legacy GenerativeAI SDK no está disponible.")
-        self._sdk = _LEGACY_GENAI_SDK
-        self._api_key = str(settings.GEMINI_API_KEY or "")
-        self._configured = False
-        self._configure_lock = threading.Lock()
-
-    def _ensure_configured(self) -> None:
-        if self._configured:
-            return
-        with self._configure_lock:
-            if self._configured:
-                return
-            self._sdk.configure(api_key=self._api_key)
-            self._configured = True
-
-    def configure(self, api_key: str | None = None, **_: Any) -> None:
-        candidate = str(api_key or "").strip()
-        if candidate:
-            self._api_key = candidate
-        with self._configure_lock:
-            self._configured = False
-        self._ensure_configured()
-
-    def GenerativeModel(self, model_name: str, generation_config: Any = None, **_: Any) -> _LegacyModelAdapter:
-        return _LegacyModelAdapter(
-            self,
-            model_name=model_name,
-            generation_config=generation_config,
-        )
-
-    def embed_content(self, **kwargs: Any) -> dict[str, Any]:
-        payload = dict(kwargs)
-        model = payload.pop("model", None)
-        contents = payload.pop("contents", payload.pop("content", None))
-        if not model:
-            raise ValueError("embed_content requiere 'model'.")
-        if contents is None:
-            raise ValueError("embed_content requiere 'content' o 'contents'.")
-
-        config = _normalized_generation_config(payload.pop("config", None))
-        task_type = payload.pop("task_type", None)
-        title = payload.pop("title", None)
-        output_dimensionality = payload.pop("output_dimensionality", None)
-        if task_type is not None:
-            config["task_type"] = task_type
-        if title is not None:
-            config["title"] = title
-        if output_dimensionality is not None:
-            config["output_dimensionality"] = output_dimensionality
-        if payload:
-            config.update({str(k): v for k, v in payload.items()})
-
-        request: dict[str, Any] = {"model": model, "content": contents}
-        request.update(config)
-
-        self._ensure_configured()
-        try:
-            response = self._sdk.embed_content(**request)
-        except TypeError:
-            if "output_dimensionality" not in request:
-                raise
-            request.pop("output_dimensionality", None)
-            response = self._sdk.embed_content(**request)
-
-        embedding = _extract_embedding_values(response)
-        if not embedding:
-            raise ValueError("Gemini no devolvió un embedding válido.")
-        return {"embedding": embedding}
-
-    def GenerationConfig(self, **kwargs: Any) -> Any:
-        generation_config_cls = getattr(self._sdk, "GenerationConfig", None)
-        if callable(generation_config_cls):
-            return generation_config_cls(**kwargs)
-        return dict(kwargs)
-
-
-def _requested_provider() -> str:
-    candidate = str(getattr(settings, "GEMINI_CLIENT_PROVIDER", "genai") or "genai").strip().lower()
-    if candidate in {"genai", "legacy"}:
-        return candidate
-    emit_structured_log(
-        "gemini_client_provider_invalid",
-        level="warning",
-        requested_provider=candidate,
-        effective_provider="genai",
-    )
-    return "genai"
-
-
-def _build_runtime() -> Any:
-    provider = _requested_provider()
-
-    if provider == "legacy":
-        if _HAS_LEGACY_SDK:
-            emit_structured_log("gemini_client_provider_selected", provider="legacy")
-            return _LegacyRuntime()
+def _build_runtime() -> _GenAiRuntime:
+    if not _HAS_GENAI_SDK:
         raise RuntimeError(
-            "GEMINI_CLIENT_PROVIDER=legacy pero no está disponible el SDK 'google-generativeai'."
+            "El SDK 'google-genai' no está disponible. Instálalo con: pip install google-genai"
         )
-
-    if _HAS_GENAI_SDK:
-        emit_structured_log("gemini_client_provider_selected", provider="genai")
-        return _GenAiRuntime()
-
-    raise RuntimeError(
-        "GEMINI_CLIENT_PROVIDER=genai pero no está disponible el SDK 'google-genai'."
-    )
+    emit_structured_log("gemini_client_provider_selected", provider="genai")
+    return _GenAiRuntime()
 
 
 genai = _build_runtime()

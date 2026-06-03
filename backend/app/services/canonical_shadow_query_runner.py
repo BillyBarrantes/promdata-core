@@ -22,6 +22,12 @@ from app.core.semantic_grammar import (
     VisualProtocol,
 )
 from app.core.structured_logging import emit_structured_log
+from app.services.analysis_memory_context import (
+    apply_parent_context_to_placeholder_filters,
+    build_parent_memory_context_text,
+    load_parent_analysis_context,
+    unwrap_prompt_payload,
+)
 from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe
 from app.services.canonical_dark_runtime_orchestrator import (
     CanonicalDarkRuntimePipelineResult,
@@ -1770,6 +1776,7 @@ def build_canonical_shadow_query_execution(
     file_id: str,
     pipeline_result: CanonicalDarkRuntimePipelineResult,
     prompt: str | None = None,
+    service_client: Any | None = None,
     prompt_type: str | None = None,
     requested_visual_family: str | None = None,
     max_plans: int = 3,
@@ -1804,17 +1811,18 @@ def build_canonical_shadow_query_execution(
             },
         )
 
+    actual_prompt, parent_task_id = unwrap_prompt_payload(prompt)
     selected_candidate_id = str(
         pipeline_result.analytical_adapter_runtime.analytical_bundle.selected_candidate_id or ""
     ).strip()
     strategy_plans, strategy_prompt, strategy_name = _build_shadow_strategy_bundle(
-        prompt=prompt,
+        prompt=actual_prompt,
         prompt_type=prompt_type,
         candidate_df=candidate_df,
         requested_visual_family=requested_visual_family,
     )
     query_prompt, prompt_strategy = (strategy_prompt, strategy_name) if strategy_plans else (
-        (prompt, "custom_prompt") if prompt else _build_shadow_prompt(candidate_df)
+        (actual_prompt, "custom_prompt") if actual_prompt else _build_shadow_prompt(candidate_df)
     )
     if not query_prompt or not prompt_strategy:
         return CanonicalShadowQueryExecution(
@@ -1835,15 +1843,26 @@ def build_canonical_shadow_query_execution(
 
     schema_profile = getattr(candidate_df, "attrs", {}).get("schema_profile", {}) or {}
     dataset_contract = getattr(candidate_df, "attrs", {}).get("semantic_contract", {}) or {}
+    parent_context = load_parent_analysis_context(
+        service_client=service_client,
+        parent_task_id=parent_task_id,
+        file_id=file_id,
+        columns=list(candidate_df.columns),
+    )
     plans = strategy_plans or (
         SemanticTranslator.translate(
             query_prompt,
             list(candidate_df.columns),
             _build_glossary_context(candidate_df),
             _build_topology_context(candidate_df),
+            memory_context=build_parent_memory_context_text(parent_context),
             schema_profile=schema_profile,
             dataset_contract=dataset_contract,
         ) or []
+    )
+    plans = apply_parent_context_to_placeholder_filters(
+        plans=plans,
+        parent_context=parent_context,
     )
     bounded_plans = list(plans[: max(int(max_plans or 0), 1)])
     plan_summaries = [_summarize_plan(plan, index + 1) for index, plan in enumerate(bounded_plans)]
@@ -1919,6 +1938,8 @@ def build_canonical_shadow_query_execution(
             "shadow_file_id": shadow_file_id,
             "shadow_parquet_path": parquet_path,
             "shadow_query_status": shadow_query_status,
+            "parent_task_id": parent_task_id,
+            "parent_context_filter_count": len(list((parent_context or {}).get("filters") or [])),
         },
     )
 
@@ -1944,6 +1965,7 @@ def run_canonical_shadow_query_for_uploaded_file(
         file_id=file_id,
         pipeline_result=pipeline_result,
         prompt=prompt,
+        service_client=service_client,
         prompt_type=prompt_type,
         requested_visual_family=requested_visual_family,
         max_plans=max_plans,

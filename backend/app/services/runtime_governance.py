@@ -120,17 +120,22 @@ def get_runtime_governance_payload() -> dict[str, Any]:
             jwt_secret_configured=supabase_jwt_ready,
         )
 
-    gemini_ready = bool(str(settings.GEMINI_API_KEY or "").strip())
+    gemini_ready = bool(
+        str(settings.GEMINI_API_KEY or "").strip()
+        or str(settings.GEMINI_VERTEX_PROJECT or "").strip()
+    )
     gemini_provider = str(getattr(settings, "GEMINI_CLIENT_PROVIDER", "genai") or "genai").strip().lower()
+    gemini_auth_mode = "api_key" if str(settings.GEMINI_API_KEY or "").strip() else "vertex_ai_enterprise"
     checks["gemini"] = _build_check(
         "healthy" if gemini_ready else "critical",
-        "Modelo generativo configurado." if gemini_ready else "Falta GEMINI_API_KEY.",
+        "Modelo generativo configurado." if gemini_ready else "Falta GEMINI_API_KEY o GEMINI_VERTEX_PROJECT.",
         configured=gemini_ready,
         model_name=str(settings.AI_MODEL_NAME or "").strip(),
         provider=gemini_provider,
+        auth_mode=gemini_auth_mode,
     )
     if not gemini_ready:
-        criticals.append("gemini_missing_api_key")
+        criticals.append("gemini_missing_credentials")
 
     broker_ready = bool(str(settings.CELERY_BROKER_URL or "").strip())
     result_backend_ready = bool(str(settings.CELERY_RESULT_BACKEND or "").strip())

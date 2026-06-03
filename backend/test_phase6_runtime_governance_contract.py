@@ -16,6 +16,7 @@ def _set_runtime(monkeypatch, **overrides) -> None:
         "SUPABASE_ANON_KEY": "anon-key",
         "SUPABASE_JWT_SECRET": "jwt-secret",
         "GEMINI_API_KEY": "gemini-key",
+        "GEMINI_VERTEX_PROJECT": "promdata-enterprise",
         "CELERY_BROKER_URL": "redis://redis:6379/0",
         "CELERY_RESULT_BACKEND": "redis://redis:6379/0",
         "BACKEND_PUBLIC_URL": "http://localhost:8000",

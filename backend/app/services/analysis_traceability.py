@@ -218,12 +218,14 @@ def build_traceability_payload(
     institutional_snippets: list[Any] | None,
     plan_entries: list[dict[str, Any]],
     final_struct: dict[str, Any],
+    semantic_context: dict[str, Any] | None = None,
     status: str,
     error_message: str | None = None,
 ) -> dict[str, Any]:
     format_override = format_override or {}
     schema_profile = schema_profile or {}
     institutional_snippets = institutional_snippets or []
+    semantic_context = semantic_context or {}
 
     outputs = {
         "analysis_present": bool(str(final_struct.get("analysis") or "").strip()),
@@ -265,6 +267,7 @@ def build_traceability_payload(
             "currency": currency_meta or {},
         },
         "documents": _serialize_document_sources(institutional_snippets),
+        "semantic_context": semantic_context,
         "plans": plan_entries,
         "outputs": outputs,
     }
