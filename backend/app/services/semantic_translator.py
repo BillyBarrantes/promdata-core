@@ -415,11 +415,19 @@ class SemanticTranslator:
         cached_decision = get_cached_json("semantic_router", router_cache_key)
         if isinstance(cached_decision, dict):
             normalized_cached_decision = SemanticTranslator._normalize_semantic_router_decision(cached_decision)
+            _contract_file_id = (
+                str((dataset_contract or {}).get("file_id") or "").strip()
+                if isinstance(dataset_contract, dict)
+                else ""
+            )
             emit_structured_log(
                 "semantic_router_cache_hit",
                 route=normalized_cached_decision.get("route"),
                 confidence=normalized_cached_decision.get("confidence"),
                 detected_intent=normalized_cached_decision.get("detected_intent"),
+                prompt=str(surface_prompt)[:180],
+                file_id=_contract_file_id or None,
+                cache_key_prefix=router_cache_key[:16],
             )
             return normalized_cached_decision
 
@@ -1031,6 +1039,15 @@ class SemanticTranslator:
             schema_profile=schema_profile,
             allowed_roles={"metric"},
         )
+        # [V3 FIX] Fallback de coincidencia exacta: si el LLM nombró una columna
+        # explícitamente en el contrato, respetarla aunque schema_profile la
+        # marque como "dimension" (caso típico: columnas protegidas por
+        # IMMUTABILITY LOCK que el router marca como "dimension" pero el LLM
+        # las usa como métricas en su plan).
+        if not metric_column:
+            contract_metric_hint = str(contract.get("plot_metric") or contract.get("metric") or "").strip()
+            if contract_metric_hint and contract_metric_hint in columns:
+                metric_column = contract_metric_hint
         if not metric_column:
             metric_column = SemanticTranslator._infer_default_metric_column(
                 str(contract.get("metric") or ""),
@@ -2622,10 +2639,23 @@ class SemanticTranslator:
         if isinstance(cached_plans, list) and cached_plans:
             try:
                 restored_plans = [AnalysisPlan.model_validate(item) for item in cached_plans]
+                _tx_file_id = (
+                    str((dataset_contract or {}).get("file_id") or "").strip()
+                    if isinstance(dataset_contract, dict)
+                    else ""
+                )
+                _tx_metrics = []
+                for _p in restored_plans:
+                    _m = getattr(_p, "metric", None)
+                    if _m:
+                        _tx_metrics.append(str(_m))
                 emit_structured_log(
                     "semantic_translator_cache_hit",
                     prompt=prompt[:200],
                     plan_count=len(restored_plans),
+                    file_id=_tx_file_id or None,
+                    plan_metrics=_tx_metrics[:5],
+                    cache_key_prefix=translator_cache_key[:16],
                 )
                 print(f"⚡ [SEMANTIC TRANSLATOR CACHE] Hit ({len(restored_plans)} planes)")
                 return restored_plans

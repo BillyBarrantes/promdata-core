@@ -2873,6 +2873,11 @@ def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=No
                                         "chart_narrative_cache_hit",
                                         model=narrative_model_name,
                                         plan_title=plan.title,
+                                        plan_metric=getattr(plan, "metric", None),
+                                        plan_dimension=getattr(plan, "dimension", None),
+                                        prompt=str(actual_prompt)[:180],
+                                        file_id=file_id,
+                                        cache_key_prefix=narrative_cache_key[:16],
                                     )
                                     print(f"⚡ [NARRATIVA CACHE] Hit ({narrative_model_name})")
 
@@ -3705,12 +3710,17 @@ def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token
             _is_logical_error = any(signal in _error_str for signal in _logical_error_signals)
 
             # [V2] Usar fila-count real del sidecar de datos si está disponible
+            # [V3 FIX] Usar glob pattern para soportar multi-sheet union
+            # (e.g. "primary_union_2021__2022__2023__2024__2025") además del
+            # legacy single-sheet ("primary_sheet_sheet1"). Sin este fix, el
+            # BIG DATA SHIELD nunca se activa para archivos multi-sheet.
             _actual_row_count = 0
             try:
-                import os, json as _json
-                _sidecar_path = f"/tmp/promdata_cache/shadow_query_{str(file_id).replace('-', '_')}_primary_sheet_sheet1.contract.json"
-                if os.path.exists(_sidecar_path):
-                    with open(_sidecar_path, 'r') as _sf:
+                import os, json as _json, glob as _glob
+                _sidecar_pattern = f"/tmp/promdata_cache/shadow_query_{str(file_id).replace('-', '_')}_primary_*.contract.json"
+                _sidecar_files = sorted(_glob.glob(_sidecar_pattern), key=os.path.getmtime, reverse=True)
+                if _sidecar_files:
+                    with open(_sidecar_files[0], 'r') as _sf:
                         _sidecar = _json.load(_sf)
                     _actual_row_count = int(_sidecar.get('row_count', 0) or _sidecar.get('rows_at_max', 0) or 0)
             except Exception:

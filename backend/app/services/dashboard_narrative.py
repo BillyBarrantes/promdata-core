@@ -210,6 +210,8 @@ def generate_dashboard_executive_summary(
             widget_count=len(normalized_widgets),
             filter_count=len(filter_scope),
             mixed_sources=mixed_sources,
+            file_ids=sorted(unique_file_ids)[:5],
+            cache_key_prefix=cache_key[:16],
         )
         return _build_summary_result(
             payload=cached_summary,

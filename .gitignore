@@ -29,4 +29,4 @@ next-env.d.ts
 # virtual environments
 backend/venv/
 .venv/
-venv/
+venv/backend/google-credentials.json

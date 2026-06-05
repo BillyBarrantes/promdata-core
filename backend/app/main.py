@@ -1,4 +1,6 @@
 import os
+import threading
+import time
 
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router as api_router
 from app.core.config import settings
+from app.core.redis_client import get_redis_client
 from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
 from app.services.canonical_canary_health import build_canonical_tabular_canary_health
@@ -136,23 +139,56 @@ def _log_runtime_governance_snapshot() -> None:
     )
 
 
+_HEALTHCHECK_PING_CACHE: dict[str, tuple[float, bool, str | None]] = {}
+_HEALTHCHECK_PING_LOCK = threading.Lock()
+_HEALTHCHECK_PING_TTL_SECONDS = 5.0
+
+
 def _check_redis(url: str) -> tuple[bool, str | None]:
     normalized = str(url or "").strip()
     if not normalized:
         return True, None
     if not normalized.startswith(("redis://", "rediss://")):
         return True, None
+
+    rate_limit_url = str(getattr(settings, "RATE_LIMIT_STORAGE_URL", "") or "").strip()
+    shared_pool_url = bool(rate_limit_url) and normalized == rate_limit_url
+
+    now = time.monotonic()
+    with _HEALTHCHECK_PING_LOCK:
+        cached = _HEALTHCHECK_PING_CACHE.get(normalized)
+        if cached and (now - cached[0]) < _HEALTHCHECK_PING_TTL_SECONDS:
+            return cached[1], cached[2]
+
     try:
-        client = Redis.from_url(
-            normalized,
-            decode_responses=True,
-            socket_connect_timeout=1.0,
-            socket_timeout=1.0,
-        )
-        client.ping()
+        if shared_pool_url:
+            client = get_redis_client(purpose="healthcheck")
+            if client is None:
+                with _HEALTHCHECK_PING_LOCK:
+                    _HEALTHCHECK_PING_CACHE[normalized] = (now, False, "healthcheck_client_unavailable")
+                return False, "healthcheck_client_unavailable"
+            client.ping()
+        else:
+            client = Redis.from_url(
+                normalized,
+                decode_responses=True,
+                socket_connect_timeout=1.0,
+                socket_timeout=1.0,
+            )
+            try:
+                client.ping()
+            finally:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+        with _HEALTHCHECK_PING_LOCK:
+            _HEALTHCHECK_PING_CACHE[normalized] = (now, True, None)
         return True, None
     except Exception as error:
-        return False, str(error)
+        with _HEALTHCHECK_PING_LOCK:
+            _HEALTHCHECK_PING_CACHE[normalized] = (now, False, str(error)[:180])
+        return False, str(error)[:180]
 
 
 @app.get("/health/live", summary="Liveness Probe")

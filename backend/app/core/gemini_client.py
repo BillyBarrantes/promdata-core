@@ -21,7 +21,14 @@ try:
     _GENAI_SDK = _genai_sdk
     _GENAI_TYPES = _genai_types
     _HAS_GENAI_SDK = True
-except Exception:
+except Exception as _genai_import_error:
+    # [GUARD] Logging explícito del fallo de import para diagnóstico futuro.
+    # Antes este try/except tragaba el error silenciosamente y solo se
+    # manifestaba como RuntimeError genérico en _build_runtime().
+    import logging
+    logging.warning(
+        "google-genai SDK import failed: %r", _genai_import_error
+    )
     _HAS_GENAI_SDK = False
 
 

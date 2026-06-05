@@ -1,5 +1,46 @@
 from __future__ import annotations
 
+"""Caché de respuestas de IA con backend Redis (con fallback a memoria).
+
+================================================================================
+GOBERNANZA CANÓNICA DE CACHE KEYS — REGLA DE ORO PARA TODO EL EQUIPO
+================================================================================
+
+Cualquier callsite que invoque `build_cache_key(namespace, payload)` debe
+garantizar que DOS prompts con intención semántica DISTINTA (aunque compartan
+archivo, dimensión o agregación) produzcan llaves DIFERENTES. Esto se logra
+aplicando UNA de estas dos reglas (o ambas):
+
+  1. **Namespace distintos** para flujos con semántica disjunta.
+     Ejemplos válidos:
+       - "semantic_router"        → decisiones de ruteo (intent, route, confidence)
+       - "semantic_translator"    → planes analíticos (AnalysisPlan JSON)
+       - "chart_narrative"        → narrativas de un chart específico
+       - "dashboard_executive_summary" → resumen ejecutivo de un dashboard
+       - "semantic_router_schema" → fingerprint de schema (sin prompt)
+
+  2. **Payload que contenga toda variable discriminante** del contexto.
+     Si dos requests pueden producir respuestas distintas con el mismo
+     namespace, los campos que las distinguen DEBEN estar en el payload:
+       - `prompt` (texto exacto del usuario, normalizado)
+       - `file_id` (cuando aplique)
+       - `plan.metric` / `plan.dimension` (cuando aplique)
+       - `glossary_context`, `format_instruction`, etc.
+
+Anti-patrones prohibidos:
+  - Usar el mismo namespace con un payload que NO incluya el prompt del
+    usuario. Esto causará colisiones cuando dos archivos del mismo
+    schema se analicen con prompts distintos.
+  - Asumir que el TTL del cache (1800s por defecto) es la red de seguridad.
+    El TTL solo limpia eventualmente; no previene respuestas incorrectas
+    servidas en los primeros 30 minutos.
+
+El versionado del esquema (`_CACHE_KEY_SCHEMA_VERSION`) garantiza que
+cualquier bump de versión invalide MASIVAMENTE todas las keys generadas
+con la versión anterior, sin necesidad de scripts de purga.
+================================================================================
+"""
+
 import hashlib
 import json
 import threading
@@ -7,22 +48,18 @@ import time
 from typing import Any
 
 try:
-    from redis import Redis
     from redis.exceptions import RedisError
 except Exception:  # pragma: no cover - fallback defensivo para entornos sin redis client
-    Redis = None  # type: ignore[assignment]
-
     class RedisError(Exception):
         pass
 
 from app.core.config import settings
+from app.core.redis_client import get_redis_client
 from app.core.structured_logging import emit_structured_log
 
 
 _CACHE_PREFIX = "promdata:ai_cache"
-_REDIS_CLIENT: Redis | None = None
-_REDIS_INIT_ATTEMPTED = False
-_REDIS_LOCK = threading.Lock()
+_CACHE_KEY_SCHEMA_VERSION = "v2"
 _MEMORY_CACHE: dict[str, tuple[float, str]] = {}
 _MEMORY_LOCK = threading.Lock()
 
@@ -37,50 +74,14 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-def _get_redis_client() -> Redis | None:
-    global _REDIS_CLIENT, _REDIS_INIT_ATTEMPTED
-
-    if _REDIS_INIT_ATTEMPTED:
-        return _REDIS_CLIENT
-
-    with _REDIS_LOCK:
-        if _REDIS_INIT_ATTEMPTED:
-            return _REDIS_CLIENT
-
-        _REDIS_INIT_ATTEMPTED = True
-        if Redis is None:
-            emit_structured_log(
-                "ai_response_cache_storage_fallback_memory",
-                level="warning",
-                error="redis_client_missing",
-                storage_url=settings.RATE_LIMIT_STORAGE_URL,
-            )
-            _REDIS_CLIENT = None
-            return _REDIS_CLIENT
-        try:
-            client = Redis.from_url(
-                settings.RATE_LIMIT_STORAGE_URL,
-                decode_responses=True,
-                socket_connect_timeout=0.5,
-                socket_timeout=0.5,
-                health_check_interval=30,
-            )
-            client.ping()
-            _REDIS_CLIENT = client
-        except Exception as exc:
-            _REDIS_CLIENT = None
-            emit_structured_log(
-                "ai_response_cache_storage_fallback_memory",
-                level="warning",
-                error=str(exc)[:180],
-                storage_url=settings.RATE_LIMIT_STORAGE_URL,
-            )
-    return _REDIS_CLIENT
+def _get_redis_client():
+    return get_redis_client(purpose="ai_response_cache")
 
 
 def build_cache_key(namespace: str, payload: dict[str, Any]) -> str:
     normalized = json.dumps(
         {
+            "_schema_version": _CACHE_KEY_SCHEMA_VERSION,
             "namespace": namespace,
             "payload": _json_safe(payload),
         },
@@ -121,6 +122,13 @@ def get_cached_json(namespace: str, key: str) -> Any | None:
         try:
             cached = redis_client.get(storage_key)
             if cached:
+                emit_structured_log(
+                    "ai_cache_hit",
+                    namespace=namespace,
+                    backend="redis",
+                    key_prefix=key[:16],
+                    key_schema_version=_CACHE_KEY_SCHEMA_VERSION,
+                )
                 return json.loads(cached)
         except RedisError as exc:
             emit_structured_log(
@@ -129,7 +137,16 @@ def get_cached_json(namespace: str, key: str) -> Any | None:
                 namespace=namespace,
                 error=str(exc)[:180],
             )
-    return _memory_get(storage_key)
+    memory_hit = _memory_get(storage_key)
+    if memory_hit is not None:
+        emit_structured_log(
+            "ai_cache_hit",
+            namespace=namespace,
+            backend="memory_fallback",
+            key_prefix=key[:16],
+            key_schema_version=_CACHE_KEY_SCHEMA_VERSION,
+        )
+    return memory_hit
 
 
 def set_cached_json(namespace: str, key: str, payload: Any, ttl_seconds: int) -> None:

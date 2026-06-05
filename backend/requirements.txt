@@ -8,7 +8,6 @@ openpyxl
 python-jose[cryptography]
 requests
 google-genai
-google-generativeai
 tabulate
 scikit-learn
 statsmodels

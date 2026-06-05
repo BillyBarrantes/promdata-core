@@ -5,17 +5,13 @@ import time
 
 from fastapi import HTTPException, Request
 from jose import jwt
-from redis import Redis
 from redis.exceptions import RedisError
 
 from app.core.config import settings
+from app.core.redis_client import get_redis_client
 from app.core.structured_logging import emit_structured_log
 from app.core.supabase_client import get_supabase_service_client
 
-
-_REDIS_CLIENT: Redis | None = None
-_REDIS_INIT_ATTEMPTED = False
-_REDIS_LOCK = threading.Lock()
 
 _MEMORY_STORE: dict[str, tuple[int, int]] = {}
 _MEMORY_LOCK = threading.Lock()
@@ -24,45 +20,8 @@ _TEAM_CACHE: dict[str, tuple[str | None, float]] = {}
 _TEAM_CACHE_LOCK = threading.Lock()
 
 
-def _get_redis_client() -> Redis | None:
-    global _REDIS_CLIENT, _REDIS_INIT_ATTEMPTED
-
-    if _REDIS_INIT_ATTEMPTED:
-        return _REDIS_CLIENT
-
-    with _REDIS_LOCK:
-        if _REDIS_INIT_ATTEMPTED:
-            return _REDIS_CLIENT
-
-        _REDIS_INIT_ATTEMPTED = True
-        storage_url = str(settings.RATE_LIMIT_STORAGE_URL or "").strip()
-        if not storage_url:
-            return None
-
-        try:
-            client = Redis.from_url(
-                storage_url,
-                decode_responses=True,
-                socket_connect_timeout=1.0,
-                socket_timeout=1.0,
-            )
-            client.ping()
-            _REDIS_CLIENT = client
-            emit_structured_log(
-                "rate_limit_storage_ready",
-                storage="redis",
-                storage_url=storage_url,
-            )
-        except Exception as error:
-            emit_structured_log(
-                "rate_limit_storage_fallback_memory",
-                level="warning",
-                storage_url=storage_url,
-                error=str(error)[:180],
-            )
-            _REDIS_CLIENT = None
-
-    return _REDIS_CLIENT
+def _get_redis_client():
+    return get_redis_client(purpose="rate_limit")
 
 
 def _extract_user_id_from_token(token: str) -> str | None:
@@ -200,11 +159,6 @@ def enforce_rate_limit(
 
 
 def _reset_rate_limit_state_for_tests() -> None:
-    global _REDIS_CLIENT, _REDIS_INIT_ATTEMPTED
-
-    with _REDIS_LOCK:
-        _REDIS_CLIENT = None
-        _REDIS_INIT_ATTEMPTED = False
     with _MEMORY_LOCK:
         _MEMORY_STORE.clear()
     with _TEAM_CACHE_LOCK:
