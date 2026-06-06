@@ -19,7 +19,7 @@
 | Auth/DB     | Supabase (Postgres + Auth + Storage)    | Multi-tenant via `tenant_id` / `file_id`.          |
 | Cache       | Redis Cloud (Free plan, 30 conn / 30MB) | Centralized pool, see §5.                          |
 | CI/CD       | Google Cloud Build                      | `cloudbuild.yaml` (backend) + manual worker deploy.|
-| Hosting     | Google Cloud Run (`us-east4`)           | 2 services: `promdata-backend` + `promdata-worker`.|
+| Hosting     | Google Cloud Run (`us-east4`)           | 2 services: `promdata-backend` + `promdata-worker`. Frontend on Vercel. |
 
 ---
 
@@ -27,12 +27,18 @@
 
 ### 2.1 `promdata-backend`
 - **Source:** `/backend/Dockerfile`
-- **Auto-deploy:** **ENABLED** (triggered by `git push` to `main` via `cloudbuild.yaml`)
-- **Public URL:** `https://promdata-backend-18829055607.us-east4.run.app`
+- **Auto-deploy:** **ENABLED** (intended via `cloudbuild.yaml`). See §10.1
+  for known incident: the step-3 deploy in `cloudbuild.yaml` has been
+  observed NOT to create the service reliably. Always verify the service
+  exists after a `git push`.
+- **Public URL:** `https://promdata-backend-698138140658.us-east4.run.app`
 - **Image tag:** `gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`
+- **Port:** 8080 (Cloud Run default; uvicorn reads `$PORT`).
+- **Min instances:** 1 (no cold starts in prod).
 - **Env vars of interest:**
   - `ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat`
   - `FRONTEND_APP_URL=https://livion.lat`
+  - `BACKEND_PUBLIC_URL=https://promdata-backend-698138140658.us-east4.run.app`
 
 ### 2.2 `promdata-worker`
 - **Source:** same image (`gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`)
@@ -184,7 +190,11 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
 2. `git push origin main`
 3. Cloud Build triggers automatically (`cloudbuild.yaml`).
 4. Monitor deploy in Cloud Console → Cloud Build → History.
-5. Verify with `curl https://promdata-backend-18829055607.us-east4.run.app/health/ready`.
+5. **Verify the service exists** in Cloud Run → `promdata-backend`. If the
+   build succeeded but the service is missing (a known intermittent
+   issue — see §10.1), create it manually from the same image
+   (`gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`).
+6. Healthcheck: `curl https://promdata-backend-698138140658.us-east4.run.app/health/ready`.
 
 ### 6.2 Redeploying Worker (manual)
 The worker does **not** auto-deploy. After pushing a new backend image:
@@ -277,5 +287,34 @@ in this file (add a row to §9 if it's a breaking change).
 
 ---
 
-**Last updated:** 2026-06-05 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
-+ Fix V3 (semantic translator) + result_expires 12h optimization.
+## 10. Incident Log
+
+### 10.1 Backend service missing (2026-06-06)
+- **Symptom:** Frontend on `livion.lat` returned 404 for every
+  `/api/v1/*` request because `NEXT_PUBLIC_API_BASE_URL` was pointing to
+  a stale Next.js v0 demo (`promdata-core-...run.app`) instead of the
+  FastAPI backend.
+- **Root cause (compound):**
+  1. `cloudbuild.yaml` step 3 (`gcloud run deploy promdata-backend`) had
+     not created the service on a recent deploy (image built, but service
+     missing from Cloud Run).
+  2. The frontend at Vercel had `NEXT_PUBLIC_API_BASE_URL` pointing to
+     `promdata-core-...run.app`, which is a leftover Next.js/v0 demo, not
+     the FastAPI backend.
+- **Resolution:**
+  1. Manually created `promdata-backend` Cloud Run service from image
+     `gcr.io/promdata-enterprise/promdata-backend:8a15bb7f` (the SHA
+     that contains the `result_expires=12h` change).
+  2. Set `BACKEND_PUBLIC_URL` in the service env vars.
+  3. Updated `NEXT_PUBLIC_API_BASE_URL` in Vercel to
+     `https://promdata-backend-698138140658.us-east4.run.app` and
+     triggered a manual redeploy (NEXT_PUBLIC_* requires rebuild).
+  4. Healthcheck confirmed 200 OK.
+- **Preventive action (TODO, not yet implemented):** Add a Cloud Build
+  step that does `curl $SERVICE_URL/health/ready` after the deploy, so
+  the build fails if the service is missing.
+
+---
+
+**Last updated:** 2026-06-06 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
++ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery).
