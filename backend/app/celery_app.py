@@ -55,6 +55,12 @@ celery_app.conf.update(
     ),
     broker_transport_options=_celery_redis_kwargs,
     result_backend_transport_options=_celery_redis_kwargs,
+    # [REDIS CLOUD MEMORY OPTIMIZATION] Expirar resultados de tareas en 12h
+    # en lugar del default de Celery (1 día = 86400s). Esto reduce el uso
+    # de memoria en Redis Cloud (plan Free 30MB) cuando hay acumulación
+    # de tareas completadas. NO afecta a la API: el frontend consulta el
+    # status de una tarea en los primeros segundos tras el submit.
+    result_expires=12 * 3600,
 )
 
 
