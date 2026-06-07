@@ -57,6 +57,47 @@ steps:
         --update-env-vars=^|^ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat|FRONTEND_APP_URL=https://livion.lat
     waitFor: ['push-backend']
 
+  # ---------------------------------------------------------------------------
+  # Paso 4: Verificar que el servicio quedó vivo (preventive action
+  # del incidente 10.1). Captura la URL del servicio recién desplegado
+  # y hace curl al healthcheck. Si no responde 200 en ~30s, falla el
+  # build para que el desarrollador se entere en lugar de descubrirlo
+  # cuando el frontend empiece a fallar silenciosamente.
+  # ---------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'verify-deploy'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -e
+        SERVICE_URL=$$(gcloud run services describe promdata-backend \
+          --region=us-east4 \
+          --project=$$PROJECT_ID \
+          --format='value(status.url)' 2>/dev/null || true)
+        if [ -z "$$SERVICE_URL" ]; then
+          echo "ERROR: promdata-backend service does not exist after deploy."
+          echo "Esto suele indicar que el Paso 3 falló silenciosamente."
+          echo "Revisa: https://console.cloud.google.com/run?project=$$PROJECT_ID"
+          exit 1
+        fi
+        echo "Verificando $$SERVICE_URL/health/ready"
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          HTTP_STATUS=$$(curl -sS -o /tmp/health.json -w "%{http_code}" \
+            --max-time 5 "$$SERVICE_URL/health/ready" 2>/dev/null || echo "000")
+          echo "  intento $$i: HTTP $$HTTP_STATUS"
+          if [ "$$HTTP_STATUS" = "200" ]; then
+            echo "OK: servicio saludable"
+            cat /tmp/health.json
+            exit 0
+          fi
+          sleep 3
+        done
+        echo "ERROR: healthcheck no retornó 200 en 30s"
+        cat /tmp/health.json || true
+        exit 1
+    waitFor: ['deploy-cloud-run']
+
 # ---------------------------------------------------------------------------
 # Imágenes publicadas al Container Registry como artefactos del build
 # ---------------------------------------------------------------------------

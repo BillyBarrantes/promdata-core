@@ -189,11 +189,11 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
 1. `git add -A && git commit -m "..."`
 2. `git push origin main`
 3. Cloud Build triggers automatically (`cloudbuild.yaml`).
-4. Monitor deploy in Cloud Console → Cloud Build → History.
-5. **Verify the service exists** in Cloud Run → `promdata-backend`. If the
-   build succeeded but the service is missing (a known intermittent
-   issue — see §10.1), create it manually from the same image
-   (`gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`).
+4. Cloud Build runs 4 steps: `build` → `push` → `deploy` → `verify-deploy`.
+5. Monitor deploy in Cloud Console → Cloud Build → History. The
+   `verify-deploy` step curls `/health/ready` with 10 retries (~30s).
+   If the build fails at this step, the service is missing or unhealthy
+   — see §10.1 for recovery procedure.
 6. Healthcheck: `curl https://promdata-backend-698138140658.us-east4.run.app/health/ready`.
 
 ### 6.2 Redeploying Worker (manual)
@@ -301,6 +301,14 @@ in this file (add a row to §9 if it's a breaking change).
   2. The frontend at Vercel had `NEXT_PUBLIC_API_BASE_URL` pointing to
      `promdata-core-...run.app`, which is a leftover Next.js/v0 demo, not
      the FastAPI backend.
+  3. **Historical context:** the FastAPI backend was originally deployed
+     to a service named `promdata-core`. On 2026-06-03 someone (manual
+     push or v0 app generator) overwrote that service with a Next.js v0
+     demo, changing its URL. The `cloudbuild.yaml` was then updated to
+     target `promdata-backend` (the new name) but the deploy step failed
+     silently. The Vercel env var was never updated to the new service
+     name. Net effect: the Vercel frontend kept pointing at the Next.js
+     demo under the old name.
 - **Resolution:**
   1. Manually created `promdata-backend` Cloud Run service from image
      `gcr.io/promdata-enterprise/promdata-backend:8a15bb7f` (the SHA
@@ -310,11 +318,16 @@ in this file (add a row to §9 if it's a breaking change).
      `https://promdata-backend-698138140658.us-east4.run.app` and
      triggered a manual redeploy (NEXT_PUBLIC_* requires rebuild).
   4. Healthcheck confirmed 200 OK.
-- **Preventive action (TODO, not yet implemented):** Add a Cloud Build
-  step that does `curl $SERVICE_URL/health/ready` after the deploy, so
-  the build fails if the service is missing.
+  5. Deleted the orphan `promdata-core` (Next.js v0 demo) from Cloud Run.
+- **Preventive action (implemented 2026-06-06):** Added step 4 to
+  `cloudbuild.yaml` (`verify-deploy`). After the deploy, the build
+  queries the service URL via `gcloud run services describe` and
+  `curl`s `/health/ready` with 10 retries (3s apart, ~30s total). If
+  the service is missing or unhealthy, the build fails immediately so
+  the engineer notices in Cloud Build History instead of waiting for
+  the frontend to break in production.
 
 ---
 
 **Last updated:** 2026-06-06 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
-+ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery).
++ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery, promdata-core removed, verify-deploy step added).
