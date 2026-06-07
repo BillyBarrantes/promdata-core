@@ -18,14 +18,35 @@
 | LLM         | Vertex AI (`google-genai` SDK)          | Default model `gemini-3.5-flash`.                  |
 | Auth/DB     | Supabase (Postgres + Auth + Storage)    | Multi-tenant via `tenant_id` / `file_id`.          |
 | Cache       | Redis Cloud (Free plan, 30 conn / 30MB) | Centralized pool, see §5.                          |
-| CI/CD       | Google Cloud Build                      | `cloudbuild.yaml` (backend) + manual worker deploy.|
-| Hosting     | Google Cloud Run (`us-east4`)           | 2 services: `promdata-backend` + `promdata-worker`. Frontend on Vercel. |
+| CI/CD       | Google Cloud Build                      | `cloudbuild.yaml` (backend) + Cloud Build trigger (frontend) + manual worker deploy.|
+| Hosting     | Google Cloud Run (`us-east4`)           | 3 services: `promdata-core` (frontend) + `promdata-backend` (FastAPI) + `promdata-worker` (Celery). See §2. |
 
 ---
 
 ## 2. Services (Cloud Run)
 
-### 2.1 `promdata-backend`
+The project has **3 independent deployable units** in Cloud Run, each
+managed by a different mechanism. **Do not delete any of them without
+reading §10.1 and §10.2 first** — the names overlap with auto-triggers.
+
+### 2.0 `promdata-core` — Frontend (Next.js)
+- **Source:** repo root `Dockerfile` (Node 22 + pnpm, Next.js build)
+- **Auto-deploy:** **ENABLED** via Cloud Build trigger
+  `rmgpgab-promdata-core-us-east4-BillyBarrantes-promdata-core-iym`
+  (id `5680bca7-...`). Trigger fires on every `git push` to `main`,
+  builds the root Dockerfile, pushes to Artifact Registry
+  (`us-east4-docker.pkg.dev/.../promdata-core/promdata-core`), and
+  runs `gcloud run services update promdata-core`.
+- **Public URL:** `https://promdata-core-698138140658.us-east4.run.app`
+  (serves custom domain `livion.lat`)
+- **⚠️ Do NOT delete this service manually.** The trigger will recreate
+  it on the next push, but in the meantime `livion.lat` will be down.
+  See §10.2.
+- **Why the HTML says "v0 App":** the frontend was originally
+  generated with v0 (Vercel's AI UI builder). This is the legitimate
+  production frontend, not a leftover demo.
+
+### 2.1 `promdata-backend` — FastAPI API
 - **Source:** `/backend/Dockerfile`
 - **Auto-deploy:** **ENABLED** (intended via `cloudbuild.yaml`). See §10.1
   for known incident: the step-3 deploy in `cloudbuild.yaml` has been
@@ -40,7 +61,9 @@
   - `FRONTEND_APP_URL=https://livion.lat`
   - `BACKEND_PUBLIC_URL=https://promdata-backend-698138140658.us-east4.run.app`
 
-### 2.2 `promdata-worker`
+### 2.2 `promdata-worker` — Celery worker pool
+**NOT** a regular Cloud Run service. It's a **Cloud Run Worker Pool**
+(beta), which runs the Celery consumer process long-lived.
 - **Source:** same image (`gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`)
 - **Auto-deploy:** **DISABLED**. Manual redeploy from Cloud Console.
 - **Command override** (set in Cloud Run):
@@ -299,16 +322,18 @@ in this file (add a row to §9 if it's a breaking change).
      not created the service on a recent deploy (image built, but service
      missing from Cloud Run).
   2. The frontend at Vercel had `NEXT_PUBLIC_API_BASE_URL` pointing to
-     `promdata-core-...run.app`, which is a leftover Next.js/v0 demo, not
-     the FastAPI backend.
+     `promdata-core-...run.app`. **`promdata-core` is the legitimate
+     Next.js frontend service** (see §2.0 and §10.2) — it has no API
+     routes, so every call to `/api/v1/*` returned 404.
   3. **Historical context:** the FastAPI backend was originally deployed
-     to a service named `promdata-core`. On 2026-06-03 someone (manual
-     push or v0 app generator) overwrote that service with a Next.js v0
-     demo, changing its URL. The `cloudbuild.yaml` was then updated to
-     target `promdata-backend` (the new name) but the deploy step failed
-     silently. The Vercel env var was never updated to the new service
-     name. Net effect: the Vercel frontend kept pointing at the Next.js
-     demo under the old name.
+     to a service also named `promdata-core`. When the user switched
+     the backend's auto-deploy to a new service named `promdata-backend`
+     in `cloudbuild.yaml`, the Vercel-managed Cloud Build trigger (see
+     §10.2) kept rebuilding the frontend into the same `promdata-core`
+     service — overwriting any backend that had been there. The deploy
+     step in `cloudbuild.yaml` then failed silently on the new service
+     name, leaving `promdata-backend` uncreated. The Vercel env var
+     still pointed at `promdata-core` (the now-frontend service).
 - **Resolution:**
   1. Manually created `promdata-backend` Cloud Run service from image
      `gcr.io/promdata-enterprise/promdata-backend:8a15bb7f` (the SHA
@@ -318,8 +343,7 @@ in this file (add a row to §9 if it's a breaking change).
      `https://promdata-backend-698138140658.us-east4.run.app` and
      triggered a manual redeploy (NEXT_PUBLIC_* requires rebuild).
   4. Healthcheck confirmed 200 OK.
-  5. Deleted the orphan `promdata-core` (Next.js v0 demo) from Cloud Run.
-- **Preventive action (implemented 2026-06-06):** Added step 4 to
+- **Preventive action (implemented 2026-06-07):** Added step 4 to
   `cloudbuild.yaml` (`verify-deploy`). After the deploy, the build
   queries the service URL via `gcloud run services describe` and
   `curl`s `/health/ready` with 10 retries (3s apart, ~30s total). If
@@ -327,7 +351,27 @@ in this file (add a row to §9 if it's a breaking change).
   the engineer notices in Cloud Build History instead of waiting for
   the frontend to break in production.
 
+### 10.2 `promdata-core` is the FRONTEND, not an orphan (2026-06-07)
+- **Symptom:** During incident 10.1 investigation, `promdata-core` was
+  misidentified as a leftover Next.js v0 demo and was deleted.
+- **Reality:** A Cloud Build trigger exists in the project
+  (id `5680bca7-8a67-41a6-a8ec-59c0d76740e5`,
+  name `rmgpgab-promdata-core-us-east4-BillyBarrantes-promdata-core-iym`)
+  that fires on every push to `main` and deploys the **root `Dockerfile`**
+  (the Next.js frontend) to the `promdata-core` service. `promdata-core`
+  is the legitimate production frontend that serves `livion.lat` (via
+  custom domain mapping).
+- **Auto-recreation:** Within ~5 minutes of the deletion, the trigger
+  fired on the next push and rebuilt the service. Net downtime of
+  `livion.lat`: ~5 minutes.
+- **Lesson learned:** **Never delete a Cloud Run service in this project
+  without first checking `gcloud builds triggers list`**. A trigger may
+  auto-recreate it, and a brief outage of the legitimate production
+  service is the worst-case outcome.
+- **Update in this doc:** §2.0 was added to document `promdata-core`
+  as the production frontend, with a prominent "do NOT delete" warning.
+
 ---
 
-**Last updated:** 2026-06-06 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
-+ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery, promdata-core removed, verify-deploy step added).
+**Last updated:** 2026-06-07 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
++ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery) + Incident 10.2 (promdata-core misidentification, do-not-delete warning added in §2.0).
