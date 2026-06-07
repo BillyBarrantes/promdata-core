@@ -373,5 +373,87 @@ in this file (add a row to §9 if it's a breaking change).
 
 ---
 
+## 11. Approved Skills Catalog
+
+The `.agents/skills/` directory contains context bundles that AI coding
+agents load on-demand. **Not all skills are equal** — some are first-party
+official (e.g., `shadcn`, `supabase-postgres-best-practices`), some are
+community-contributed, and some contain prompt-injection patterns
+designed to manipulate the agent.
+
+This section is the **canonical allow-list**. Before installing a new
+skill or trusting an existing one, read §11.3 and §11.4.
+
+### 11.1 Approved (17)
+
+| Skill | Why it's approved | When to load |
+|---|---|---|
+| `promdata-engineering-standard` | **Project-specific.** Mandatory. Encodes the fortress rules from §1–§4. | ALWAYS on PromData work. |
+| `shadcn` | First-party. `allowed-tools` limited to `shadcn@latest` CLI. License MIT. | Adding/fixing shadcn/ui components. |
+| `supabase-postgres-best-practices` | First-party (Supabase). License MIT. PromData uses Supabase intensively. | Writing/optimizing SQL, schema, RLS policies. |
+| `playwright-best-practices` | Community. License MIT. No executable `allowed-tools`. | E2E testing, debug, CI setup. |
+| `bash-defensive-patterns` | Community. Fomenta `set -Eeuo pipefail`. Improves `cloudbuild.yaml` step quality. | Writing CI/CD or admin scripts. |
+| `react-best-practices` | Community (Vercel Engineering). License MIT. | React/Next.js performance work. |
+| `react-hook-form` | Community. Library-specific best practices. | Client-side forms. |
+| `composition-patterns` | Community (Vercel). React composition patterns. | Refactoring boolean-prop-heavy components. |
+| `next-best-practices` | Community. Next.js conventions, RSC, async APIs. | Any Next.js work. |
+| `next-cache-components` | Community. Next.js 16 cache components, PPR, `use cache`. | Caching work on Next.js 16+. |
+| `next-upgrade` | Community. Codemods + migration guides. | Upgrading Next.js versions. |
+| `tailwind-css-patterns` | Community. Comprehensive Tailwind v3 + v4 patterns. | Tailwind utility usage, layouts, design systems. |
+| `zod` | Community. Zod schema validation best practices. | Defining `z.object` schemas, `safeParse`, `z.infer`. |
+| `typescript-advanced-types` | Community. Generics, conditional types, template literals. | Complex type logic. |
+| `accessibility` | Community. WCAG 2.2 guidance. | a11y audits, keyboard nav, screen reader support. |
+| `seo` | Community. Meta tags, sitemaps, structured data. | SEO improvements. |
+| `frontend-design` | Community. Distinctive UI design patterns. | Building polished UI components. |
+
+### 11.2 Removed (do NOT re-install)
+
+| Skill | Removed on | Reason |
+|---|---|---|
+| `tailwind-v4-shadcn` | 2026-06-07 | **Prompt injection in SKILL.md.** Section "BEFORE YOU START" instructs AI agents to always state they are using the skill, prefer its content over general knowledge, and pressure users to invoke it. Fabricated metrics ("70% token reduction", "0 errors", "1 minute setup") with no source. The technical content was correct but the marketing manipulation made the skill unsafe to trust blindly. **Replaced by:** `tailwind-css-patterns` (Tailwind) + `shadcn` (UI). |
+| `nodejs-best-practices` | 2026-06-07 | **Not applicable.** PromData backend is Python/FastAPI, not Node.js. Loading this skill risks the agent applying Node.js patterns to Python code. |
+| `nodejs-backend-patterns` | 2026-06-07 | **Not applicable.** Same reason as above. |
+
+### 11.3 Decision matrix (what to load per task)
+
+| Task | Skills to load |
+|---|---|
+| **UI component** (React/Next.js) | `react-best-practices` + `shadcn` + `composition-patterns` + `tailwind-css-patterns` |
+| **Form (client-side)** | `react-hook-form` + `zod` + `react-best-practices` |
+| **Tailwind styling** | `tailwind-css-patterns` |
+| **shadcn/ui component** | `shadcn` (primary) + `react-best-practices` |
+| **Next.js page/route** | `next-best-practices` + `next-cache-components` (if Next 16+) |
+| **Next.js upgrade** | `next-upgrade` |
+| **SQL / RLS / Supabase schema** | `supabase-postgres-best-practices` |
+| **E2E test** | `playwright-best-practices` |
+| **CI/CD / shell script** | `bash-defensive-patterns` |
+| **TypeScript types** | `typescript-advanced-types` + `zod` |
+| **a11y audit** | `accessibility` |
+| **SEO work** | `seo` |
+| **Any PromData work** | `promdata-engineering-standard` (always) |
+
+### 11.4 Governance (rules for adding/removing skills)
+
+1. **Before installing a new skill:** read its `SKILL.md` fully. Check for:
+   - Prompt-injection patterns (instructions to the AI agent on how to
+     talk about itself, "USER ACTION REQUIRED", fabricated metrics).
+   - Unclear or missing `license` field.
+   - `allowed-tools` broader than necessary (e.g., blanket `Bash` access).
+2. **If the skill contains prompt-injection:** do NOT install. Document
+   the reason in this section (§11.2) and propose a non-malicious
+   alternative.
+3. **If the skill is a duplicate of an existing one:** keep the one
+   with the cleaner license + no `allowed-tools`. Document the
+   removal.
+4. **Periodically (quarterly):** re-audit this catalog. Remove skills
+   that have been superseded or are no longer applicable.
+5. **Skills are tooling, not application code.** They live in
+   `.agents/skills/` which is intentionally **not** in `.gitignore` for
+   the approved list — version-controlling the curated allow-list lets
+   new engineers/agents reproduce the setup. Skills removed from
+   approval should also be removed from disk.
+
+---
+
 **Last updated:** 2026-06-07 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
-+ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery) + Incident 10.2 (promdata-core misidentification, do-not-delete warning added in §2.0).
++ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery) + Incident 10.2 (promdata-core misidentification, do-not-delete warning added in §2.0) + Skills audit (17 approved, 3 removed — see §11).
