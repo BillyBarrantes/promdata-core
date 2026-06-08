@@ -102,4 +102,3 @@ celery_app.autodiscover_tasks(['app.tasks'])
 from app.tasks import analysis_tasks
 from app.tasks import document_tasks
 from app.tasks import cloud_sync_tasks
-from app.tasks import test_sentry_task  # NOQA: temporary, for Sentry verification only
