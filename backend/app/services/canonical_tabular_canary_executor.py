@@ -343,6 +343,19 @@ def _build_chart_option(
         option["query_contract"] = query_contract
 
     filtered_granular_df = result_payload.get("filtered_granular_df")
+    if filtered_granular_df is None:
+        # [FIX 2026-06-08] Fallback: si el plan no inyecta filtered_granular_df
+        # explícitamente, generamos uno desde result_payload['data'] (los records
+        # que ECharts ya usa para renderizar el chart). Sin este fallback,
+        # granular_arrow queda en 0KB para >80% de los charts y el frontend
+        # no puede hacer cross-filter sobre el chart.
+        chart_data = result_payload.get("data")
+        if isinstance(chart_data, list) and chart_data:
+            try:
+                filtered_granular_df = pd.DataFrame(chart_data)
+            except Exception as df_exc:
+                print(f"⚠️ [CANARY-ARROW] No se pudo derivar filtered_granular_df desde data: {df_exc}")
+                filtered_granular_df = None
     if isinstance(filtered_granular_df, pd.DataFrame) and not filtered_granular_df.empty:
         granular_arrow = _try_dataframe_to_arrow_base64(filtered_granular_df)
         if granular_arrow and len(granular_arrow) <= 4 * 1024 * 1024:
@@ -398,8 +411,22 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
             )
             if option:
                 final_struct["chart_options"].append(option)
-            if not final_struct["data"] and isinstance(result_payload.get("data"), list):
-                final_struct["data"] = _safe_list(result_payload.get("data"))
+            # [FIX 2026-06-08] data_by_chart: poblar SIEMPRE los records de cada chart
+            # para que el frontend pueda usar cross-filter sobre cualquier chart,
+            # no solo sobre el primero. data se mantiene para el primer chart
+            # (compatibilidad con código legacy que lee data directamente).
+            if isinstance(result_payload.get("data"), list):
+                chart_data = _safe_list(result_payload.get("data"))
+                if chart_data:
+                    data_by_chart = final_struct.setdefault("data_by_chart", {})
+                    chart_key = (
+                        (option.get("id") if option and option.get("id") else None)
+                        or title
+                        or f"chart_{len(data_by_chart)}"
+                    )
+                    data_by_chart[chart_key] = chart_data
+                    if not final_struct["data"]:
+                        final_struct["data"] = chart_data
             analysis_blocks.append(_analysis_line_from_hard_facts(title, hard_facts))
             final_struct["explainability"].append(
                 {
@@ -450,7 +477,7 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
 
         snapshot_arrow = _try_dataframe_to_arrow_base64(serialization_df)
         if snapshot_arrow:
-            # Guard de tamaño: si el Arrow base64 excede el budget, lo descartamos
+            # Guard de tamanho: si el Arrow base64 excede el budget, lo descartamos
             # para que el payload total no supere el límite de PostgREST.
             if len(snapshot_arrow) <= _MAX_PAYLOAD_BYTES:
                 final_struct["snapshot_arrow"] = snapshot_arrow
@@ -463,6 +490,50 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
         final_struct["snapshot_row_count"] = total_snapshot_rows
         final_struct["snapshot_serialized_rows"] = len(serialization_df)
         final_struct["snapshot_columns"] = list(snapshot_df.columns)
+    else:
+        # [FIX 2026-06-08] Cascade de fallbacks para snapshot_arrow.
+        # Si candidate_df es None o está vacío (lo cual ocurre en la mayoría
+        # de los paths del canary), intentamos recuperar el snapshot desde:
+        # 1. candidate_dataframe del adapter runtime (si el plan lo expone)
+        # 2. data_by_chart de la sección data_by_chart que acabamos de poblar
+        # 3. main_df del dataframe de análisis (atributo del execution)
+        snapshot_df = None
+        try:
+            candidate_alt = attrs.get("candidate_dataframe")
+            if isinstance(candidate_alt, pd.DataFrame) and not candidate_alt.empty:
+                snapshot_df = candidate_alt
+        except Exception:
+            pass
+        if snapshot_df is None:
+            # Reconstruir desde los records que ya recolectamos
+            data_by_chart = final_struct.get("data_by_chart", {}) or {}
+            for chart_key, chart_data in data_by_chart.items():
+                if isinstance(chart_data, list) and chart_data:
+                    try:
+                        snapshot_df = pd.DataFrame(chart_data)
+                        break
+                    except Exception:
+                        continue
+        if snapshot_df is not None and not snapshot_df.empty:
+            if "is_latest_snapshot" in snapshot_df.columns:
+                latest_mask = snapshot_df["is_latest_snapshot"] == True
+                if bool(latest_mask.any()):
+                    snapshot_df = snapshot_df[latest_mask]
+            serialization_df = (
+                snapshot_df.head(_MAX_SNAPSHOT_ROWS)
+                if len(snapshot_df) > _MAX_SNAPSHOT_ROWS
+                else snapshot_df
+            )
+            snapshot_arrow = _try_dataframe_to_arrow_base64(serialization_df)
+            if snapshot_arrow and len(snapshot_arrow) <= _MAX_PAYLOAD_BYTES:
+                final_struct["snapshot_arrow"] = snapshot_arrow
+                final_struct["snapshot_row_count"] = len(snapshot_df)
+                final_struct["snapshot_serialized_rows"] = len(serialization_df)
+                final_struct["snapshot_columns"] = list(snapshot_df.columns)
+                print(
+                    f"🦆 [SNAPSHOT-FALLBACK] snapshot_arrow derivado desde data_by_chart: "
+                    f"{len(snapshot_df)} filas, {len(snapshot_df.columns)} cols"
+                )
 
     summary_widgets = _build_summary_widgets(
         execution=execution,

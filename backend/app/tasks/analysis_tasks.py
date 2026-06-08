@@ -3303,9 +3303,15 @@ def _save_analysis_task_result_with_payload_shedding(sb, task_id: str, runtime_r
         if not soft_limit_bytes or original_bytes <= soft_limit_bytes:
             return original_json, original_bytes, []
 
+        # [FIX 2026-06-08] Cambiar el orden de shedding para preservar
+        # snapshot_arrow y arrow_data, que son CRÍTICOS para el cross-filter
+        # del frontend. Solo strippeamos granular_arrow (regenerable per-chart
+        # desde la pipeline) como primera línea, y arrow_data como segunda
+        # (se puede regenerar desde final_struct['data'] que viaja en JSON).
+        # snapshot_arrow es la única copia completa del dataset → última en descartar.
         stripped: list[str] = []
         json_output = original_json
-        for fields in (("snapshot_arrow",), ("arrow_data",), ("granular_arrow",)):
+        for fields in (("granular_arrow",), ("arrow_data",), ("snapshot_arrow",)):
             stripped.extend(_strip_payload_fields(final_struct, fields))
             json_output = json.dumps(final_struct, cls=CustomEncoder)
             if len(json_output) <= soft_limit_bytes:

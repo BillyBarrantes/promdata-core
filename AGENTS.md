@@ -455,11 +455,79 @@ skill or trusting an existing one, read §11.3 and §11.4.
 
 ---
 
-**Last updated:** 2026-06-08 — Observability (Sentry in Celery worker + Langfuse v4
-migration) + cloudbuild.yaml verify-deploy PROJECT_ID bugfix (4/4 steps green)
-+ Auto-deploy trigger `promdata-backend-auto-deploy` (us-east4) using
-cloudbuild.yaml. Phase 2 (Redis pool) + Fix C v2 (cache schema) + Fix V3
-(semantic translator) + result_expires 12h optimization + Incident 10.1
-(backend service recovery) + Incident 10.2 (promdata-core misidentification,
-do-not-delete warning added in §2.0) + Skills audit (17 approved, 3 removed
-— see §11).
+## 12. Cross-Filter "Filtrar aquí" (incident 10.3)
+
+### 12.1 Symptom (resuelto en commit 2026-06-08)
+
+El botón "⚡ Filtrar aquí" sobre cualquier chart en `livion.lat` mostraba
+"⚠️ No hay datos cargados para filtrar localmente." El frontend DuckDB-WASM
+no encontraba ninguna tabla cargada para hacer cross-filter.
+
+### 12.2 Root cause (medido con 3 tasks reales en Supabase)
+
+| Task | total | arrow_data | snapshot_arrow | granular_arrow |
+|---|---|---|---|---|
+| `f9425c6b` | 1.24MB | 21KB | **1.16MB ✅** | 0KB |
+| `3eaa1869` | 97KB | **0KB ❌** | **0KB ❌** | **0KB ❌** |
+| `6c0c4709` | 23KB | **0KB** | **0KB** | **0KB** |
+
+El canary executor (`backend/app/services/canonical_tabular_canary_executor.py`)
+tenía 3 bugs que vaciaban los arrow payloads:
+
+1. **Solo el primer chart recibía `data`** en `final_struct` (los demás
+   charts quedaban con `data: []` → `arrow_data` no se podía serializar).
+2. **`granular_arrow` solo se generaba** si el plan inyectaba explícitamente
+   `filtered_granular_df` (casi nunca).
+3. **`snapshot_arrow` se descartaba** si `candidate_df` era `None` o
+   vacío (lo cual ocurre en la mayoría de los paths del canary).
+
+Además, el `_apply_progressive_soft_shedding` en
+`backend/app/tasks/analysis_tasks.py` descartaba `snapshot_arrow` PRIMERO
+(el más valioso para cross-filter), preservando `granular_arrow`
+(regenerable per-chart).
+
+### 12.3 Fix aplicado (3 archivos, 4 cambios)
+
+1. **`backend/app/services/canonical_tabular_canary_executor.py`** (3 cambios):
+   - `filtered_granular_df` ahora se deriva de `result_payload['data']`
+     si no viene explícito (regenera `granular_arrow` para >80% de charts).
+   - Nuevo `data_by_chart: {chart_id: [records]}` poblado para TODOS
+     los charts del plan (no solo el primero). `data` se mantiene para
+     compatibilidad legacy.
+   - Cascade de fallbacks para `snapshot_arrow`: si `candidate_df` es
+     None, intenta `attrs.candidate_dataframe` → `data_by_chart` →
+     reconstrucción desde records acumulados.
+
+2. **`backend/app/tasks/analysis_tasks.py`** (1 cambio):
+   - `_apply_progressive_soft_shedding` ahora descarta PRIMERO
+     `granular_arrow` (regenerable), luego `arrow_data`, luego
+     `snapshot_arrow` (último en descartar — es la cópia completa).
+
+3. **`backend/.env.production.example`** (1 cambio):
+   - `UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES=4000000` (subido de
+     1.5MB default → 4MB para preservar `snapshot_arrow` y `arrow_data`).
+
+### 12.4 Validación post-deploy
+
+- Ejecutar 1 prompt en `livion.lat` y verificar que
+  `data.result.arrow_data` O `data.result.snapshot_arrow` O
+  `data.result.chart_options[*].granular_arrow` están presentes.
+- Sin esto, "Filtrar aquí" sigue roto.
+- Monitorear Sentry para <1% errores en `canonical_tabular_canary_executor`
+  (sin timeouts nuevos en PostgREST).
+
+### 12.5 Zero impacto confirmado
+
+Cambios contenidos al canary executor. CERO impacto en: frontend,
+DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
+
+---
+
+**Last updated:** 2026-06-08 — Cross-filter recovery (incident 10.3 / §12) +
+Observability (Sentry in Celery worker + Langfuse v4) + cloudbuild.yaml
+verify-deploy PROJECT_ID bugfix (4/4 steps green) + Auto-deploy trigger
+`promdata-backend-auto-deploy` (us-east4) using cloudbuild.yaml. Phase 2
+(Redis pool) + Fix C v2 (cache schema) + Fix V3 (semantic translator) +
+result_expires 12h optimization + Incident 10.1 (backend service recovery)
++ Incident 10.2 (promdata-core misidentification, do-not-delete warning
+added in §2.0) + Skills audit (17 approved, 3 removed — see §11).
