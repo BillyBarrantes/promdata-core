@@ -455,5 +455,11 @@ skill or trusting an existing one, read §11.3 and §11.4.
 
 ---
 
-**Last updated:** 2026-06-07 — Phase 2 (Redis pool) + Fix C v2 (cache schema)
-+ Fix V3 (semantic translator) + result_expires 12h optimization + Incident 10.1 (backend service recovery) + Incident 10.2 (promdata-core misidentification, do-not-delete warning added in §2.0) + Skills audit (17 approved, 3 removed — see §11).
+**Last updated:** 2026-06-08 — Observability (Sentry in Celery worker + Langfuse v4
+migration) + cloudbuild.yaml verify-deploy PROJECT_ID bugfix (4/4 steps green)
++ Auto-deploy trigger `promdata-backend-auto-deploy` (us-east4) using
+cloudbuild.yaml. Phase 2 (Redis pool) + Fix C v2 (cache schema) + Fix V3
+(semantic translator) + result_expires 12h optimization + Incident 10.1
+(backend service recovery) + Incident 10.2 (promdata-core misidentification,
+do-not-delete warning added in §2.0) + Skills audit (17 approved, 3 removed
+— see §11).
