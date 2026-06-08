@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+import httpx
 
 from fastapi import FastAPI, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,17 @@ from app.services.runtime_governance import get_runtime_governance_payload
 # Si SENTRY_DSN no está configurado, es un no-op silencioso.
 # ---------------------------------------------------------------------------
 init_sentry()
+
+# [FIX 2026-06-08] Log de versiones y timeouts de dependencias externas al startup.
+# Cuando algo se rompe en prod, estos logs son el primer punto de referencia
+# para distinguir "el upstream está lento" de "nuestro código está mal".
+print(
+    f"[STARTUP] httpx={httpx.__version__} | supabase-py=installed "
+    f"| Supabase timeouts: connect={settings.SUPABASE_CONNECT_TIMEOUT_SECONDS}s "
+    f"read={settings.SUPABASE_READ_TIMEOUT_SECONDS}s "
+    f"write={settings.SUPABASE_WRITE_TIMEOUT_SECONDS}s "
+    f"pool={settings.SUPABASE_POOL_TIMEOUT_SECONDS}s"
+)
 
 app = FastAPI(title="PromData API")
 

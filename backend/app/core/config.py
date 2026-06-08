@@ -282,5 +282,21 @@ class Settings:
     UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES: int = int(
         os.getenv("UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", "1500000")
     )
+    # [FIX 2026-06-08] Supabase HTTP client timeouts. Supabase plan free tiene un
+    # Disk IO budget limitado — cuando se agota, el PostgREST edge puede tardar
+    # 10+ segundos en responder. Estos timeouts fail-fast evitan que nuestro
+    # backend se cuelgue y retornen 500 genéricos en vez de 503 informativos.
+    SUPABASE_CONNECT_TIMEOUT_SECONDS: float = float(
+        os.getenv("SUPABASE_CONNECT_TIMEOUT_SECONDS", "3.0")
+    )
+    SUPABASE_READ_TIMEOUT_SECONDS: float = float(
+        os.getenv("SUPABASE_READ_TIMEOUT_SECONDS", "8.0")
+    )
+    SUPABASE_WRITE_TIMEOUT_SECONDS: float = float(
+        os.getenv("SUPABASE_WRITE_TIMEOUT_SECONDS", "5.0")
+    )
+    SUPABASE_POOL_TIMEOUT_SECONDS: float = float(
+        os.getenv("SUPABASE_POOL_TIMEOUT_SECONDS", "3.0")
+    )
 
 settings = Settings()

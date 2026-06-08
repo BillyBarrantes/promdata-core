@@ -1,5 +1,7 @@
 # En: backend/app/api/routes.py
 
+import os
+import httpx
 from fastapi import APIRouter, HTTPException, Depends, Query, Request, Response, UploadFile, File, Form
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -463,8 +465,7 @@ def start_analysis(
             window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
         )
 
-        supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-        supabase.auth.set_session(access_token=token, refresh_token=token)
+        supabase: Client = get_supabase_user_client(token)
         user_response = supabase.auth.get_user()
         current_user_id = user_response.user.id
 
@@ -565,6 +566,26 @@ def start_analysis(
         )
         if "Invalid JWT" in str(e) or "Unauthorized" in str(e):
              raise HTTPException(status_code=401, detail=f"No se pudieron validar las credenciales: {e}")
+        # [FIX 2026-06-08] Distinguir Supabase degradado de errores reales.
+        # httpx.TimeoutException = request tardó más que el timeout configurado
+        # IndexError/KeyError = respuesta corrupta (jwt.split falló, Disk IO agotado)
+        # En ambos casos → 503 (transitorio, reintentar) en vez de 500 (bug código)
+        if (
+            isinstance(e, (httpx.TimeoutException, IndexError, KeyError))
+            or "list index out of range" in str(e)
+            or "Invalid API key" in str(e)
+        ):
+            emit_structured_log(
+                "api_supabase_degraded",
+                level="warning",
+                endpoint="/analyze",
+                error=str(e)[:240],
+                hint="Supabase plan free Disk IO budget probablemente agotado",
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="El servicio de base de datos está temporalmente no disponible. Por favor, inténtalo de nuevo en unos minutos.",
+            )
         raise HTTPException(status_code=500, detail=str(e))
     
 # (Removed ReportSaveRequest class definition from here)
@@ -1718,6 +1739,22 @@ def get_chat_history(
             file_id=file_id,
             error=str(e),
         )
+        # [FIX 2026-06-08] Distinguir Supabase degradado de errores reales
+        if (
+            isinstance(e, (httpx.TimeoutException, IndexError, KeyError))
+            or "list index out of range" in str(e)
+            or "Invalid API key" in str(e)
+        ):
+            emit_structured_log(
+                "api_supabase_degraded",
+                level="warning",
+                endpoint="/chat/{file_id}",
+                error=str(e)[:240],
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="El servicio de base de datos está temporalmente no disponible. Por favor, inténtalo de nuevo en unos minutos.",
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat", status_code=201)
