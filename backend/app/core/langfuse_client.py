@@ -15,6 +15,11 @@ Uso estándar:
 
 Uso en threads (narrativas paralelas — ThreadPoolExecutor):
     record_llm_event("narrative", model_name, prompt, response.text, trace_id=task_id)
+
+API de Langfuse:
+  Esta implementación usa la API de Langfuse v3+/v4+ (start_as_current_observation
+  + update_current_generation). La API antigua (lf_client.trace() + .generation())
+  fue removida en Langfuse 3.x — ver https://langfuse.com/docs/observability/sdk-python
 """
 from __future__ import annotations
 
@@ -71,6 +76,7 @@ def get_langfuse() -> Any | None:
             emit_structured_log(
                 "langfuse_initialized",
                 host=settings.LANGFUSE_HOST,
+                sdk_version=getattr(_langfuse_client, "_version", "unknown"),
             )
         except Exception as exc:
             emit_structured_log(
@@ -124,19 +130,46 @@ def record_llm_call(
         yield result
         return
 
-    generation = None
+    # Construir trace_context para conectar este span a un trace_id existente
+    # (típicamente el task_id de Celery). Si no se pasa, Langfuse genera uno.
+    trace_context: dict[str, str] | None = None
+    if trace_id:
+        trace_context = {"trace_id": str(trace_id)}
+
     try:
-        trace = lf_client.trace(
-            id=trace_id,
-            name=trace_name or "llm_call",
-            metadata=metadata or {},
-        )
-        generation = trace.generation(
-            name=span_name,
-            model=model_name,
+        with lf_client.start_as_current_observation(
+            trace_context=trace_context,
+            name=trace_name or span_name,
+            as_type="generation",
             input=[{"role": "user", "content": prompt[:15_000]}],
+            model=model_name,
             metadata=metadata or {},
-        )
+        ) as generation:
+            try:
+                yield result
+            except Exception as call_exc:
+                # La llamada a Gemini falló — registrar el error en Langfuse
+                try:
+                    lf_client.update_current_generation(
+                        level="ERROR",
+                        status_message=str(call_exc)[:500],
+                    )
+                except Exception:
+                    pass
+                raise  # re-raise para no silenciar el error real
+            else:
+                # Llamada exitosa — registrar output via update_current_generation
+                try:
+                    lf_client.update_current_generation(
+                        output=str(result.get("output", ""))[:15_000],
+                    )
+                except Exception as end_exc:
+                    emit_structured_log(
+                        "langfuse_span_close_failed",
+                        level="warning",
+                        span=span_name,
+                        error=str(end_exc)[:500],
+                    )
     except Exception as setup_exc:
         # Si falla el setup de Langfuse, el análisis sigue funcionando
         emit_structured_log(
@@ -147,34 +180,6 @@ def record_llm_call(
         )
         yield result
         return
-
-    try:
-        yield result
-    except Exception as call_exc:
-        # La llamada a Gemini falló — registrar el error en Langfuse
-        if generation is not None:
-            try:
-                generation.end(
-                    level="ERROR",
-                    status_message=str(call_exc)[:500],
-                )
-            except Exception:
-                pass
-        raise  # re-raise para no silenciar el error real
-    else:
-        # Llamada exitosa — registrar output
-        if generation is not None:
-            try:
-                generation.end(
-                    output=str(result.get("output", ""))[:15_000],
-                )
-            except Exception as end_exc:
-                emit_structured_log(
-                    "langfuse_span_close_failed",
-                    level="warning",
-                    span=span_name,
-                    error=str(end_exc)[:500],
-                )
 
 
 # ---------------------------------------------------------------------------
@@ -203,20 +208,23 @@ def record_llm_event(
     if lf_client is None:
         return
 
+    trace_context: dict[str, str] | None = None
+    if trace_id:
+        trace_context = {"trace_id": str(trace_id)}
+
     try:
-        trace = lf_client.trace(
-            id=trace_id,
-            name=trace_name or "llm_call",
-            metadata=metadata or {},
-        )
-        trace.generation(
-            name=span_name,
-            model=model_name,
+        # Crear observation manual (no es context manager) y cerrarla inmediatamente
+        observation = lf_client.start_observation(
+            trace_context=trace_context,
+            name=trace_name or span_name,
+            as_type="generation",
             input=[{"role": "user", "content": prompt[:15_000]}],
+            model=model_name,
             output=output[:15_000],
             metadata=metadata or {},
             level=level,
-        ).end()
+        )
+        # Langfuse v4 cierra automáticamente cuando el objeto sale de scope
     except Exception as exc:
         emit_structured_log(
             "langfuse_event_failed",
