@@ -5,7 +5,17 @@ from celery.signals import worker_init
 
 from app.core.config import settings
 from app.core.redis_client import reset_redis_pools
+from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
+
+# ---------------------------------------------------------------------------
+# Sentry: inicializar ANTES de crear celery_app y registrar tasks.
+# Sin esto, las excepciones de las tasks (analysis_tasks, document_tasks,
+# cloud_sync_tasks) son invisibles a Sentry. Ver AGENTS.md §4.1 sobre
+# observabilidad obligatoria para PromData.
+# Si SENTRY_DSN no está configurado, es un no-op silencioso.
+# ---------------------------------------------------------------------------
+init_sentry()
 
 celery_app = Celery(
     "tasks",

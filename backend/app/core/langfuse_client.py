@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 from app.core.config import settings
+from app.core.structured_logging import emit_structured_log
 
 # ---------------------------------------------------------------------------
 # Singleton thread-safe del cliente Langfuse
@@ -48,7 +49,11 @@ def get_langfuse() -> Any | None:
             return _langfuse_client
 
         if not (settings.LANGFUSE_SECRET_KEY and settings.LANGFUSE_PUBLIC_KEY):
-            print("[LANGFUSE] Credenciales no configuradas — trazas LLM desactivadas.", flush=True)
+            emit_structured_log(
+                "langfuse_disabled",
+                level="warning",
+                reason="credentials_not_configured",
+            )
             _langfuse_initialized = True
             return None
 
@@ -63,12 +68,16 @@ def get_langfuse() -> Any | None:
                 flush_interval=5.0,
                 flush_at=10,
             )
-            print(
-                f"[LANGFUSE] Inicializado → host='{settings.LANGFUSE_HOST}'.",
-                flush=True,
+            emit_structured_log(
+                "langfuse_initialized",
+                host=settings.LANGFUSE_HOST,
             )
         except Exception as exc:
-            print(f"[LANGFUSE] Error inicializando SDK: {exc} — trazas desactivadas.", flush=True)
+            emit_structured_log(
+                "langfuse_init_failed",
+                level="warning",
+                error=str(exc)[:500],
+            )
             _langfuse_client = None
 
         _langfuse_initialized = True
@@ -130,7 +139,12 @@ def record_llm_call(
         )
     except Exception as setup_exc:
         # Si falla el setup de Langfuse, el análisis sigue funcionando
-        print(f"[LANGFUSE] Error creando span '{span_name}': {setup_exc}", flush=True)
+        emit_structured_log(
+            "langfuse_span_setup_failed",
+            level="warning",
+            span=span_name,
+            error=str(setup_exc)[:500],
+        )
         yield result
         return
 
@@ -155,7 +169,12 @@ def record_llm_call(
                     output=str(result.get("output", ""))[:15_000],
                 )
             except Exception as end_exc:
-                print(f"[LANGFUSE] Error cerrando span '{span_name}': {end_exc}", flush=True)
+                emit_structured_log(
+                    "langfuse_span_close_failed",
+                    level="warning",
+                    span=span_name,
+                    error=str(end_exc)[:500],
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -199,4 +218,9 @@ def record_llm_event(
             level=level,
         ).end()
     except Exception as exc:
-        print(f"[LANGFUSE] Error registrando evento '{span_name}': {exc}", flush=True)
+        emit_structured_log(
+            "langfuse_event_failed",
+            level="warning",
+            span=span_name,
+            error=str(exc)[:500],
+        )

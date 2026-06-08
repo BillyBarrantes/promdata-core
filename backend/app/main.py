@@ -237,6 +237,47 @@ def health_ready():
     return payload
 
 
+@app.get("/health/observability", summary="Observability stack status (Sentry + Langfuse)")
+def health_observability():
+    """Diagnóstico rápido del stack de observabilidad.
+
+    Devuelve el estado de inicialización de Sentry y Langfuse SIN enviar
+    datos a los servicios externos. Útil para verificar que las env vars
+    están bien configuradas en Cloud Run y para diagnóstico post-mortem.
+
+    Esta ruta NO reemplaza a /health/ready — es solo informativa.
+    """
+    sentry_enabled = bool(getattr(settings, "SENTRY_DSN", "").strip())
+    sentry_status = {
+        "enabled": sentry_enabled,
+        "dsn_configured": sentry_enabled,
+        "environment": getattr(settings, "APP_DEPLOY_ENV", "unknown"),
+        "release": getattr(settings, "APP_BUILD_VERSION", "unknown"),
+        "host": "https://sentry.io" if sentry_enabled else None,
+    }
+
+    lf_public = bool(getattr(settings, "LANGFUSE_PUBLIC_KEY", "").strip())
+    lf_secret = bool(getattr(settings, "LANGFUSE_SECRET_KEY", "").strip())
+    lf_host = getattr(settings, "LANGFUSE_HOST", "")
+    langfuse_status = {
+        "enabled": lf_public and lf_secret and bool(lf_host),
+        "public_key_configured": lf_public,
+        "secret_key_configured": lf_secret,
+        "host": lf_host or None,
+    }
+
+    all_ok = sentry_status["enabled"] and langfuse_status["enabled"]
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "sentry": sentry_status,
+        "langfuse": langfuse_status,
+        "note": (
+            "Verifica también que promdata-worker Cloud Run tenga "
+            "SENTRY_DSN y LANGFUSE_* configuradas (no solo promdata-backend)."
+        ),
+    }
+
+
 @app.get("/health/runtime", summary="Runtime Governance Summary")
 def health_runtime():
     payload = get_runtime_governance_payload()
