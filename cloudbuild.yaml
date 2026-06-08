@@ -71,6 +71,22 @@ steps:
       - '-c'
       - |
         set -e
+        # [BUGFIX 2026-06-08] Detect PROJECT_ID dinámicamente.
+        # Antes: --project=$$PROJECT_ID — fallaba porque la sustitución de
+        # Cloud Build no estaba disponible cuando el build se invoca
+        # manualmente con `gcloud builds submit` sin --substitutions=PROJECT_ID.
+        # Ahora: extraemos el project del metadata server (disponible en Cloud Build)
+        # o de la configuración de gcloud como fallback.
+        PROJECT_ID=$$(curl -sS -H "Metadata-Flavor: Google" \
+          http://metadata.google.internal/computeMetadata/v1/project/project-id 2>/dev/null || true)
+        if [ -z "$$PROJECT_ID" ]; then
+          PROJECT_ID=$$(gcloud config get-value project 2>/dev/null | tr -d '\n' || true)
+        fi
+        if [ -z "$$PROJECT_ID" ]; then
+          echo "ERROR: no se pudo determinar PROJECT_ID"
+          exit 1
+        fi
+        echo "PROJECT_ID detectado: $$PROJECT_ID"
         SERVICE_URL=$$(gcloud run services describe promdata-backend \
           --region=us-east4 \
           --project=$$PROJECT_ID \
