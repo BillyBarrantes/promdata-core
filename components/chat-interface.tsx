@@ -1523,11 +1523,23 @@ export function ChatInterface() {
       // agregada. La tabla pd_snapshot_*_latest tiene 10K filas raw
       // con fecha_operacion como timestamp, donde el motor DuckDB puede
       // aplicar el predicate temporal EXTRACT(YEAR|MONTH).
+      //
+      // [FIX 2026-06-09 4ta iteracion] Se guarda la tabla original
+      // (per-chart, agregada) en `originalChartTableName` como fallback.
+      // Si el cross-filter contra la tabla snapshot retorna 0 rows
+      // (porque el snapshot de 10K head() no contiene el periodo
+      // seleccionado por el usuario, e.g. 'Dec-2023' cae fuera del
+      // rango de las primeras 10K filas), hacemos fallback a la tabla
+      // per-chart y mostramos la fila agregada con un mensaje claro.
+      // Esto preserva el contrato de UX: el usuario SIEMPRE ve datos
+      // del periodo que selecciono, ya sea crudos o agregados.
+      let originalChartTableName: string | null = null;
       if (
         tName &&
         (tName.startsWith('pd_chart_') || tName.startsWith('pd_analysis_')) &&
         analysisFileId
       ) {
+        originalChartTableName = tName;
         const snapshotTableName = buildAnalysisTableName(
           analysisFileId,
           'snapshot',
@@ -1574,7 +1586,28 @@ export function ChatInterface() {
         `🦆 [CROSS-FILTER] Filtrando: ${filterSummary} en tabla '${tName}'`,
         { baseFilters, clickFilters: filters, merged: mergedFilters }
       );
-      const filtered = await duckdbEngine.crossFilter(effectiveFilters, tName);
+      let filtered = await duckdbEngine.crossFilter(effectiveFilters, tName);
+
+      // [FIX 2026-06-09 4ta iteracion] FALLBACK al per-chart si el snapshot
+      // retorna 0 rows. Esto pasa cuando el snapshot de 10K head() no
+      // contiene el periodo seleccionado (e.g. 'Dec-2023' cae fuera del
+      // rango de las primeras 10K filas). En ese caso, mostramos la fila
+      // agregada del per-chart como fallback honesto.
+      let isAggregatedFallback = false;
+      if (filtered.length === 0 && originalChartTableName) {
+        console.log(
+          `🦆 [CROSS-FILTER] Snapshot sin resultados. Fallback a tabla per-chart ` +
+          `'${originalChartTableName}' para mostrar datos agregados del periodo.`
+        );
+        const fallbackFiltered = await duckdbEngine.crossFilter(
+          effectiveFilters,
+          originalChartTableName
+        );
+        if (fallbackFiltered.length > 0) {
+          filtered = fallbackFiltered;
+          isAggregatedFallback = true;
+        }
+      }
 
       if (filtered.length === 0) {
         console.warn('⚠️ [CROSS-FILTER] Sin resultados, manteniendo vista actual');
@@ -1604,6 +1637,9 @@ export function ChatInterface() {
       }
       if (!baseFilterSummary && !clickFilterSummary) {
         filterDescription += `🔍 Sin filtros activos\n`;
+      }
+      if (isAggregatedFallback) {
+        filterDescription += `\n⚠️ **Nota:** El detalle crudo no estaba disponible para este periodo (el snapshot solo incluye las primeras 10,000 filas del dataset). Mostrando la **fila agregada** del chart. Para ver el detalle completo, intenta con un periodo cubierto por el snapshot.\n`;
       }
       filterDescription += `\n📌 *Se encontraron ${filtered.length} registros en <50ms.* \nLa tabla filtrada ha sido añadida a tu Lienzo.`;
 
