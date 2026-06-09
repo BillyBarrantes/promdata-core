@@ -1486,24 +1486,30 @@ export function ChatInterface() {
         }
       }
 
-      // [FIX 2026-06-09] RUTEO INTELIGENTE DE TABLA: Si hay filtros base
-      // dimensionales (e.g. "tipo_movimiento=Ingreso") y la tabla resuelta
-      // es per-chart (pd_chart_*, agregada y sin dimensiones), preferir
-      // la tabla top-level (pd_analysis_*, raw con todas las dimensiones).
+      // [FIX 2026-06-09] RUTEO INTELIGENTE DE TABLA: Si la tabla resuelta
+      // es per-chart (pd_chart_*, agregada), preferir SIEMPRE la tabla
+      // top-level (pd_analysis_*, raw con todas las dimensiones).
       //
-      // Por que: la tabla per-chart contiene el resultado agregado (sum(monto)
-      // by month), NO contiene columnas dimensionales como tipo_movimiento.
-      // El motor DuckDB detecta que la columna no existe y emite
-      // "Degradación elegante: omitido porque no se encontró coincidencia
-      // estructural" — el filtro se descarta y la tabla resultante mezcla
-      // Ingresos + Egresos.
+      // Por que: el requerimiento de negocio es que el usuario SIEMPRE
+      // vea el detalle crudo (drill-down) cuando hace clic en 'Filtrar aquí',
+      // independientemente de si el chart tiene filtros base o no.
+      //
+      // La tabla per-chart contiene el resultado agregado (e.g. sum(monto)
+      // by month), NO contiene todas las columnas dimensionales. El usuario
+      // espera ver los registros crudos subyacentes, no una sola fila
+      // agregada (Name, Value) que es lo que retorna la tabla per-chart
+      // cuando se filtra por un valor dimensional.
       //
       // La tabla top-level (pd_analysis_<fileId>_detail) SÍ tiene todas
-      // las dimensiones raw, por lo que el filtro dimensional SÍ se aplica
-      // correctamente. Esta tabla siempre se pre-carga junto con el chart
-      // (linea 952-961) cuando data.result.arrow_data existe.
+      // las dimensiones raw. Esta tabla siempre se pre-carga junto con el
+      // chart (linea 952-961) cuando data.result.arrow_data existe.
+      //
+      // [FIX 2026-06-09 2da iteracion] Se elimino la condicion
+      // `Object.keys(baseFilters).length > 0` porque el ruteo debe ocurrir
+      // siempre que la tabla per-chart sea agregada, no solo cuando hay
+      // filtros dimensionales. El caso "evolucion de gastos por gasolina"
+      // (sin filtros base) tambien necesita ver el detalle crudo subyacente.
       if (
-        Object.keys(baseFilters).length > 0 &&
         tName &&
         tName.startsWith('pd_chart_') &&
         analysisFileId
@@ -1515,10 +1521,12 @@ export function ChatInterface() {
         );
         const refreshedTables = duckdbEngine.getTableNames();
         if (refreshedTables.includes(topLevelTableName)) {
+          const reason = Object.keys(baseFilters).length > 0
+            ? `hay ${Object.keys(baseFilters).length} filtro(s) dimensional(es) que requieren columnas raw`
+            : `el usuario espera ver el detalle crudo subyacente (drill-down)`;
           console.log(
             `🦆 [CROSS-FILTER] Re-ruteo a tabla top-level '${topLevelTableName}' ` +
-            `porque hay ${Object.keys(baseFilters).length} filtro(s) dimensional(es) ` +
-            `que requieren columnas raw (la tabla per-chart '${tName}' solo tiene datos agregados).`
+            `porque ${reason} (la tabla per-chart '${tName}' solo tiene datos agregados).`
           );
           tName = topLevelTableName;
         }
