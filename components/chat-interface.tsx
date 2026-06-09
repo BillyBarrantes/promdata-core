@@ -214,6 +214,27 @@ const sanitizeTableToken = (value: string): string => {
     .toLowerCase()
 }
 
+// [FIX 2026-06-09] LIMPIEZA DE STRING en chart_base_filters.
+//
+// Por que: el backend (canonical_tabular_canary_executor.py:359) serializa
+// filtros como `f"{op} {val}"`, donde `op` viene de `str(f.operator)`.
+// Si `f.operator` es un `FilterOperator` (que es `str, Enum` en Python),
+// `str()` devuelve la representación textual del enum, e.g.
+// "FilterOperator.EQUALS" en vez de su valor canónico "==".
+// Resultado: el chart_base_filters llega al frontend con valores como
+//   "tipo_movimiento": "FilterOperator.EQUALS ingreso"
+// Cuando DuckDB-WASM intenta hacer WHERE tipo_movimiento = 'FilterOperator.EQUALS ingreso',
+// no encuentra coincidencias y emite "Degradación elegante: omitido".
+//
+// Esta función defensiva limpia cualquier prefijo "FilterOperator.X "
+// (case-insensitive) o prefijo de operador canónico ("== ", "!= ", "> ", "< ")
+// para que el valor puro quede como DuckDB lo espera ("ingreso").
+const FILTER_OPERATOR_RE = /^(?:filteroperator\.(?:equals|not_equals|greater_than|less_than|greater_equal|less_equal|in|not_in|like|not_like|contains|starts_with|ends_with)\s+|[!=><~]+\s+)/i
+const sanitizeFilterValue = (value: string): string => {
+  if (typeof value !== "string") return value
+  return value.replace(FILTER_OPERATOR_RE, "").trim()
+}
+
 const buildAnalysisTableName = (
   fileId: string | null,
   scope: string,
@@ -1445,6 +1466,11 @@ export function ChatInterface() {
       // El backend (canary_executor) ahora inyecta estos en chart_option.chart_base_filters.
       // Sin mergearlos, DuckDB solo filtra por el clic y retorna registros
       // que no pertenezcan al subset que el chart estaba visualizando.
+      //
+      // [FIX 2026-06-09] Aplicar sanitizeFilterValue a cada valor para
+      // limpiar prefijos como "FilterOperator.EQUALS " que el backend
+      // serializa accidentalmente. Sin esto, DuckDB busca la cadena
+      // literal y nunca encuentra coincidencia.
       let baseFilters: Record<string, string> = {};
       if (matchedComponent) {
         const chartOption =
@@ -1452,7 +1478,11 @@ export function ChatInterface() {
           (matchedComponent as any).original_chart_option ||
           null;
         if (chartOption?.chart_base_filters && typeof chartOption.chart_base_filters === 'object') {
-          baseFilters = { ...chartOption.chart_base_filters };
+          baseFilters = Object.fromEntries(
+            Object.entries(chartOption.chart_base_filters).map(
+              ([k, v]) => [k, sanitizeFilterValue(String(v))]
+            )
+          );
         }
       }
 
