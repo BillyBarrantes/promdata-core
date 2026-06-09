@@ -1456,6 +1456,44 @@ export function ChatInterface() {
         }
       }
 
+      // [FIX 2026-06-09] RUTEO INTELIGENTE DE TABLA: Si hay filtros base
+      // dimensionales (e.g. "tipo_movimiento=Ingreso") y la tabla resuelta
+      // es per-chart (pd_chart_*, agregada y sin dimensiones), preferir
+      // la tabla top-level (pd_analysis_*, raw con todas las dimensiones).
+      //
+      // Por que: la tabla per-chart contiene el resultado agregado (sum(monto)
+      // by month), NO contiene columnas dimensionales como tipo_movimiento.
+      // El motor DuckDB detecta que la columna no existe y emite
+      // "Degradación elegante: omitido porque no se encontró coincidencia
+      // estructural" — el filtro se descarta y la tabla resultante mezcla
+      // Ingresos + Egresos.
+      //
+      // La tabla top-level (pd_analysis_<fileId>_detail) SÍ tiene todas
+      // las dimensiones raw, por lo que el filtro dimensional SÍ se aplica
+      // correctamente. Esta tabla siempre se pre-carga junto con el chart
+      // (linea 952-961) cuando data.result.arrow_data existe.
+      if (
+        Object.keys(baseFilters).length > 0 &&
+        tName &&
+        tName.startsWith('pd_chart_') &&
+        analysisFileId
+      ) {
+        const topLevelTableName = buildAnalysisTableName(
+          analysisFileId,
+          'analysis',
+          'detail'
+        );
+        const refreshedTables = duckdbEngine.getTableNames();
+        if (refreshedTables.includes(topLevelTableName)) {
+          console.log(
+            `🦆 [CROSS-FILTER] Re-ruteo a tabla top-level '${topLevelTableName}' ` +
+            `porque hay ${Object.keys(baseFilters).length} filtro(s) dimensional(es) ` +
+            `que requieren columnas raw (la tabla per-chart '${tName}' solo tiene datos agregados).`
+          );
+          tName = topLevelTableName;
+        }
+      }
+
       // Merge: los filtros base del chart (e.g. "Tipo Movimiento=Ingreso")
       // se combinan con el clic del usuario (e.g. "mes=Jan-2025").
       // Si el usuario hace click en algo que YA está en los filtros base,
