@@ -1488,7 +1488,7 @@ export function ChatInterface() {
 
       // [FIX 2026-06-09] RUTEO INTELIGENTE DE TABLA: Si la tabla resuelta
       // es per-chart (pd_chart_*, agregada), preferir SIEMPRE la tabla
-      // top-level (pd_analysis_*, raw con todas las dimensiones).
+      // snapshot (pd_snapshot_*, raw con todas las dimensiones).
       //
       // Por que: el requerimiento de negocio es que el usuario SIEMPRE
       // vea el detalle crudo (drill-down) cuando hace clic en 'Filtrar aquí',
@@ -1500,35 +1500,49 @@ export function ChatInterface() {
       // agregada (Name, Value) que es lo que retorna la tabla per-chart
       // cuando se filtra por un valor dimensional.
       //
-      // La tabla top-level (pd_analysis_<fileId>_detail) SÍ tiene todas
-      // las dimensiones raw. Esta tabla siempre se pre-carga junto con el
-      // chart (linea 952-961) cuando data.result.arrow_data existe.
+      // La tabla snapshot (pd_snapshot_<fileId>_latest) SÍ tiene todas
+      // las dimensiones raw: fecha_operacion, placa_unidad, tipo_unidad,
+      // origen, destino, km_recorridos, horas_manejo, galones_consumidos,
+      // gasto_combustible_s, etc. (truncada a 10,000 filas por el
+      // BIG DATA SHIELD del backend). Esta tabla siempre se pre-carga
+      // junto con el chart (linea 1014-1027) cuando data.result.snapshot_arrow
+      // existe.
       //
       // [FIX 2026-06-09 2da iteracion] Se elimino la condicion
       // `Object.keys(baseFilters).length > 0` porque el ruteo debe ocurrir
       // siempre que la tabla per-chart sea agregada, no solo cuando hay
-      // filtros dimensionales. El caso "evolucion de gastos por gasolina"
-      // (sin filtros base) tambien necesita ver el detalle crudo subyacente.
+      // filtros dimensionales.
+      //
+      // [FIX 2026-06-09 3ra iteracion] Se cambio la tabla destino de
+      // `pd_analysis_*_detail` (que resulto ser AGREGADA, no raw) a
+      // `pd_snapshot_*_latest` (que es RAW con todas las dimensiones).
+      // La tabla pd_analysis_*_detail solo contiene la salida agregada
+      // del chart (e.g. name='Aug-2021', value=sum), NO las columnas
+      // dimensionales como fecha_operacion. Por eso DuckDB retornaba
+      // solo 1 fila para 'Aug-2021': matcheaba contra la columna 'name'
+      // agregada. La tabla pd_snapshot_*_latest tiene 10K filas raw
+      // con fecha_operacion como timestamp, donde el motor DuckDB puede
+      // aplicar el predicate temporal EXTRACT(YEAR|MONTH).
       if (
         tName &&
-        tName.startsWith('pd_chart_') &&
+        (tName.startsWith('pd_chart_') || tName.startsWith('pd_analysis_')) &&
         analysisFileId
       ) {
-        const topLevelTableName = buildAnalysisTableName(
+        const snapshotTableName = buildAnalysisTableName(
           analysisFileId,
-          'analysis',
-          'detail'
+          'snapshot',
+          'latest'
         );
         const refreshedTables = duckdbEngine.getTableNames();
-        if (refreshedTables.includes(topLevelTableName)) {
+        if (refreshedTables.includes(snapshotTableName)) {
           const reason = Object.keys(baseFilters).length > 0
             ? `hay ${Object.keys(baseFilters).length} filtro(s) dimensional(es) que requieren columnas raw`
             : `el usuario espera ver el detalle crudo subyacente (drill-down)`;
           console.log(
-            `🦆 [CROSS-FILTER] Re-ruteo a tabla top-level '${topLevelTableName}' ` +
-            `porque ${reason} (la tabla per-chart '${tName}' solo tiene datos agregados).`
+            `🦆 [CROSS-FILTER] Re-ruteo a tabla snapshot '${snapshotTableName}' ` +
+            `porque ${reason} (la tabla '${tName}' solo tiene datos agregados).`
           );
-          tName = topLevelTableName;
+          tName = snapshotTableName;
         }
       }
 
