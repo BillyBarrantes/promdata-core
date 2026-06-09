@@ -342,6 +342,24 @@ def _build_chart_option(
     if query_contract:
         option["query_contract"] = query_contract
 
+    # [FIX 2026-06-08] Inyectar los filtros base del plan (e.g. "Tipo Movimiento = Ingreso")
+    # en el chart_option para que el frontend los pueda combinar con el clic del
+    # usuario en "Filtrar aquí". Sin esto, DuckDB solo filtra por el clic y la
+    # tabla resultante incluye TODOS los registros (ej. Ingresos + Egresos).
+    # Solo se extraen filtros con formato column+value; operadores !=
+    # se serializan como "op value" para que el frontend los pueda parsear.
+    plan_filters: dict[str, str] = {}
+    intent = getattr(plan, "main_intent", None)
+    if intent is not None:
+        for f in getattr(intent, "filters", []) or []:
+            col = str(getattr(f, "column", "") or "").strip()
+            val = str(getattr(f, "value", "") or "").strip()
+            op = str(getattr(f, "operator", "==") or "==").strip()
+            if col and val:
+                plan_filters[col] = f"{op} {val}" if op != "==" else val
+    if plan_filters:
+        option["chart_base_filters"] = plan_filters
+
     filtered_granular_df = result_payload.get("filtered_granular_df")
     if filtered_granular_df is None:
         # [FIX 2026-06-08] Fallback: si el plan no inyecta filtered_granular_df
