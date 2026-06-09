@@ -48,25 +48,57 @@ reading §10.1 and §10.2 first** — the names overlap with auto-triggers.
 
 ### 2.1 `promdata-backend` — FastAPI API
 - **Source:** `/backend/Dockerfile`
-- **Auto-deploy:** **ENABLED** (intended via `cloudbuild.yaml`). See §10.1
-  for known incident: the step-3 deploy in `cloudbuild.yaml` has been
-  observed NOT to create the service reliably. Always verify the service
-  exists after a `git push`.
+- **Auto-deploy:** **BROKEN AS OF 2026-06-08.** The Cloud Build trigger
+  intended for `cloudbuild.yaml` (`promdata-backend-auto-deploy`,
+  us-east4) **does not exist** in the project. After a `git push`,
+  the image is built and pushed (step 1+2 of `cloudbuild.yaml`) by
+  the *worker* trigger (which is wired to the same image), but the
+  *backend* service is NOT updated. The backend deploy must be done
+  manually with `gcloud run deploy promdata-backend ...` (see §6.7).
+  This was confirmed on 2026-06-09 by
+  `gcloud builds triggers list` showing only the `promdata-core`
+  (frontend) trigger.
 - **Public URL:** `https://promdata-backend-698138140658.us-east4.run.app`
 - **Image tag:** `gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`
 - **Port:** 8080 (Cloud Run default; uvicorn reads `$PORT`).
 - **Min instances:** 1 (no cold starts in prod).
-- **Env vars of interest:**
+- **Env vars of interest (full list has 42 entries as of 2026-06-09):**
   - `ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat`
   - `FRONTEND_APP_URL=https://livion.lat`
   - `BACKEND_PUBLIC_URL=https://promdata-backend-698138140658.us-east4.run.app`
+  - `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_ANON_KEY`
+  - `GEMINI_API_KEY`, `GEMINI_VERTEX_PROJECT`, `GEMINI_VERTEX_LOCATION`
+  - `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`
+  - `MICROSOFT_ONEDRIVE_CLIENT_ID`, `MICROSOFT_ONEDRIVE_CLIENT_SECRET`
+  - `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `REDIS_URL`
+  - `SENTRY_DSN`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`
+  - `AI_MODEL_NAME`, `NARRATIVE_FAST_MODEL_NAME`, `NARRATIVE_STRICT_MODEL_NAME`
+  - 16 `CANONICAL_*` feature flags
+  - `UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED`
+  - `UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES`
 
 ### 2.2 `promdata-worker` — Celery worker pool
 **NOT** a regular Cloud Run service. It's a **Cloud Run Worker Pool**
 (beta), which runs the Celery consumer process long-lived.
 - **Source:** same image (`gcr.io/$PROJECT_ID/promdata-backend:$COMMIT_SHA`)
-- **Auto-deploy:** **DISABLED**. Manual redeploy from Cloud Console.
-- **Command override** (set in Cloud Run):
+- **Auto-deploy:** **ENABLED** via Cloud Build trigger
+  `d4a8317c-0666-4e68-ae81-450eb11aa6d4` (us-east4) pointing at
+  `cloudbuild.worker.yaml`. The trigger builds the image, pushes it,
+  and runs `gcloud beta run worker-pools deploy promdata-worker`.
+  **WARNING (2026-06-09):** the trigger fires on every push to `main`
+  because there is no `--branch-pattern` filter excluding
+  frontend-only commits. The current `cloudbuild.worker.yaml` deploys
+  with `--concurrency=4 --max-tasks-per-child=` (NONE), which violates
+  the constraint below. **TODO:** pin to `--concurrency=2
+  --max-tasks-per-child=50` and re-create the trigger with a
+  path filter.
+- **Command override** (set in `cloudbuild.worker.yaml`, currently active):
+  ```
+  celery -A app.celery_app worker --loglevel=info --pool=prefork \
+         --concurrency=4 -Ofair --prefetch-multiplier=1
+  ```
+  **This is a known regression (June 2026).** The canonical override
+  per §4.4 is:
   ```
   celery -A app.celery_app worker --loglevel=info --pool=prefork \
          --concurrency=2 --max-tasks-per-child=50 -Ofair --prefetch-multiplier=1
@@ -268,6 +300,53 @@ celery -A app.celery_app worker --loglevel=info --pool=prefork \
   "promdata:ai_cache:v2:*" | xargs -L 100 redis-cli -u "$REDIS_URL" DEL`.
 - **Never use FLUSHALL in production.** It wipes rate-limit counters too.
 
+### 6.7 Manual deploy of `promdata-backend` (recovery procedure)
+Use this when the Cloud Build auto-deploy trigger is broken, missing,
+or you need to roll back to a specific image SHA. **Read §10.4 before
+running `gcloud run deploy` with env vars** — `--env-vars-file` and
+`--update-env-vars` have **opposite semantics** and a wrong choice
+silently wipes the service's credentials.
+
+**Step 1: Extract the full env-var list from a known-good revision.**
+```bash
+gcloud run revisions describe promdata-backend-00011-d9t \
+  --project=promdata-enterprise --region=us-east4 \
+  --format="value(spec.containers[0].env)" > /tmp/env_raw.txt
+```
+The output is a Python repr (`{'name': 'X', 'value': 'Y'};{...}`) that
+must be parsed into a YAML file (one `KEY: "value"` per line) before
+feeding back to `gcloud run deploy`. Use the parser in
+`/tmp/promdata_recovery/` as a reference.
+
+**Step 2: Deploy with the COMPLETE env file.**
+```bash
+gcloud run deploy promdata-backend \
+  --image=gcr.io/promdata-enterprise/promdata-backend:<SHA> \
+  --region=us-east4 --platform=managed --allow-unauthenticated \
+  --env-vars-file=/tmp/promdata_recovery/env_full.yaml \
+  --project=promdata-enterprise
+```
+
+**Step 3: Verify.**
+```bash
+# Must show sentry.enabled=true, langfuse.enabled=true
+curl https://promdata-backend-698138140658.us-east4.run.app/health/observability
+# Must return 200
+curl https://promdata-backend-698138140658.us-east4.run.app/health/ready
+# Any auth-protected endpoint must return 401 (NOT 500)
+curl https://promdata-backend-698138140658.us-east4.run.app/api/v1/chat/<file_id>
+```
+
+**Flag semantics (CRITICAL — see §10.4):**
+- `--env-vars-file=FILE`: **REPLACES** the full env-var list with the
+  file's contents. If the file has only 2 vars, the other 40 are gone.
+- `--update-env-vars=K1=V1,K2=V2`: **ADDS/UPDATES** the listed vars
+  and preserves everything else. The `cloudbuild.yaml` step 3 uses
+  this flag — that's why the auto-deploy never lost env vars.
+- **Rule:** if you don't have a complete env-var file, use
+  `--update-env-vars` for the 1-2 vars you actually want to change,
+  not `--env-vars-file`.
+
 ---
 
 ## 7. Anti-Patterns (Forbidden)
@@ -370,6 +449,76 @@ in this file (add a row to §9 if it's a breaking change).
   service is the worst-case outcome.
 - **Update in this doc:** §2.0 was added to document `promdata-core`
   as the production frontend, with a prominent "do NOT delete" warning.
+
+### 10.4 Backend wiped env vars via `--env-vars-file` in manual deploy (2026-06-09)
+- **Symptom:** Systemic 500 errors on ALL backend endpoints from
+  `livion.lat`: `/analyze`, `/chat`, `/connectors/providers`,
+  `/connectors/watchdog/status`. Sentry captured **nothing** (the
+  SDK never initialized because `SENTRY_DSN` was missing).
+  Browser console showed all 4 endpoints returning
+  `{"detail":"Error interno del servidor. Por favor, inténtelo de nuevo."}`.
+- **Root cause:** A manual `gcloud run deploy promdata-backend` was
+  issued to apply the supabase-py fix (commit `5f542174`). The
+  command used `--env-vars-file=/tmp/cloud_run_env.yaml`, but that
+  file contained **only 2 env vars** (`ALLOWED_ORIGINS`,
+  `FRONTEND_APP_URL`). Per gcloud semantics,
+  `--env-vars-file=FILE` **REPLACES** the entire env-var list with
+  the file's contents — the other 40 env vars (`SUPABASE_URL`,
+  `SUPABASE_KEY`, `SUPABASE_ANON_KEY`, `GEMINI_*`, `GOOGLE_DRIVE_*`,
+  `MICROSOFT_ONEDRIVE_*`, `CELERY_*`, `REDIS_URL`, `SENTRY_DSN`,
+  `LANGFUSE_*`, 16 `CANONICAL_*`, etc.) were silently dropped.
+  Cloud Run accepted the deploy without warning.
+- **Detection:** Log query via
+  `gcloud logging read "resource.type=cloud_run_revision AND
+  resource.labels.service_name=promdata-backend" --limit=10`
+  revealed the exact error in stderr:
+  ```json
+  {"error":"supabase_url is required",
+   "event":"api_chat_history_error",
+   "status_code":500}
+  ```
+  Confirmed by `gcloud run revisions describe promdata-backend-00012-n95
+  --format="value(spec.containers[0].env)"` showing only 2 env vars
+  (vs 42 in the prior functional revision `00011-d9t`).
+- **Resolution (no code changes):**
+  1. Extracted the full env-var list from `00011-d9t` (functional):
+     ```bash
+     gcloud run revisions describe promdata-backend-00011-d9t \
+       --format="value(spec.containers[0].env)" > /tmp/env_raw.txt
+     ```
+  2. Parsed the Python repr into a clean YAML file with all 42 vars.
+  3. Re-deployed the **same** image (5f542174) with the **complete**
+     env file:
+     ```bash
+     gcloud run deploy promdata-backend \
+       --image=gcr.io/promdata-enterprise/promdata-backend:5f542174... \
+       --env-vars-file=/tmp/promdata_recovery/env_full.yaml
+     ```
+  4. Result: revision `promdata-backend-00013-9cf` with 42 env vars
+     and `/health/observability` showing `sentry.enabled=true,
+     langfuse.enabled=true`.
+- **Lesson learned (CRITICAL for future manual deploys):**
+  - `--env-vars-file=FILE` **REPLACES** the full env-var list.
+  - `--update-env-vars=K1=V1,K2=V2` **ADDS/UPDATES** and preserves
+    everything else. The `cloudbuild.yaml` step 3 uses this flag
+    (which is why the auto-deploy never lost env vars).
+  - **Rule:** when manually deploying with a complete env file,
+    use `--env-vars-file` with ALL vars. When changing 1-2 vars,
+    use `--update-env-vars`. Never mix them.
+  - **Sanity check after ANY manual deploy:**
+    `gcloud run revisions describe <NEW_REV> --format="value(spec.containers[0].env)"`
+    must show the same env-var count as the prior functional revision.
+  - If you don't have a complete env-var file, the only safe path is
+    `gcloud run services update <service> --update-env-vars=...`
+    which is purely additive.
+- **Update in this doc:**
+  - §6.7 added: step-by-step manual deploy procedure with the
+    gotcha prominently flagged.
+  - §2.1 updated: `--update-env-vars` vs `--env-vars-file` semantics
+    now documented in the deploy context.
+  - §2.1 also documents that the
+    `promdata-backend-auto-deploy` trigger (us-east4) is missing —
+    manual deploys are the norm until the trigger is re-created.
 
 ---
 
@@ -629,14 +778,10 @@ DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
 
 ---
 
-**Last updated:** 2026-06-08 — Cross-filter recovery (incident 10.3 / §12) +
-Defensive Supabase code (timeouts + 503 on degraded responses, §13) +
-Cross-filter chart_base_filters inheritance (backend + frontend + UI
-feedback, §14) + Observability (Sentry in Celery worker + Langfuse v4) +
-cloudbuild.yaml verify-deploy PROJECT_ID bugfix (4/4 steps green) +
-Auto-deploy trigger `promdata-backend-auto-deploy` (us-east4) using
-cloudbuild.yaml. Phase 2 (Redis pool) + Fix C v2 (cache schema) + Fix V3
-(semantic translator) + result_expires 12h optimization + Incident 10.1
-(backend service recovery) + Incident 10.2 (promdata-core
-misidentification, do-not-delete warning added in §2.0) + Skills audit
-(17 approved, 3 removed — see §11).
+**Last updated:** 2026-06-09 — supabase-py 2.31.0 ClientOptions fix
+(deployed to backend via manual `gcloud run deploy`, revision
+`promdata-backend-00013-9cf` with full 42 env vars restored from
+`00011-d9t`) + Incident 10.4 documented (`--env-vars-file` REPLACES
+vs `--update-env-vars` ADDS) + §6.7 manual deploy procedure + §2.1
+flagged missing `promdata-backend-auto-deploy` trigger + §2.2
+flagged worker `--concurrency=4` regression in `cloudbuild.worker.yaml`.
