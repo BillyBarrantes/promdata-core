@@ -1,5 +1,6 @@
 import httpx
 from supabase import create_client, Client
+from supabase.lib.client_options import SyncClientOptions
 from app.core.config import settings
 
 
@@ -10,28 +11,32 @@ def _build_client(key: str) -> Client:
     [FIX 2026-06-08] Sin timeouts explícitos, el cliente usa los defaults
     de httpx (~10s en connect/read) — cuando Supabase se vuelve lento
     (Disk IO budget agotado, mantenimiento, etc.), nuestro backend se
-    cuelga 10+ segundos y retorna 500 en vez de fallar rápido con 503.
+    cuelga 10+ segundos y retorna 500 en vez de fail-fast con 503.
     Configuramos timeouts razonables para que el impacto sea mínimo:
     - connect: 3s (Supabase edge está en Cloudflare, debe ser <500ms)
     - read: 8s (queries grandes pueden tardar)
     - write: 5s (writes son simples INSERTs)
     - pool: 3s (timeouts en la cola de conexiones)
+
+    [FIX 2026-06-09] supabase-py 2.31.0 NO acepta `http_client=` como kwarg
+    directo en `create_client()`. La API oficial es pasar un `ClientOptions`
+    con `httpx_client=httpx.Client(timeout=...)`. Verificado con
+    `inspect.signature(create_client)` → `(url, key, options=None)`.
     """
     url: str = settings.SUPABASE_URL
     if not url or not key:
         print("CRITICAL WARNING: Faltan credenciales de Supabase en .env del Backend")
 
-    # httpx.Timeout es el format nativo que supabase-py 2.x acepta vía el
-    # parámetro `http_client`. Pasamos None para options/limits para no
-    # interferir con el resto del setup.
     timeout = httpx.Timeout(
         connect=settings.SUPABASE_CONNECT_TIMEOUT_SECONDS,
         read=settings.SUPABASE_READ_TIMEOUT_SECONDS,
         write=settings.SUPABASE_WRITE_TIMEOUT_SECONDS,
         pool=settings.SUPABASE_POOL_TIMEOUT_SECONDS,
     )
-    http_client = httpx.Client(timeout=timeout)
-    return create_client(url, key, http_client=http_client)
+    httpx_client = httpx.Client(timeout=timeout)
+
+    options = SyncClientOptions(httpx_client=httpx_client)
+    return create_client(url, key, options=options)
 
 
 def get_supabase_service_client() -> Client:

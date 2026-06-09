@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 celery[redis]
 python-dotenv
-supabase
+supabase>=2.31.0,<3.0.0
 pandas>=2.0,<3.0
 openpyxl
 python-jose[cryptography]
