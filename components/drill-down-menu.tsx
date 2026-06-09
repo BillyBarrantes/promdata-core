@@ -173,8 +173,19 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                                 ) {
                                                     filters['global_cross_filter'] = String(dataContext.secondaryCategory);
                                                 }
-                                                
-                                                console.log("1. Iniciando filtro. Tabla:", dataContext.tableName, "Filtros:", filters);
+
+                                                // [FIX 2026-06-08] Preview los filtros base del chart original
+                                                // (los que el canary executor aplicó para generar este chart).
+                                                // El usuario debe ver explícitamente que estos se combinarán
+                                                // con su clic para producir la tabla resultante.
+                                                const chartOption = (dataContext as any)?.option;
+                                                const baseFilters = chartOption?.chart_base_filters || {};
+                                                const baseFilterKeys = Object.keys(baseFilters);
+                                                const baseFilterHint = baseFilterKeys.length > 0
+                                                    ? `+ ${baseFilterKeys.length} base`
+                                                    : '';
+
+                                                console.log("1. Iniciando filtro. Tabla:", dataContext.tableName, "Filtros:", filters, "Base filters:", baseFilters);
                                                 onCrossFilter(filters, dataContext.tableName);
                                                 onClose();
                                             }}
@@ -185,7 +196,11 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[13px] font-semibold text-primary truncate">⚡ Filtrar aquí</p>
-                                                <p className="text-[10px] text-muted-foreground">Instantáneo · Sin servidor</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Instantáneo · Sin servidor
+                                                    {/* Show base filter count if any exist */}
+                                                    <BaseFilterBadge dataContext={dataContext} />
+                                                </p>
                                             </div>
                                         </button>
                                     )}
@@ -219,5 +234,25 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                 )}
             </AnimatePresence>
         </>
+    );
+}
+
+/**
+ * [FIX 2026-06-08] Muestra un badge con el conteo de filtros base del chart
+ * (los que el canary executor aplicó al generar el chart, ej.
+ * "Tipo Movimiento = Ingreso"). El usuario ve explícitamente que el filtro
+ * del clic se va a COMBINAR con N filtros base del chart, no reemplazarlos.
+ */
+function BaseFilterBadge({ dataContext }: { dataContext: any }) {
+    const chartOption = dataContext?.option;
+    const baseFilters = chartOption?.chart_base_filters;
+    if (!baseFilters || typeof baseFilters !== "object" || Object.keys(baseFilters).length === 0) {
+        return null;
+    }
+    const count = Object.keys(baseFilters).length;
+    return (
+        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+            + {count} base
+        </span>
     );
 }

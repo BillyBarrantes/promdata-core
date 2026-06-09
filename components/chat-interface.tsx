@@ -1420,17 +1420,51 @@ export function ChatInterface() {
       if (Array.isArray(lastVis)) allVisualSources.push(...lastVis);
 
       const matchedComponent = findComponentByTableName(allVisualSources);
-      const effectiveFilters = matchedComponent
-        ? enrichFiltersWithSyntheticBucket(filters, matchedComponent)
-        : filters;
 
-      const filterSummary = Object.entries(filters)
+      // [FIX 2026-06-08] Extraer los filtros base del chart original (e.g.
+      // "Tipo Movimiento = Ingreso" si el chart solo graficaba ingresos).
+      // El backend (canary_executor) ahora inyecta estos en chart_option.chart_base_filters.
+      // Sin mergearlos, DuckDB solo filtra por el clic y retorna registros
+      // que no pertenezcan al subset que el chart estaba visualizando.
+      let baseFilters: Record<string, string> = {};
+      if (matchedComponent) {
+        const chartOption =
+          (matchedComponent as any).option ||
+          (matchedComponent as any).original_chart_option ||
+          null;
+        if (chartOption?.chart_base_filters && typeof chartOption.chart_base_filters === 'object') {
+          baseFilters = { ...chartOption.chart_base_filters };
+        }
+      }
+
+      // Merge: los filtros base del chart (e.g. "Tipo Movimiento=Ingreso")
+      // se combinan con el clic del usuario (e.g. "mes=Jan-2025").
+      // Si el usuario hace click en algo que YA está en los filtros base,
+      // gana el clic (overwrite) para evitar duplicación.
+      const mergedFilters = { ...baseFilters, ...filters };
+      const effectiveFilters = matchedComponent
+        ? enrichFiltersWithSyntheticBucket(mergedFilters, matchedComponent)
+        : mergedFilters;
+
+      // Build summaries for UI feedback
+      const baseFilterSummary = Object.entries(baseFilters)
+        .filter(([key]) => !key.startsWith('__'))
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(' AND ');
+      const clickFilterSummary = Object.entries(filters)
+        .filter(([key]) => !key.startsWith('__'))
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(' AND ');
+      const filterSummary = Object.entries(mergedFilters)
         .filter(([key]) => !key.startsWith('__'))
         .map(([k, v]) => `${k}="${v}"`)
         .join(' AND ');
 
       // ── Step 3: Execute local DuckDB cross-filter ──
-      console.log(`🦆 [CROSS-FILTER] Filtrando: ${filterSummary} en tabla '${tName}'`);
+      console.log(
+        `🦆 [CROSS-FILTER] Filtrando: ${filterSummary} en tabla '${tName}'`,
+        { baseFilters, clickFilters: filters, merged: mergedFilters }
+      );
       const filtered = await duckdbEngine.crossFilter(effectiveFilters, tName);
 
       if (filtered.length === 0) {
@@ -1449,10 +1483,25 @@ export function ChatInterface() {
       console.log('4. [Bridge/Chat] Despachando a workspaceItemsAtom y messagesAtom:', { newTableComponent });
       setWorkspaceItems((prev: AnalysisComponent[]) => [...prev, newTableComponent]);
 
+      // [FIX 2026-06-08] UI feedback que muestra EXPLÍCITAMENTE la suma de
+      // los filtros (base + clic) para que el usuario confíe en la tabla
+      // resultante y entienda por qué algunos registros fueron excluidos.
+      let filterDescription = `⚡ **Filtro local aplicado:** \n\n`;
+      if (baseFilterSummary) {
+        filterDescription += `📊 **Filtros base del chart:** ${baseFilterSummary}\n`;
+      }
+      if (clickFilterSummary) {
+        filterDescription += `➕ **Filtros del clic:** ${clickFilterSummary}\n`;
+      }
+      if (!baseFilterSummary && !clickFilterSummary) {
+        filterDescription += `🔍 Sin filtros activos\n`;
+      }
+      filterDescription += `\n📌 *Se encontraron ${filtered.length} registros en <50ms.* \nLa tabla filtrada ha sido añadida a tu Lienzo.`;
+
       const filterMsg: ChatMessage = {
         id: `crossfilter-${Date.now()}`,
         type: 'assistant',
-        content: `⚡ **Filtro local aplicado:** \n\n${filterSummary}\n\n📌 *Se encontraron ${filtered.length} registros en <50ms.* \nLa tabla filtrada ha sido añadida a tu Lienzo.`,
+        content: filterDescription,
         timestamp: new Date(),
         components: [],
         _visuals: [newTableComponent]
