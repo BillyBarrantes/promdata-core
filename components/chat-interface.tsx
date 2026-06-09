@@ -903,6 +903,25 @@ export function ChatInterface() {
                     ], 0)
                       .then(() => setIsDuckDBReady(true))
                       .catch((err: any) => console.warn('⚠️ [DuckDB] Chart Arrow no cargado:', err));
+                  } else {
+                    // [FIX 2026-06-09] FALLBACK: El backend solo inyecta arrow_data a nivel
+                    // top-level (final_struct.arrow_data), no dentro de chart_options[*].
+                    // Si este chart no tiene granular_arrow ni arrow_data per-chart, igual
+                    // podemos cross-filtrar usando la MISMA tabla top-level
+                    // (pd_analysis_<fileId>_detail) que el backend SÍ garantiza.
+                    // Sin este fallback, el botón "Filtrar aquí" siempre falla con
+                    // "No hay datos cargados" cuando el canary omite granular_arrow.
+                    // IMPORTANTE: usamos el MISMO nombre que la línea 935
+                    // (buildAnalysisTableName(analysisFileId, 'analysis', 'detail'))
+                    // para que ambos referencien la misma tabla en DuckDB-WASM.
+                    const topLevelArrow = data.result?.arrow_data;
+                    if (topLevelArrow) {
+                      chartTableName = buildAnalysisTableName(
+                        analysisFileId,
+                        'analysis',
+                        'detail'
+                      );
+                    }
                   }
 
                   componentsList.push({
