@@ -455,6 +455,112 @@ skill or trusting an existing one, read §11.3 and §11.4.
 
 ---
 
+## 13. Defensive Supabase Code (2026-06-08)
+
+### 13.1 Symptom (incident post-Supabase recovery)
+
+Al recuperar Supabase del outage por Disk IO budget, las API routes
+comenzaron a fallar con `IndexError: list index out of range` en
+`supabase_auth/_sync/gotrue_client.py:733` (línea
+`if access_token and access_token.split(".")[1]:`). El JWT corrupto
+provocaba un 500 opaco que el frontend no podía distinguir de un bug
+real del código.
+
+### 13.2 Fix (5 cambios backend, ~70 líneas)
+
+1. **`backend/app/core/config.py`**: 4 env vars nuevas
+   `SUPABASE_*_TIMEOUT_SECONDS` con defaults seguros
+   (connect=3s, read=8s, write=5s, pool=3s).
+
+2. **`backend/app/core/supabase_client.py`**: `_build_client` ahora
+   inyecta `httpx.Client(timeout=...)` en TODOS los clientes
+   (service, user, anon). Fail-fast en 3s en vez de 10s default.
+
+3. **`backend/app/api/routes.py` — `/analyze`**: usa
+   `get_supabase_user_client(token)` (centraliza timeouts).
+
+4. **`backend/app/api/routes.py` — handlers `/analyze` y `/chat/{file_id}`**:
+   nuevo bloque try/except que distingue `httpx.TimeoutException`,
+   `IndexError`, `KeyError`, o mensajes con "list index out of range" /
+   "Invalid API key" → retorna **HTTP 503** con mensaje claro "El servicio
+   de base de datos está temporalmente no disponible. Por favor, inténtalo
+   de nuevo en unos minutos." El frontend puede reintentar mejor con 503
+   que con 500.
+
+5. **`backend/app/main.py`**: log de startup con versiones de
+   `httpx` + `supabase-py` + timeouts configurados. Primer punto de
+   referencia para diagnosticar futuras incidencias de upstream.
+
+### 13.3 Cero impacto en funcionalidades existentes
+
+- Sentry sigue capturando excepciones (mejor — más precisas)
+- Langfuse v4 sigue emitiendo trazas
+- Cross-filter fix (§12) sigue funcionando
+- Redis + Cloud Run + Vercel sin cambios
+
+---
+
+## 14. Cross-Filter chart_base_filters Herencia (2026-06-08)
+
+### 14.1 Bug lógico detectado por el usuario
+
+Prompt: "realiza un gráfico que muestre la evolución de los ingresos en el tiempo"
+→ El chart solo graficaba Ingresos (filtro base `Tipo Movimiento = Ingreso`).
+→ Click en `Jan-2025` + "Filtrar aquí" → DuckDB retornaba 666 registros
+mezclando Ingresos + Egresos.
+
+### 14.2 Root cause
+
+El canary executor aplicaba el filtro `Tipo Movimiento = Ingreso` a nivel
+SQL para generar el chart, pero NO propagaba ese filtro al frontend. El
+usuario al hacer clic solo enviaba `global_chart_filter="Jan-2025"` y
+DuckDB retornaba TODOS los registros de Jan-2025 (Ingresos + Egresos)
+porque no sabía que el chart original solo graficaba Ingresos.
+
+### 14.3 Fix (3 archivos)
+
+1. **`backend/app/services/canonical_tabular_canary_executor.py`**:
+   `_build_chart_option` ahora extrae los filtros del `plan.main_intent`
+   y los inyecta en `option["chart_base_filters"]` como dict
+   `{col: op_value}`. Cada chart lleva los filtros que el canary
+   aplicó para generarlo.
+
+2. **`components/chat-interface.tsx` — handleCrossFilter**:
+   - Extrae `chart_option.chart_base_filters` del matchedComponent
+   - Mergea: `{...baseFilters, ...clickFilters}` (clic gana en conflicto)
+   - Pasa el merged al `duckdbEngine.crossFilter()`
+   - Muestra en el filterMsg la suma explícita:
+     ```
+     📊 Filtros base del chart: Tipo Movimiento="Ingreso"
+     ➕ Filtros del clic: global_chart_filter="Jan-2025"
+     📌 Se encontraron 42 registros en <50ms.
+     ```
+
+3. **`components/drill-down-menu.tsx`**:
+   - Añade `BaseFilterBadge` component que muestra `+ N base` al lado
+     de "Instantáneo · Sin servidor" cuando el chart tiene filtros
+     base. El usuario ve ANTES de hacer click que el filtro del clic
+     se va a combinar con N filtros del chart original.
+
+### 14.4 Cero impacto en funcionalidades existentes
+
+- Si el chart no tiene `chart_base_filters` (caso legacy), el
+  comportamiento es idéntico al anterior.
+- `BaseFilterBadge` retorna `null` cuando no hay filtros base.
+- Sentry + Langfuse + Redis + CI/CD sin cambios.
+
+### 14.5 Validación esperada
+
+1. Lanzar el mismo prompt del usuario: "evolución de los ingresos en el tiempo"
+2. Click en un punto del chart
+3. Click en "Filtrar aquí"
+4. Verificar:
+   - La tabla muestra SOLO registros de Ingreso + la fecha clickeada
+   - El filterMsg muestra los 2 filtros (base + clic)
+   - El badge `+ 1 base` aparece en el menú antes del click
+
+---
+
 ## 12. Cross-Filter "Filtrar aquí" (incident 10.3)
 
 ### 12.1 Symptom (resuelto en commit 2026-06-08)
@@ -524,10 +630,13 @@ DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
 ---
 
 **Last updated:** 2026-06-08 — Cross-filter recovery (incident 10.3 / §12) +
-Observability (Sentry in Celery worker + Langfuse v4) + cloudbuild.yaml
-verify-deploy PROJECT_ID bugfix (4/4 steps green) + Auto-deploy trigger
-`promdata-backend-auto-deploy` (us-east4) using cloudbuild.yaml. Phase 2
-(Redis pool) + Fix C v2 (cache schema) + Fix V3 (semantic translator) +
-result_expires 12h optimization + Incident 10.1 (backend service recovery)
-+ Incident 10.2 (promdata-core misidentification, do-not-delete warning
-added in §2.0) + Skills audit (17 approved, 3 removed — see §11).
+Defensive Supabase code (timeouts + 503 on degraded responses, §13) +
+Cross-filter chart_base_filters inheritance (backend + frontend + UI
+feedback, §14) + Observability (Sentry in Celery worker + Langfuse v4) +
+cloudbuild.yaml verify-deploy PROJECT_ID bugfix (4/4 steps green) +
+Auto-deploy trigger `promdata-backend-auto-deploy` (us-east4) using
+cloudbuild.yaml. Phase 2 (Redis pool) + Fix C v2 (cache schema) + Fix V3
+(semantic translator) + result_expires 12h optimization + Incident 10.1
+(backend service recovery) + Incident 10.2 (promdata-core
+misidentification, do-not-delete warning added in §2.0) + Skills audit
+(17 approved, 3 removed — see §11).
