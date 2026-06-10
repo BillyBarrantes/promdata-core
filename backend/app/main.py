@@ -34,6 +34,19 @@ print(
     f"pool={settings.SUPABASE_POOL_TIMEOUT_SECONDS}s"
 )
 
+# [TRIGGER VALIDATION 2026-06-10] Health check log marker.
+# Este print se usa para validar que el trigger promdata-backend-auto-deploy
+# (Cloud Build → cloudbuild.yaml → gcloud run deploy promdata-backend)
+# dispara correctamente cuando se hace push a main.
+# Cuando el trigger funciona, este mensaje aparece en los logs de Cloud Run
+# de la nueva revision dentro de los 30s posteriores al push.
+print(
+    f"[STARTUP] promdata-backend health check OK "
+    f"| commit=trigger-validation | revision=auto-deployed-via-cloudbuild | "
+    f"timestamp={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
+    flush=True,
+)
+
 app = FastAPI(title="PromData API")
 
 # ---------------------------------------------------------------------------

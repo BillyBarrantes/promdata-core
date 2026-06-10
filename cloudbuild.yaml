@@ -53,6 +53,7 @@ steps:
       - '--region=us-east4'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      - '--max-instances=20'
       - >-
         --update-env-vars=^|^ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat|FRONTEND_APP_URL=https://livion.lat
     waitFor: ['push-backend']
