@@ -166,27 +166,59 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
   skipped silently (logged at `warning` level). **The pipeline never
   blocks on cache failures.**
 
-### 4.4 Redis Pool (Pro 1 — Pro-ready defaults)
+### 4.4 Redis Pool (Essentials 256-conn — Production-safe defaults)
 - Centralized in `app/core/redis_client.py`.
-- Three named pools, each with its own connection cap (Pro 1 tuned):
+- Three named pools, each with its own connection cap (Essentials-tuned):
 
   | purpose             | max_connections | env override                                    |
   |---------------------|----------------:|-------------------------------------------------|
-  | `rate_limit`        |              30 | `REDIS_MAX_CONNECTIONS_RATE_LIMIT`              |
-  | `ai_response_cache` |              30 | `REDIS_MAX_CONNECTIONS_AI_CACHE`                |
-  | `healthcheck`       |              10 | `REDIS_MAX_CONNECTIONS_HEALTHCHECK`             |
-  | (other)             |              20 | `REDIS_MAX_CONNECTIONS_DEFAULT`                 |
+  | `rate_limit`        |               6 | `REDIS_MAX_CONNECTIONS_RATE_LIMIT`              |
+  | `ai_response_cache` |               6 | `REDIS_MAX_CONNECTIONS_AI_CACHE`                |
+  | `healthcheck`       |               2 | `REDIS_MAX_CONNECTIONS_HEALTHCHECK`             |
+  | (other)             |               3 | `REDIS_MAX_CONNECTIONS_DEFAULT`                 |
 
-- Celery broker/backend capped at 30 each (Pro 1 headroom)
+- Celery broker/backend capped at 5 each (Essentials headroom)
   (`CELERY_BROKER_POOL_LIMIT`, `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`).
-- **Plan actual:** Redis Cloud Pro 1 (1000 conn / 250MB memory).
-  Los defaults del codigo estan calibrados para Pro 1. Si algun dia
-  alguien revierte al plan Free (30 conn / 30MB), debe bajar los
-  defaults explicitamente via env vars a los valores Free.
+- **Plan actual:** Redis Cloud Essentials (256 conn / 250MB memory).
+  Los defaults del codigo estan calibrados para mantener un techo
+  de ~160 conexiones totales con 5 instancias backend (256/5 = 51
+  conexiones disponibles por instancia). Ver §4.4b para comparacion
+  con Pro 1.
 - **Per-child pool reset:** `celery_app.py:_on_celery_worker_init` calls
   `reset_redis_pools()` in the `worker_init` signal. This prevents the
   parent process's sockets from being inherited by child workers after
   `fork()` (which would cause them to be in an invalid state).
+
+### 4.4b Redis Pool: Essentials vs Pro 1 tuning
+- **Motivación:** los defaults del código deben ser seguros para el plan
+  actual (Essentials, 256 conn) sin requerir env vars de override. Si en
+  el futuro se migra a Pro 1 (1000 conn), basta con cambiar los env vars
+  en Cloud Run (o actualizar los defaults del código).
+
+| Pool / param              | Essentials (256 conn) — **DEFAULT** | Pro 1 (1000 conn) — via env vars |
+|---------------------------|-------------------------------------|----------------------------------|
+| `rate_limit`              | 6                                   | 30                               |
+| `ai_response_cache`       | 6                                   | 30                               |
+| `healthcheck`             | 2                                   | 10                               |
+| (other / default)         | 3                                   | 20                               |
+| `CELERY_BROKER_POOL_LIMIT`| 5                                   | 30                               |
+| `CELERY_RESULT_BACKEND_MAX_CONNECTIONS` | 5                    | 30                               |
+| Worker `--concurrency`    | 4                                   | 6+                               |
+| Worker `--max-tasks-per-child` | 100                              | 100                              |
+| `socket_*_timeout`        | 2.0s                                | 2.0s                             |
+| `result_expires`          | 24h                                 | 24h                              |
+| Total por instancia backend (estimado) | ~25 conexiones        | ~150 conexiones                 |
+| Techo con 5 instancias backend | ~160 conexiones (37% margen vs 256) | ~750 conexiones (25% margen vs 1000) |
+| Techo con `max-instances=20` (auto-escala pico) | ~640 (reventaría 256) | ~3000 (sin riesgo)              |
+
+- **Operación actual:** Essentials-tuned defaults. Los env vars de
+  Cloud Run **NO deben** inyectar los valores Pro-tuned (30/30/10/20)
+  porque eso haría que el backend use esos valores en vez de los
+  defaults del código, y reventaría el límite de 256 al escalar.
+  Ver §11.5 para la limpieza de env vars.
+- **Migración a Pro 1:** cuando llegue el momento, además de cambiar la
+  URL de Redis (Free → Pro), hay que actualizar los env vars en Cloud Run
+  del backend y worker a los valores de la columna "Pro 1" de arriba.
 
 ### 4.5 TLS + Redis Cloud
 - `rediss://` URLs are required for Redis Cloud from Cloud Run.
@@ -604,21 +636,72 @@ skill or trusting an existing one, read §11.3 and §11.4.
    new engineers/agents reproduce the setup. Skills removed from
    approval should also be removed from disk.
 
-### 11.5 Redis Cloud plan transition guide (Pro-Ready code, Free URL still in use)
+### 11.5 Redis Cloud plan tuning: Essentials (256 conn) vs Pro 1 (1000 conn)
 
 **Estado actual (2026-06-10):** el código está calibrado para Redis Cloud
-**Pro 1** (1000 conn / 250MB memory). Los defaults de `redis_client.py`
-y `config.py` reflejan este plan. Sin embargo, **las URLs de conexión
-siguen apuntando al plan Free** (`grape-cloth-driftwood-89364.../0`).
-La migración física de la URL se hará en un paso posterior.
+**Essentials** (256 conn / 250MB memory). Los defaults de `redis_client.py`
+y `config.py` reflejan este plan: techo de ~160 conexiones totales
+con 5 instancias backend (37% de margen vs el límite de 256). Ver
+§4.4b para la tabla comparativa Essentials vs Pro 1.
 
-**Por qué importa:** si un día alguien borra los env vars de Cloud Run
-que override los defaults, el sistema automáticamente vuelve a usar
-los defaults del código (5 conn Free-style) — y eso va a saturar el
-plan Free actual. Con los defaults Pro-ready, si el código se ejecuta
-sin env vars override, automáticamente aprovecha la capacidad Pro.
+**Importante:** los env vars de Cloud Run **NO deben** inyectar los
+valores Pro-tuned (30/30/10/20) porque eso haría que el backend use
+esos valores en vez de los defaults del código, y reventaría el límite
+de 256 al escalar. Si los env vars inflados están activos, hay que
+eliminarlos con `--remove-env-vars` (ver comandos al final de esta
+sección).
 
-**Cómo migrar la URL al Pro 1 cuando llegue el momento:**
+**Cómo migrar al Pro 1 cuando llegue el momento:**
+
+1. **Provisionar la DB Pro 1 en Redis Cloud console** (15-20 min):
+   - New database → Pro plans tab → Pro 1 (1000 conn)
+   - Region: us-east4 (misma que Cloud Run)
+   - Persistence: SSD (RDB)
+   - Anotar: endpoint público + password
+
+2. **Actualizar `.env` local + .env.example:**
+   ```bash
+   # Essentials (actual)
+   REDIS_URL=redis://default:CIJFa2G8d6uOqteanaY7nn55qWBRmbW3@grape-cloth-driftwood-89364.db.redis.io:13366/0
+   # Pro 1 (futuro)
+   REDIS_URL=rediss://default:<password>@redis-12345.c12345.us-east4-1.gcp.cloud.redislabs.com:12345
+   ```
+   ⚠️ Importante: el esquema cambia de `redis://` a `rediss://` (TLS).
+
+3. **Migrar producción gradualmente (worker → backend):**
+   - Editar `promdata-worker` en Cloud Run → cambiar
+     `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` a la URL Pro
+   - Validar 5+ tareas sin errores antes de continuar
+   - Repetir para `promdata-backend` (también `REDIS_URL`,
+     `RATE_LIMIT_STORAGE_URL`)
+
+4. **Actualizar los env vars de pool en Cloud Run (NO solo la URL):**
+   - Sin este paso, los defaults Essentials-tuned (6/6/2/3) no se activan
+   - Backend: `--update-env-vars=REDIS_MAX_CONNECTIONS_RATE_LIMIT=30,...`
+     con los valores de la columna "Pro 1" de §4.4b
+   - Worker: igual
+
+5. **Cleanup 7 días después:**
+   - Eliminar la DB Essentials de Redis Cloud console
+   - Actualizar los defaults del código a Pro 1
+   - Documentar la migración en §10.3
+
+**Comandos de limpieza de producción (estado actual Essentials):**
+```bash
+# Backend: eliminar env vars inflados Pro-tuned para forzar defaults Essentials
+gcloud run services update promdata-backend \
+  --region=us-east4 --project=promdata-enterprise \
+  --remove-env-vars=REDIS_MAX_CONNECTIONS_RATE_LIMIT,REDIS_MAX_CONNECTIONS_AI_CACHE,REDIS_MAX_CONNECTIONS_HEALTHCHECK,REDIS_MAX_CONNECTIONS_DEFAULT,CELERY_BROKER_POOL_LIMIT,CELERY_RESULT_BACKEND_MAX_CONNECTIONS
+
+# Worker: igual
+gcloud beta run worker-pools update promdata-worker \
+  --region=us-east4 --project=promdata-enterprise \
+  --remove-env-vars=REDIS_MAX_CONNECTIONS_RATE_LIMIT,REDIS_MAX_CONNECTIONS_AI_CACHE,REDIS_MAX_CONNECTIONS_HEALTHCHECK,REDIS_MAX_CONNECTIONS_DEFAULT,CELERY_BROKER_POOL_LIMIT,CELERY_RESULT_BACKEND_MAX_CONNECTIONS
+```
+
+**Regla de oro:** "Primero se paga el plan grande, luego se sube la
+variable." No subir los pool limits antes de migrar la URL — sin el
+plan Pro, el sistema Essentials colapsa.
 
 1. **Provisionar la DB Pro 1 en Redis Cloud console** (15-20 min):
    - New database → Pro plans tab → Pro 1 (1000 conn)
@@ -827,15 +910,18 @@ DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
 
 ---
 
-**Last updated:** 2026-06-10 — perf(redis) Pro-Ready defaults (Fase 0 of Pro 1
-migration). Pool sizes 5/5/2/5 → 30/30/10/20, timeouts 1.0s → 2.0s,
-`result_expires` 12h → 24h, worker `--concurrency` 2 → 6, `--max-tasks-per-child`
-50 → 100. URLs de Redis en `.env`/prod siguen apuntando al Free
-(la migración física de URL es un paso posterior). AGENTS.md §1, §2.2,
-§4.4, §4.7, §7 actualizados a reflejar Pro 1; §11.5 nueva con guía de
-transición de planes Redis Cloud. Cero impacto funcional: prod ya
-sobreescribía con env vars; los defaults solo aplican si alguien borra
-los env vars.
+**Last updated:** 2026-06-10 — perf(redis) Essentials-Tuned defaults (Fase 0
+de ajuste al plan real). Pool sizes 30/30/10/20 → 6/6/2/3 (default),
+`CELERY_BROKER_POOL_LIMIT` 30 → 5, `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`
+30 → 5, worker `--concurrency` 6 → 4. Timeouts y `result_expires` se
+mantienen (compatibles con ambos planes). Techo calculado: 160
+conexiones totales con 5 instancias backend (37% margen vs 256 del
+plan Essentials). AGENTS.md §4.4 actualizado a Essentials; §4.4b (nueva)
+con tabla comparativa Essentials vs Pro 1; §11.5 actualizado con
+guía de transición al Pro 1 y comandos de limpieza de env vars
+inflados. Pendiente: ejecutar los comandos de `--remove-env-vars`
+para que producción use los nuevos defaults sanos (no los Pro-tuned
+inflados que saturarían 256).
 (deployed to backend via manual `gcloud run deploy`, revision
 `promdata-backend-00013-9cf` with full 42 env vars restored from
 `00011-d9t`) + Incident 10.4 documented (`--env-vars-file` REPLACES

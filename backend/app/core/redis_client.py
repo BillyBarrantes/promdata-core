@@ -16,20 +16,20 @@ _POOLS_LOCK = threading.Lock()
 
 
 _PURPOSE_MAX_CONNECTIONS: dict[str, int] = {
-    "rate_limit": 30,
-    "ai_response_cache": 30,
-    "healthcheck": 10,
+    "rate_limit": 6,
+    "ai_response_cache": 6,
+    "healthcheck": 2,
 }
 
 
 def _resolve_max_connections(purpose: str) -> int:
     if purpose == "rate_limit":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_RATE_LIMIT", 30) or 30), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_RATE_LIMIT", 6) or 6), 1)
     if purpose == "ai_response_cache":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_AI_CACHE", 30) or 30), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_AI_CACHE", 6) or 6), 1)
     if purpose == "healthcheck":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_HEALTHCHECK", 10) or 10), 1)
-    return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_DEFAULT", 20) or 20), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_HEALTHCHECK", 2) or 2), 1)
+    return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_DEFAULT", 3) or 3), 1)
 
 
 def _build_pool(purpose: str, max_connections: int) -> ConnectionPool:
