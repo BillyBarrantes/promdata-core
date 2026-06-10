@@ -910,16 +910,19 @@ DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
 
 ---
 
-**Last updated:** 2026-06-10 — perf(redis) Essentials-Tuned defaults (Fase 0
-de ajuste al plan real). Pool sizes 30/30/10/20 → 6/6/2/3 (default),
-`CELERY_BROKER_POOL_LIMIT` 30 → 5, `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`
-30 → 5, worker `--concurrency` 6 → 4. Timeouts y `result_expires` se
-mantienen (compatibles con ambos planes). Techo calculado: 160
-conexiones totales con 5 instancias backend (37% margen vs 256 del
-plan Essentials). AGENTS.md §4.4 actualizado a Essentials; §4.4b (nueva)
-con tabla comparativa Essentials vs Pro 1; §11.5 actualizado con
-guía de transición al Pro 1 y comandos de limpieza de env vars
-inflados. Pendiente: ejecutar los comandos de `--remove-env-vars`
+**Last updated:** 2026-06-10 — perf(redis) Essentials-Tuned defaults
+COMPLETADO. Pool sizes 30/30/10/20 → 6/6/2/3 (default), `CELERY_BROKER_POOL_LIMIT`
+30 → 5, `CELERY_RESULT_BACKEND_MAX_CONNECTIONS` 30 → 5, worker `--concurrency`
+6 → 4. Deploy: `promdata-backend-00017-zl2` + `promdata-worker-00035-drm`
+con imagen `632b093c`. **Limpieza de producción ejecutada:** env vars
+inflados (REDIS_MAX_CONNECTIONS_*, CELERY_BROKER_POOL_LIMIT,
+CELERY_RESULT_BACKEND_MAX_CONNECTIONS) eliminados de backend y worker
+via `gcloud run services update --remove-env-vars` y
+`gcloud beta run worker-pools update --remove-env-vars`. Verificación:
+`redis-cli CLIENT LIST | wc -l` = **11 conexiones activas** (96% por
+debajo del techo de 256 del plan Essentials). Infraestructura blindada
+y lista para la prueba de usuarios (10-250 usuarios con 37% de margen).
+Proximos pasos documentados en §11.5 para migración futura a Pro 1.
 para que producción use los nuevos defaults sanos (no los Pro-tuned
 inflados que saturarían 256).
 (deployed to backend via manual `gcloud run deploy`, revision
