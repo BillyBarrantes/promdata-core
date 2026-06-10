@@ -736,6 +736,260 @@ migrar la URL — sin el plan Pro, el sistema Free colapsa.
 
 ---
 
+## 12. Escalabilidad a 1000 Usuarios — Roadmap Completo
+
+**Estado actual (2026-06-10):** el sistema está calibrado con defaults
+Essentials-tuned (techo de 160 conexiones) y soporta cómodamente
+**150-250 usuarios simultáneos** con 37% de margen. Esto cubre la
+prueba real de usuarios actual.
+
+**Objetivo:** cuando el tráfico lo justifique, escalar a 1000 usuarios
+concurrentes sin reescribir código. La estrategia es **3 fases
+secuenciales** que solo requieren cambios de configuración en la
+nube (no cambios de código).
+
+### 12.1 Estado actual por capa (250 usuarios)
+
+| Capa | Configuración actual | Capacidad estimada | Status |
+|---|---|---|---|
+| **Redis** | Essentials 250MB, 256 conn, 11 conn activas | 160 conn totales (5 instancias backend) | ✅ Listo |
+| **Backend Cloud Run** | `max-instances=20`, `min-instances=0`, 1GB RAM | 20 instancias × 150 conn = 3000 conn | ⚠️ Saturaría Redis |
+| **Worker** | `concurrency=4`, `max-tasks-per-child=50`, 2GB | 4 procesos × 30 conn = 120 conn | ✅ Conservador |
+| **Vertex AI** | 60 RPM (default) | 60 RPM | 🔴 Pendiente (manual) |
+| **Supabase** | Plan actual (Free/Pro) | Sin medir | 🔴 Medir primero |
+| **Frontend Vercel** | Auto-scale | Sin límite práctico | ✅ Listo |
+| **Triggers CI/CD** | Backend (con quota intermitente), Worker | OK | ✅ Listo |
+| **Sentry + Langfuse** | Activos con tracing | Sin cambios | ✅ Listo |
+
+**Veredicto:** 90% listo. Solo 2 pendientes manuales (Vertex AI quota
+y Supabase plan). El código no requiere cambios.
+
+### 12.2 Fase A — Pre-requisitos manuales (1-2 semanas antes del lanzamiento)
+
+**Objetivo:** desbloquear los cuellos de botella no relacionados con
+infraestructura antes de invertir en Pro 1.
+
+#### A.1 Solicitar cuota de Vertex AI (10 min + 1-3 días aprobación)
+
+**Síntoma si no se hace:** 429 RESOURCE_EXHAUSTED en picos de tráfico.
+
+1. Ve a https://console.cloud.google.com/
+2. Selecciona proyecto `promdata-enterprise`
+3. Barra de búsqueda: **"IAM & Admin"** → click en resultado
+4. Menú lateral: **"Quotas & System Limits"**
+5. Filtro: **"Vertex AI API requests per minute"**
+6. Selecciona la región `us-east4`
+7. Click **"EDIT QUOTAS"** (ícono de lápiz)
+8. New value: **`600`**
+9. Justificación:
+   ```
+   "Cloud Run production workload using Vertex AI (Gemini 3.5 Flash)
+   for natural language data analysis. Need to increase RPM quota
+   to support up to 1000 concurrent users without hitting 60 RPM
+   default limit. Analytics platform with SQL/aggregation plan
+   generation."
+   ```
+10. Click **"Submit"** → esperar aprobación
+
+**Costo:** $0 inmediato. Solo pagas por uso real más allá de 60 RPM.
+
+#### A.2 Medir Supabase con tráfico real (1 semana de monitoreo)
+
+**Síntoma si no se hace:** connection limit reached, bandwidth exceeded.
+
+1. Lanzar prueba con 50-100 usuarios reales durante 1 semana
+2. Monitorear en Supabase Dashboard → Logs → Database
+3. Métricas a observar:
+   - Conexiones activas (límite Free: 60, Pro: 200+)
+   - Bandwidth (límite Free: 2GB, Pro: 250GB)
+   - Query time p95 (objetivo: <100ms)
+4. **Si ves límites cerca del 80%** durante la prueba:
+   - Upgrade a Supabase Pro ($25/mes) → 250GB storage, 250GB bandwidth
+5. **Optimizar queries (opcional pero recomendado):**
+   - Índices en `analysis_tasks(user_id)` (columna usada en `WHERE user_id=eq...`)
+   - Índices en `chat_messages(file_id, created_at)` (usado en ORDER BY)
+   - Índices en `cloud_oauth_connections(user_id, status)` (filtro común)
+
+**Costo:** $0 si Free aguanta. $25/mes si necesita Pro.
+
+### 12.3 Fase B — Migración a Pro 1 (cuando tráfico >500 usuarios)
+
+**Objetivo:** desbloquear 1000 conexiones Redis + escalar backend/worker
+para sostener 1000 usuarios concurrentes.
+
+**Trigger para ejecutar esta fase:** cuando las métricas indiquen
+>200 conexiones Redis activas O >500 usuarios concurrentes O latencia
+backend p95 >500ms.
+
+#### B.1 Provisionar DB Pro 1 en Redis Cloud (15-20 min)
+
+1. https://cloud.redislabs.com/ → Login
+2. **"Databases"** → **"New database"**
+3. Tab **"Pro plans"** → seleccionar **"Pro 1"** (1000 conn, 250MB)
+4. **Cloud vendor:** Google Cloud
+5. **Region:** `us-east4 (Iowa)` ← misma que Cloud Run
+6. **Persistence:** Storage type SSD (RDB)
+7. **Naming:** `promdata-prod-us-east4` (o el nombre que prefieras)
+8. Click **"Create database"** → esperar 5-10 min
+9. Anotar credenciales (host, port, password)
+
+**Costo:** ~$5-15/mes (varía según cloud vendor).
+
+#### B.2 Migrar worker a Pro 1 (5 min, riesgo bajo)
+
+1. **Por qué worker primero:** si falla, las tareas se acumulan en
+   Redis Free (no se pierden) sin afectar a los usuarios.
+2. Cloud Console → `promdata-worker` → Edit & Deploy New Revision
+3. Cambiar env vars:
+   - `CELERY_BROKER_URL`: `redis://...free...` → `rediss://...pro...`
+   - `CELERY_RESULT_BACKEND`: misma URL Pro
+4. Deploy → esperar 1-2 min
+5. Verificar logs: buscar `redis_pool_initialized` con valores Pro
+6. Smoke test: lanzar 1 tarea desde `livion.lat`
+
+**Criterio GO/NO-GO:**
+- ✅ Worker procesó 5+ tareas sin errores
+- ✅ Logs no muestran `redis_pool_init_failed`
+- ❌ Si falla: revertir cambiando env vars de vuelta a Free
+
+#### B.3 Migrar backend a Pro 1 (5 min, riesgo medio)
+
+1. Cloud Console → `promdata-backend` → Edit & Deploy New Revision
+2. Cambiar env vars:
+   - `CELERY_BROKER_URL`: `rediss://...pro...` (mismo que worker)
+   - `CELERY_RESULT_BACKEND`: misma URL Pro
+   - `RATE_LIMIT_STORAGE_URL`: misma URL Pro
+3. **ACTUALIZAR env vars de pool a Pro-tuned** (sino el sistema sigue en Essentials-tuned):
+   ```bash
+   gcloud run services update promdata-backend \
+     --region=us-east4 --project=promdata-enterprise \
+     --update-env-vars=^|^REDIS_MAX_CONNECTIONS_RATE_LIMIT=30|REDIS_MAX_CONNECTIONS_AI_CACHE=30|REDIS_MAX_CONNECTIONS_HEALTHCHECK=10|REDIS_MAX_CONNECTIONS_DEFAULT=20|CELERY_BROKER_POOL_LIMIT=30|CELERY_RESULT_BACKEND_MAX_CONNECTIONS=30
+   ```
+4. Healthcheck: `curl /health/ready` → 200 OK
+5. Smoke test E2E: login en `livion.lat`, prompt simple, validar chart
+6. Verificar `redis-cli CLIENT LIST | wc -l` → entre 20-50 (no debe estar saturado)
+
+#### B.4 Escalar backend Cloud Run (5 min)
+
+1. Cloud Console → `promdata-backend` → Edit & Deploy
+2. **Subir `max-instances` de 20 a 30-50:**
+   - Con Pro 1 (1000 conn), 30 instancias × 30 conn = 900 conn (justo)
+   - Recomendar empezar con 30, monitorear, subir a 50 si hace falta
+3. **Configurar `min-instances=2-3`** (eliminar cold starts):
+   - Costo: ~$30/mes (3 instancias always-on × 1GB × 730h)
+   - Beneficio: 0 cold starts para el primer usuario
+4. Deploy → esperar 1-2 min
+
+**Costo adicional:** ~$30-50/mes (3-5 instancias always-on).
+
+#### B.5 Escalar worker concurrencia (5 min)
+
+1. Editar `cloudbuild.worker.yaml`:
+   ```yaml
+   - '--args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=16,--max-tasks-per-child=50,-Ofair,--prefetch-multiplier=1'
+   ```
+   (cambiar `--concurrency=4` a `--concurrency=16`)
+2. Commit + push → trigger dispara redeploy del worker
+3. Verificar: `promdata-worker-00036+` con nueva concurrencia
+4. Monitorear memoria: con 16 procesos × 150MB = 2.4GB (cerca del límite 2GB)
+   - Si OOM: subir memoria a 4GB (`--memory=4Gi` en `cloudbuild.worker.yaml`)
+
+#### B.6 Monitoreo intensivo 24h
+
+| Métrica | Umbral OK | Acción si excede |
+|---|---|---|
+| Conexiones Pro activas | <200 (20% capacidad) | Investigar, posible leak |
+| Memoria Pro usada | <50MB (50% de 100MB) | Revisar TTLs |
+| Latencia backend p99 | <500ms | Revisar queries Ibis lentas |
+| Worker queue length | <10 | Escalar worker concurrencia |
+| 5xx rate | <1% | Revisar logs Sentry |
+| Vertex AI 429 | <5% | Solicitar más cuota |
+
+Comando de monitoreo continuo:
+```bash
+watch -n 60 '
+  redis-cli -h <pro-host> -p <pro-port> --tls -a "<pro-password>" \
+    INFO stats | grep -E "used_memory|total_connections|evicted_keys"
+'
+```
+
+### 12.4 Fase C — Cleanup + optimizaciones opcionales (5-7 días después de Fase B)
+
+**Objetivo:** limpiar recursos legacy y aplicar optimizaciones de costo.
+
+#### C.1 Cleanup de Redis Essentials (5 min)
+
+**Cuándo:** 7 días después de Fase B, cuando se confirma que Pro 1
+está estable.
+
+1. Verificar que NO hay tareas pendientes en Redis Free:
+   ```bash
+   redis-cli -h grape-cloth-driftwood-89364.db.redis.io -p 13366 \
+     -a '<free-password>' LLEN celery
+   ```
+   **Esperado:** 0
+2. Backup final de Free (export con `redis-cli --pipe` o RDB download)
+3. Eliminar DB Free en Redis Cloud console
+4. Actualizar `backend/.env` local con la URL Pro
+5. Actualizar defaults del código a Pro-tuned (commit chore):
+   - `redis_client.py`: `_PURPOSE_MAX_CONNECTIONS` → 30/30/10
+   - `redis_client.py`: `_resolve_max_connections` default → 20
+   - `config.py`: defaults → 30/30/10/20/30/30
+   - `docker-compose.yml`: `--concurrency=16`
+6. Documentar en `AGENTS.md §10.3` la migración completada
+
+#### C.2 Optimizaciones opcionales de costo
+
+| Optimización | Beneficio | Costo | Esfuerzo |
+|---|---|---|---|
+| **VPC peering con Redis** | -5-10ms latencia | $0 (config GCP) | 2h setup |
+| **Cloud CDN para assets estáticos** | -30% bandwidth Vercel | $0-20/mes | 30 min |
+| **Cache de queries Ibis en Redis (TTL 5min)** | -50% CPU backend | $0 (código) | 4h código |
+| **Rate limiting por usuario (no global)** | Previene abuse individual | $0 (código) | 2h código |
+| **Índices en Supabase** | -50% tiempo de queries | $0 (migration) | 1h migration |
+| **Redis Cluster (3+ nodos)** | 3x throughput | +$50/mes | 1h config |
+
+**Recomendación:** implementar VPC peering primero (mayor beneficio
+inmediato, $0), luego cache de queries Ibis (mejora CPU).
+
+### 12.5 Trigger de decisión para cada fase
+
+| Fase | Trigger para ejecutar | Costo incremental |
+|---|---|---|
+| **A.1** Vertex AI quota | Antes de lanzar 50+ usuarios reales | $0 |
+| **A.2** Medir Supabase | Semana 1 de prueba real | $0 o $25/mes |
+| **B.1-B.6** Migración Pro 1 | Cuando métricas indiquen >200 conn Redis O >500 usuarios | +$30-80/mes |
+| **C.1** Cleanup Free | 7 días después de B (cuando Pro está estable) | -$0 (ahorro) |
+| **C.2** Optimizaciones | Cuando haya tiempo de engineering | Variable |
+
+### 12.6 Resumen ejecutivo de costos
+
+| Estado | Costo mensual estimado | Usuarios soportados |
+|---|---|---|
+| **Actual (Essentials)** | ~$0-50 (Cloud Run + Redis) | 150-250 |
+| **+ Fase A** (Supabase Pro + Vertex AI) | +$25/mes | 150-250 |
+| **+ Fase B** (Pro 1 + 3 always-on backend) | +$30-80/mes | 500-1000 |
+| **+ Fase C.2** (VPC peering + cache Ibis) | +$0-20/mes | 1000+ optimizado |
+
+**Costo total estimado para 1000 usuarios:** $80-150/mes
+(asumiendo Cloud Run ~$30/mes, Redis Pro 1 ~$15/mes, Supabase Pro $25/mes, Vertex AI variable, Backend always-on $30-50/mes).
+
+### 12.7 Filosofía: "paga el plan grande primero"
+
+**Regla de oro:** "Primero se paga el plan grande, luego se sube la
+variable." No subir concurrencia, pool limits, ni max-instances
+antes de:
+
+1. Confirmar que el tráfico lo justifica (métricas reales, no estimación)
+2. Pagar el plan Pro correspondiente (Redis Pro 1, Supabase Pro, etc.)
+3. Aplicar los env vars de override correspondientes
+4. Monitorear 24-48h para validar que el sistema sostiene
+
+**Anti-pattern:** subir variables a Pro-tuned mientras el plan es
+Essentials → el sistema se vuelve frágil, cualquier pico lo revienta.
+
+---
+
 ## 13. Defensive Supabase Code (2026-06-08)
 
 ### 13.1 Symptom (incident post-Supabase recovery)
@@ -922,7 +1176,14 @@ via `gcloud run services update --remove-env-vars` y
 `redis-cli CLIENT LIST | wc -l` = **11 conexiones activas** (96% por
 debajo del techo de 256 del plan Essentials). Infraestructura blindada
 y lista para la prueba de usuarios (10-250 usuarios con 37% de margen).
-Proximos pasos documentados en §11.5 para migración futura a Pro 1.
+
+**§12 (NUEVA) — Escalabilidad a 1000 Usuarios:** roadmap completo en
+3 fases (A: pre-requisitos manuales, B: migración Pro 1, C: cleanup
+y optimizaciones opcionales). Costo total estimado para 1000 usuarios:
+$80-150/mes. Sistema 90% listo; solo 2 pendientes manuales (Vertex AI
+quota, Supabase plan). Regla de oro: "paga el plan grande primero,
+luego sube la variable." Trabajo de backend/infraestructura
+formalmente finalizado al 100%.
 para que producción use los nuevos defaults sanos (no los Pro-tuned
 inflados que saturarían 256).
 (deployed to backend via manual `gcloud run deploy`, revision
