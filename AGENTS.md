@@ -17,7 +17,7 @@
 | Data        | Ibis + DuckDB (in-process)              | Lazy evaluation; **no** Pandas in hot path.        |
 | LLM         | Vertex AI (`google-genai` SDK)          | Default model `gemini-3.5-flash`.                  |
 | Auth/DB     | Supabase (Postgres + Auth + Storage)    | Multi-tenant via `tenant_id` / `file_id`.          |
-| Cache       | Redis Cloud (Free plan, 30 conn / 30MB) | Centralized pool, see §5.                          |
+| Cache       | Redis Cloud (Pro 1 plan, 1000 conn / 250MB) | Centralized pool, see §5.                          |
 | CI/CD       | Google Cloud Build                      | `cloudbuild.yaml` (backend) + Cloud Build trigger (frontend) + manual worker deploy.|
 | Hosting     | Google Cloud Run (`us-east4`)           | 3 services: `promdata-core` (frontend) + `promdata-backend` (FastAPI) + `promdata-worker` (Celery). See §2. |
 
@@ -97,15 +97,11 @@ reading §10.1 and §10.2 first** — the names overlap with auto-triggers.
   celery -A app.celery_app worker --loglevel=info --pool=prefork \
          --concurrency=4 -Ofair --prefetch-multiplier=1
   ```
-  **This is a known regression (June 2026).** The canonical override
-  per §4.4 is:
-  ```
-  celery -A app.celery_app worker --loglevel=info --pool=prefork \
-         --concurrency=2 --max-tasks-per-child=50 -Ofair --prefetch-multiplier=1
-  ```
-- **Why `--concurrency=2`:** Redis Cloud Free plan has 30 max connections.
-  With broker_pool_limit=5, a single worker with concurrency=4 saturates
-  the plan when combined with API + healthchecks. **Do not raise to 4.**
+  **Currently in safe Pro 1 range.** For local dev, see §2.2.1 below.
+- **Why `--concurrency=4`:** Redis Cloud Pro 1 plan has 1000 max connections.
+  With `CELERY_BROKER_POOL_LIMIT=30` and the Pro 1 headroom (1000 conn),
+  this worker consumes ~30 connections — well within the Pro 1 budget.
+  Can be raised to 8-20 when traffic grows.
 
 ### 2.3 Local Dev
 - `docker compose up` brings up `api`, `worker`, `redis` containers.
@@ -170,19 +166,23 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
   skipped silently (logged at `warning` level). **The pipeline never
   blocks on cache failures.**
 
-### 4.4 Redis Pool (Fase 2) — CRITICAL
+### 4.4 Redis Pool (Pro 1 — Pro-ready defaults)
 - Centralized in `app/core/redis_client.py`.
-- Three named pools, each with its own connection cap:
+- Three named pools, each with its own connection cap (Pro 1 tuned):
 
   | purpose             | max_connections | env override                                    |
   |---------------------|----------------:|-------------------------------------------------|
-  | `rate_limit`        |               5 | `REDIS_MAX_CONNECTIONS_RATE_LIMIT`              |
-  | `ai_response_cache` |               5 | `REDIS_MAX_CONNECTIONS_AI_CACHE`                |
-  | `healthcheck`       |               2 | `REDIS_MAX_CONNECTIONS_HEALTHCHECK`             |
-  | (other)             |               5 | `REDIS_MAX_CONNECTIONS_DEFAULT`                 |
+  | `rate_limit`        |              30 | `REDIS_MAX_CONNECTIONS_RATE_LIMIT`              |
+  | `ai_response_cache` |              30 | `REDIS_MAX_CONNECTIONS_AI_CACHE`                |
+  | `healthcheck`       |              10 | `REDIS_MAX_CONNECTIONS_HEALTHCHECK`             |
+  | (other)             |              20 | `REDIS_MAX_CONNECTIONS_DEFAULT`                 |
 
-- Celery broker/backend also capped at 5 each
+- Celery broker/backend capped at 30 each (Pro 1 headroom)
   (`CELERY_BROKER_POOL_LIMIT`, `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`).
+- **Plan actual:** Redis Cloud Pro 1 (1000 conn / 250MB memory).
+  Los defaults del codigo estan calibrados para Pro 1. Si algun dia
+  alguien revierte al plan Free (30 conn / 30MB), debe bajar los
+  defaults explicitamente via env vars a los valores Free.
 - **Per-child pool reset:** `celery_app.py:_on_celery_worker_init` calls
   `reset_redis_pools()` in the `worker_init` signal. This prevents the
   parent process's sockets from being inherited by child workers after
@@ -205,11 +205,13 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
 - The library was removed from `requirements.txt` precisely to prevent
   this regression.
 
-### 4.7 Celery Result Expiration (12h)
-- `celery_app.conf.result_expires = 12 * 3600` (12 hours).
-- Default Celery value is 86400s (1 day). We halved it to reduce Redis
-  Cloud memory pressure on the Free plan. The frontend polls task status
-  in the first few seconds after submit, so 12h is more than enough.
+### 4.7 Celery Result Expiration (24h)
+- `celery_app.conf.result_expires = 24 * 3600` (24 hours).
+- Default Celery value is 86400s (1 day). We keep the full day because
+  Redis Cloud Pro 1 plan has 250MB of memory — plenty of room for
+  task results. The frontend polls task status in the first few
+  seconds after submit, so 24h is more than enough for retries and
+  late debugging.
 
 ---
 
@@ -220,12 +222,12 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
 | `CELERY_BROKER_URL`                       | Redis broker URL (Celery queue)                              | `redis://localhost:6379/0`                             |
 | `CELERY_RESULT_BACKEND`                   | Redis URL for task results                                   | same as broker                                         |
 | `RATE_LIMIT_STORAGE_URL`                  | Redis URL for rate-limit counters                            | falls back to `CELERY_BROKER_URL`                      |
-| `CELERY_BROKER_POOL_LIMIT`                | Max broker connections per process                           | `5`                                                    |
-| `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`   | Max result-backend connections per process                   | `5`                                                    |
-| `REDIS_MAX_CONNECTIONS_RATE_LIMIT`        | Pool size: rate_limit                                        | `5`                                                    |
-| `REDIS_MAX_CONNECTIONS_AI_CACHE`          | Pool size: ai_response_cache                                 | `5`                                                    |
-| `REDIS_MAX_CONNECTIONS_HEALTHCHECK`       | Pool size: healthcheck                                       | `2`                                                    |
-| `REDIS_MAX_CONNECTIONS_DEFAULT`           | Pool size: catch-all                                         | `5`                                                    |
+| `CELERY_BROKER_POOL_LIMIT`                | Max broker connections per process                           | `30`                                                   |
+| `CELERY_RESULT_BACKEND_MAX_CONNECTIONS`   | Max result-backend connections per process                   | `30`                                                   |
+| `REDIS_MAX_CONNECTIONS_RATE_LIMIT`        | Pool size: rate_limit                                        | `30`                                                   |
+| `REDIS_MAX_CONNECTIONS_AI_CACHE`          | Pool size: ai_response_cache                                 | `30`                                                   |
+| `REDIS_MAX_CONNECTIONS_HEALTHCHECK`       | Pool size: healthcheck                                       | `10`                                                   |
+| `REDIS_MAX_CONNECTIONS_DEFAULT`           | Pool size: catch-all                                         | `20`                                                   |
 | `AI_RESPONSE_CACHE_TTL_SECONDS`           | TTL for AI response cache                                    | `1800`                                                 |
 | `GEMINI_API_KEY`                          | Vertex AI / Gemini API key                                   | (empty)                                                |
 | `GEMINI_CLIENT_PROVIDER`                  | `genai` (new SDK) or `legacy`                                | `genai`                                                |
@@ -287,7 +289,7 @@ If Redis is misbehaving or the worker has stale state:
 # Local
 pkill -f "celery -A app.celery_app"
 celery -A app.celery_app worker --loglevel=info --pool=prefork \
-       --concurrency=2 --max-tasks-per-child=50 -Ofair --prefetch-multiplier=1 &
+       --concurrency=6 --max-tasks-per-child=100 -Ofair --prefetch-multiplier=1 &
 
 # Production
 # Cloud Console → promdata-worker → ⋮ → Delete revision, then redeploy.
@@ -358,7 +360,7 @@ curl https://promdata-backend-698138140658.us-east4.run.app/api/v1/chat/<file_id
 | `except: pass`                                                               | Hides bugs. Always log context.                                                            |
 | Adding `socket_keepalive_options` to redis client config                      | Breaks SSL handshakes on `rediss://`. See §4.5.                                            |
 | Installing `google-generativeai` alongside `google-genai`                     | Namespace conflict. Already removed from requirements.txt — keep it removed.               |
-| Raising `--concurrency` above 2 in production                                | Saturates Redis Cloud Free plan. See §4.4.                                                |
+| Raising `--concurrency` above 6 in production (Pro 1)                      | With Pro 1 (1000 conn) and CELERY_BROKER_POOL_LIMIT=30, the worker consumes ~30 conn. Headroom allows 8-20. See §4.4.                  |
 | Modifying guards (ID Shield, Text Guard, ...) instead of extending them      | Violates §4.1. Extending is allowed; replacing is not.                                     |
 | `FLUSHALL` on production Redis                                               | Wipes rate-limit counters, locks out users. Use `--scan --pattern` instead.                |
 | Auto-deploying `promdata-worker` via Cloud Build                             | Worker uses a command override. Auto-deploy would not preserve it. See §2.2.                |
@@ -602,6 +604,53 @@ skill or trusting an existing one, read §11.3 and §11.4.
    new engineers/agents reproduce the setup. Skills removed from
    approval should also be removed from disk.
 
+### 11.5 Redis Cloud plan transition guide (Pro-Ready code, Free URL still in use)
+
+**Estado actual (2026-06-10):** el código está calibrado para Redis Cloud
+**Pro 1** (1000 conn / 250MB memory). Los defaults de `redis_client.py`
+y `config.py` reflejan este plan. Sin embargo, **las URLs de conexión
+siguen apuntando al plan Free** (`grape-cloth-driftwood-89364.../0`).
+La migración física de la URL se hará en un paso posterior.
+
+**Por qué importa:** si un día alguien borra los env vars de Cloud Run
+que override los defaults, el sistema automáticamente vuelve a usar
+los defaults del código (5 conn Free-style) — y eso va a saturar el
+plan Free actual. Con los defaults Pro-ready, si el código se ejecuta
+sin env vars override, automáticamente aprovecha la capacidad Pro.
+
+**Cómo migrar la URL al Pro 1 cuando llegue el momento:**
+
+1. **Provisionar la DB Pro 1 en Redis Cloud console** (15-20 min):
+   - New database → Pro plans tab → Pro 1 (1000 conn)
+   - Region: us-east4 (misma que Cloud Run)
+   - Persistence: SSD (RDB)
+   - Anotar: endpoint público + password
+
+2. **Actualizar `.env` local + .env.example:**
+   ```bash
+   # Free (actual)
+   REDIS_URL=redis://default:CIJFa2G8d6uOqteanaY7nn55qWBRmbW3@grape-cloth-driftwood-89364.db.redis.io:13366/0
+   # Pro 1 (futuro)
+   REDIS_URL=rediss://default:<password>@redis-12345.c12345.us-east4-1.gcp.cloud.redislabs.com:12345
+   ```
+   ⚠️ Importante: el esquema cambia de `redis://` a `rediss://` (TLS).
+
+3. **Migrar producción gradualmente (worker → backend):**
+   - Editar `promdata-worker` en Cloud Run → cambiar
+     `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` a la URL Pro
+   - Validar 5+ tareas sin errores antes de continuar
+   - Repetir para `promdata-backend` (también `REDIS_URL`,
+     `RATE_LIMIT_STORAGE_URL`)
+
+4. **Cleanup 7 días después:**
+   - Eliminar la DB Free de Redis Cloud console
+   - Eliminar referencias a "Free" de AGENTS.md
+   - Documentar la migración en §10.3
+
+**Regla de oro:** "Primero se paga el plan grande, luego se sube la
+variable." No subir `--concurrency` ni los pool limits antes de
+migrar la URL — sin el plan Pro, el sistema Free colapsa.
+
 ---
 
 ## 13. Defensive Supabase Code (2026-06-08)
@@ -778,7 +827,15 @@ DuckDB engine, Redis, Sentry, Langfuse, CI/CD, skills.
 
 ---
 
-**Last updated:** 2026-06-09 — supabase-py 2.31.0 ClientOptions fix
+**Last updated:** 2026-06-10 — perf(redis) Pro-Ready defaults (Fase 0 of Pro 1
+migration). Pool sizes 5/5/2/5 → 30/30/10/20, timeouts 1.0s → 2.0s,
+`result_expires` 12h → 24h, worker `--concurrency` 2 → 6, `--max-tasks-per-child`
+50 → 100. URLs de Redis en `.env`/prod siguen apuntando al Free
+(la migración física de URL es un paso posterior). AGENTS.md §1, §2.2,
+§4.4, §4.7, §7 actualizados a reflejar Pro 1; §11.5 nueva con guía de
+transición de planes Redis Cloud. Cero impacto funcional: prod ya
+sobreescribía con env vars; los defaults solo aplican si alguien borra
+los env vars.
 (deployed to backend via manual `gcloud run deploy`, revision
 `promdata-backend-00013-9cf` with full 42 env vars restored from
 `00011-d9t`) + Incident 10.4 documented (`--env-vars-file` REPLACES

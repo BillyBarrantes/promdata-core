@@ -70,7 +70,7 @@ celery_app.conf.update(
     # de memoria en Redis Cloud (plan Free 30MB) cuando hay acumulación
     # de tareas completadas. NO afecta a la API: el frontend consulta el
     # status de una tarea en los primeros segundos tras el submit.
-    result_expires=12 * 3600,
+    result_expires=24 * 3600,
 )
 
 

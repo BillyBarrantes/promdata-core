@@ -16,20 +16,20 @@ _POOLS_LOCK = threading.Lock()
 
 
 _PURPOSE_MAX_CONNECTIONS: dict[str, int] = {
-    "rate_limit": 5,
-    "ai_response_cache": 5,
-    "healthcheck": 2,
+    "rate_limit": 30,
+    "ai_response_cache": 30,
+    "healthcheck": 10,
 }
 
 
 def _resolve_max_connections(purpose: str) -> int:
     if purpose == "rate_limit":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_RATE_LIMIT", 5) or 5), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_RATE_LIMIT", 30) or 30), 1)
     if purpose == "ai_response_cache":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_AI_CACHE", 5) or 5), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_AI_CACHE", 30) or 30), 1)
     if purpose == "healthcheck":
-        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_HEALTHCHECK", 2) or 2), 1)
-    return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_DEFAULT", 5) or 5), 1)
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_HEALTHCHECK", 10) or 10), 1)
+    return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_DEFAULT", 20) or 20), 1)
 
 
 def _build_pool(purpose: str, max_connections: int) -> ConnectionPool:
@@ -41,8 +41,8 @@ def _build_pool(purpose: str, max_connections: int) -> ConnectionPool:
         "decode_responses": True,
         "max_connections": max_connections,
         "socket_keepalive": True,
-        "socket_connect_timeout": 1.0,
-        "socket_timeout": 1.0,
+        "socket_connect_timeout": 2.0,
+        "socket_timeout": 2.0,
         "health_check_interval": 30,
         "retry_on_timeout": True,
     }
