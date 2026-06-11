@@ -990,6 +990,245 @@ Essentials → el sistema se vuelve frágil, cualquier pico lo revienta.
 
 ---
 
+## 15. Roadmap Comercial: Plan 1 (B2C) + Plan 2 (B2B)
+
+**Fecha:** 2026-06-10
+**Visión estratégica:** dividir el roadmap en dos planes secuenciales
+para gestionar riesgo y tiempo. Plan 1 enfoca B2C (suscripción) para
+tracción rápida; Plan 2 evolución a B2B (Enterprise) a mediano plazo.
+
+**Regla de oro inquebrantable:** toda optimización debe mantener la
+armonía del sistema. Prohibido romper funcionalidades existentes al
+mejorar otras.
+
+**Cómo lo garantizamos**:
+1. **Tests E2E antes de cada cambio**: Playwright suite (crossfilter,
+   happy-path, knowledge) corre antes de merge.
+2. **Refactor incremental**: 1 archivo movido por commit, con tests
+   pasando.
+3. **Compatibilidad hacia atrás**: `__init__.py` re-exporta todo, los
+   call sites siguen funcionando sin cambios.
+4. **Smoke test en producción**: después de cada deploy, 1 análisis
+   real en `livion.lat` para validar.
+5. **Monitoreo activo**: Sentry + Langfuse detectan regresiones
+   automáticamente.
+
+### 15.1 Plan 1: B2C Launch (Corto Plazo) — 4-5 meses
+
+**Objetivo:** PromData listo para vender suscripciones individuales
+(mercado LATAM, personas y freelancers). Tracción rápida, revenue
+recurrente desde día 1.
+
+#### Fase 0 — Cimientos y Seguridad B2C (Meses 1-2)
+
+**0.1 — Operación Refactor** (PRIORIDAD #1 — ejecutado el 2026-06-10)
+
+- **Diagnóstico**: `backend/app/tasks/analysis_tasks.py` (3823 líneas) y
+  `backend/app/services/semantic_translator.py` (3322 líneas) son
+  bombas de relojería de mantenibilidad. Ambos monolíticos.
+- **Decisión**: empezar por `semantic_translator.py` (cerebro IA,
+  invocado por todos los análisis, tiene fronteras naturales).
+- **Plan de división** (3322 líneas → 4 archivos):
+
+  ```
+  backend/app/services/semantic_translator/
+  ├── __init__.py        # Re-exports (mantener API pública)
+  ├── core.py            # Estado compartido + constantes
+  ├── router.py          # SemanticRouter (clasifica intent)
+  ├── validator.py       # Anti-alucinación, validadores
+  ├── planner.py         # Plan generation, Triple Vista
+  └── memory.py          # Memoria de sesión
+  ```
+
+- **Estrategia**: refactor incremental con `__init__.py` re-exports
+  (compatibilidad hacia atrás garantizada).
+- **Validación**: tests E2E Playwright + curl de endpoints clave.
+- **Criterio de éxito**: 0 regresiones, todos los call sites siguen
+  importando el mismo símbolo, tests pasando.
+- **Tiempo**: 3-5 días.
+
+**0.2 — Seguridad Básica B2C: Aislamiento de Datos por Usuario**
+
+- Sin RBAC complejo (eso es Plan 2). Solo garantizar que cada usuario
+  SOLO ve sus propios datos.
+- Auditar Supabase RLS policies en `analysis_tasks`, `chat_messages`,
+  `uploaded_files`, `cloud_oauth_connections`, `cloud_watch_targets`.
+- Tests E2E que intenten acceder a datos de otro usuario (deben
+  recibir 403/404).
+- **Tiempo**: 1-2 días.
+
+**0.3 — Diagnóstico de Base de Conocimiento (RAG)**
+
+- Verificación del estado (ejecutado 2026-06-10):
+  - `backend/app/services/document_rag.py`: 583 líneas, funcional
+  - `backend/app/services/knowledge_qa.py`: 210 líneas, funcional
+  - `backend/app/tasks/document_tasks.py`: Celery task funcional
+  - `routes.py:814` y siguientes: endpoints `/knowledge/*` funcionales
+  - `app/conocimiento/page.tsx`: UI completa con Q&A y citas
+  - `components/sidebar.tsx:45`: link "Conocimiento" presente
+- **Veredicto**: el RAG está conectado y funcional. Los cables NO se
+  desconectaron.
+- **Acción**: lanzar 1 prueba E2E completa (subir PDF → esperar → preguntar
+  → verificar respuesta con citas). Tiempo: 1 día.
+
+**0.4 — Exportación Inteligente** (Crítico B2C)
+
+- **Visión confirmada**: exportar dataframes PROCESADOS, resúmenes
+  o datos detrás de gráficos, NO el archivo original.
+- **Arquitectura**: Frontend dispara → Backend genera → Supabase
+  Storage temporal → Link de descarga.
+- **Scopes soportados**:
+  - `chart_data`: CSV/XLSX con datos que ECharts renderizó
+  - `analysis_summary`: XLSX multi-sheet (narrativa + métricas + data)
+  - `full_analysis`: todo el análisis completo
+  - `cross_filter_result`: resultado del cross-filter
+- **Endpoint backend**: `POST /api/v1/export {task_id, scope, format}`
+- **Librerías**: `openpyxl` (XLSX), `csv` (stdlib), `reportlab` (PDF)
+- **Tiempo**: 3-5 días.
+
+#### Fase 1 — Aceleración de Valor (Meses 3-4)
+
+**1.1 — Onboarding con Plantillas Rápidas**
+
+- `auto_analyst.py` ya existe (lógica pre-armada).
+- Frontend: en `chat-interface.tsx`, sección "Análisis Sugeridos" después
+  de subir un archivo.
+- 4-6 templates: Resumen Ejecutivo, Tendencia Temporal, Distribución
+  por Categoría, Detección de Anomalías.
+- **Tiempo**: 3-5 días.
+
+**1.2 — Pricing / Suscripción B2C**
+
+- Stripe o MercadoPago (LATAM)
+- 3 tiers: Free (5 análisis/mes, 1GB) / Pro $29/mes (100 análisis, 10GB)
+  / Business $99/mes (ilimitado, multi-usuario limitado)
+- Webhook de Stripe
+- UI de billing en `app/billing/page.tsx` (nueva)
+- **Tiempo**: 7-10 días.
+
+**1.3 — Marketing Site + Landing Page**
+
+- `app/page.tsx` mejorada con hero, features, pricing, testimonios
+- SEO (metadata, sitemap, robots.txt)
+- Blog con casos de uso (opcional)
+- **Tiempo**: 5-7 días.
+
+**1.4 — AI Insights Proactivos (conectar al frontend)**
+
+- Diagnóstico previo (1 día): ¿existe lógica proactiva? ¿Hay tabla
+  `insights` en Supabase? ¿Hay endpoint?
+- Si existe: panel lateral con cards + notificación in-app.
+- Si no: 10-15 días para construir desde cero.
+- **Tiempo estimado si existe**: 3-5 días.
+
+**Output del Plan 1**: PromData listo para vender suscripciones B2C.
+
+### 15.2 Plan 2: B2B Enterprise (Mediano Plazo) — 6-7 meses
+
+**Objetivo:** PromData compite con Power BI en features enterprise.
+Multi-tenancy, RBAC, integraciones corporativas, API pública.
+
+#### Fase 2 — Enterprise Core (Meses 5-8)
+
+**2.1 — RBAC Estricto**
+
+- 3 roles: `owner` (control total, billing), `editor`
+  (crear/editar), `viewer` (solo lectura)
+- Supabase: columna `role` en `team_members`, RLS policies
+- Backend: decorator `@require_role("editor")` en rutas de escritura
+- Frontend: condicional en botones de edición
+- **Tiempo**: 7-10 días.
+
+**2.2 — Multi-Datasource (SQL)**
+
+- PostgreSQL (prioridad #1), MySQL (#2), BigQuery (#3)
+- Nuevo servicio `datasource_connector.py` con Ibis backends
+- Supabase: tabla `datasources` con credenciales cifradas
+- Frontend: UI en `cargar-datos/` para configurar conexiones
+- Query caching (1h TTL en Redis)
+- **Tiempo**: 15-20 días.
+
+**2.3 — Scheduled Reports + Email**
+
+- Tabla Supabase `scheduled_reports` (file_id, prompt, cron, email)
+- Celery Beat scheduler
+- Task que ejecuta análisis + genera PDF + envía email
+- Frontend: modal "Programar este análisis"
+- **Tiempo**: 7-10 días.
+
+#### Fase 3 — Líder del Sector (Meses 9-12)
+
+**3.1 — API Pública + SDK JavaScript**
+
+- Autenticación por API key (tabla `api_keys` con rate limits)
+- Documentación OpenAPI (FastAPI ya la genera)
+- SDK npm `@promdata/sdk`
+- **Tiempo**: 10-15 días.
+
+**3.2 — Integraciones Corporativas**
+
+- Slack, Microsoft Teams (notificaciones de insights)
+- Google Workspace (Sheets, Drive)
+- Salesforce, HubSpot (leer datos CRM)
+- **Tiempo**: 15-20 días.
+
+**3.3 — Testing + Observability Enterprise**
+
+- Unit tests por servicio (target 80% coverage)
+- Integration tests del pipeline completo
+- E2E con Playwright (ya hay base)
+- Load tests con k6 (simular 1000 usuarios)
+- Distributed tracing (OpenTelemetry)
+- Real User Monitoring
+- SLOs definidos
+- **Tiempo**: 15-20 días.
+
+**3.4 — Disaster Recovery + Multi-Region**
+
+- Backup policy automatizado
+- RTO/RPO definidos
+- Failover entre regiones
+- Runbooks
+- **Tiempo**: 10-15 días.
+
+**Output del Plan 2**: PromData compite con Power BI en features enterprise.
+
+### 15.3 Timeline Consolidado
+
+```
+2026 H2 (Plan 1 B2C) — 4-5 meses
+├── Mes 1: Refactor semantic_translator (0.1) + Seguridad B2C (0.2)
+├── Mes 1-2: Diagnostico RAG (0.3) + Exportacion (0.4)
+├── Mes 2: Plantillas rapidas (1.1)
+├── Mes 3: Pricing/Stripe (1.2) + Marketing site (1.3)
+└── Mes 4: AI Insights UI (1.4)
+
+2027 H1 (Plan 2 B2B) — 6-7 meses
+├── Mes 5-6: RBAC estricto (2.1)
+├── Mes 6-8: Multi-datasource SQL (2.2)
+├── Mes 7-8: Scheduled Reports (2.3)
+├── Mes 9-10: API Publica + SDK (3.1)
+├── Mes 10-11: Integraciones corporativas (3.2)
+├── Mes 11-12: Testing + Observability (3.3)
+└── Mes 12: Disaster Recovery (3.4)
+```
+
+### 15.4 Reglas de Armonía (NO Romper Funcionalidades)
+
+**Prohibido**:
+- Romper tests E2E existentes
+- Cambiar firma de funciones públicas sin deprecation cycle
+- Eliminar endpoints API sin versionado
+- Modificar payloads de respuesta sin avisar
+
+**Permitido**:
+- Refactor interno con misma API pública
+- Agregar nuevos endpoints/funciones
+- Mejorar performance sin cambiar semántica
+- Optimizar queries manteniendo mismo resultado
+
+---
+
 ## 13. Defensive Supabase Code (2026-06-08)
 
 ### 13.1 Symptom (incident post-Supabase recovery)
@@ -1184,6 +1423,15 @@ $80-150/mes. Sistema 90% listo; solo 2 pendientes manuales (Vertex AI
 quota, Supabase plan). Regla de oro: "paga el plan grande primero,
 luego sube la variable." Trabajo de backend/infraestructura
 formalmente finalizado al 100%.
+
+**§15 (NUEVA) — Roadmap Comercial:** Plan 1 (B2C Launch, 4-5 meses)
++ Plan 2 (B2B Enterprise, 6-7 meses). Plan 1 enfoca B2C con
+suscripción rápida; Plan 2 evolución a Enterprise con RBAC,
+multi-datasource, scheduled reports, API pública. Regla de oro:
+toda optimización mantiene armonía del sistema, prohibido romper
+funcionalidades existentes. **Fase 0.1 (Refactor de
+semantic_translator.py)** iniciada hoy con estrategia incremental
+(véase commits subsiguientes).
 para que producción use los nuevos defaults sanos (no los Pro-tuned
 inflados que saturarían 256).
 (deployed to backend via manual `gcloud run deploy`, revision
