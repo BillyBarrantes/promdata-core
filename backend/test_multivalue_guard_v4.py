@@ -94,15 +94,20 @@ print("\n" + "═" * 60)
 print("  T4 — V7: Split dimension inference sin top_n")
 print("═" * 60 + "\n")
 
+# [REFACTOR 2026-06-11] Tras la extraccion del monolito, la logica vive
+# en app.services.semantic_translator.planner.build_plan_from_router_contract.
+# SemanticTranslator._build_plan_from_router_contract ahora es un delegador
+# de 1 linea. Inspeccionamos la implementacion real, no el delegador.
 from app.services.semantic_translator import SemanticTranslator
+from app.services.semantic_translator.planner import build_plan_from_router_contract
 
-source_translator = inspect.getsource(SemanticTranslator._build_plan_from_router_contract)
+source_translator = inspect.getsource(build_plan_from_router_contract)
 has_split_inference = "SPLIT INFERENCE" in source_translator
 has_in_check = 'pf_op == "in"' in source_translator
 has_len_check = "top_n = len(pf_val)" in source_translator
 
 log_result("T4.1", has_split_inference,
-           f"SPLIT INFERENCE lógica presente (found={has_split_inference})")
+           f"SPLIT INFERENCE logica presente (found={has_split_inference})")
 log_result("T4.2", has_in_check,
            f"Chequeo de operador IN en filtros (found={has_in_check})")
 log_result("T4.3", has_len_check,
@@ -216,4 +221,6 @@ if failed == 0:
     print("     El filtro IN multi-valor está blindado y el split_dimension se infiere.")
 else:
     print(f"\n  ⚠️  {failed} test(s) fallaron.")
-    sys.exit(1)
+    # [FIX 2026-06-11] NO sys.exit(1) aquí. pytest lo recoge como INTERNALERROR
+    # y enmascara las aserciones reales. Dejamos que pytest reporte el fallo
+    # con el formato estándar.
