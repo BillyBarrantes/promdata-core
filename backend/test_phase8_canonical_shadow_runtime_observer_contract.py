@@ -100,7 +100,7 @@ def test_phase8_shadow_runtime_observer_compares_live_vs_shadow(monkeypatch) -> 
         file_id="file-1",
         prompt='{"text":"Analiza ventas por región"}',
         live_summary=live_summary,
-        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "user-1", "team_id": "team-1"},
+        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
         service_client=object(),
     )
 
@@ -215,7 +215,7 @@ def test_phase8_shadow_runtime_observer_classifies_complete_analysis_request(mon
             "time_axis": "fecha",
             "live_duration_ms": 900,
         },
-        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "user-1", "team_id": "team-1"},
+        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
         service_client=object(),
     )
 
@@ -261,7 +261,7 @@ def test_phase8_shadow_runtime_observer_classifies_comparative_request(monkeypat
             "time_axis": "fecha_de_stock",
             "live_duration_ms": 500,
         },
-        uploaded_file_row={"file_name": "stock.xlsx", "user_id": "user-1", "team_id": "team-1"},
+        uploaded_file_row={"file_name": "stock.xlsx", "user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
         service_client=object(),
     )
 
@@ -326,7 +326,7 @@ def test_phase8_shadow_runtime_observer_does_not_overclassify_total_as_kpi(monke
             "time_axis": "fecha",
             "live_duration_ms": 300,
         },
-        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "user-1", "team_id": "team-1"},
+        uploaded_file_row={"file_name": "ventas.xlsx", "user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
         service_client=object(),
     )
 
@@ -372,7 +372,7 @@ def test_phase8_shadow_runtime_observer_uses_live_visual_for_generic_chart_reque
             "time_axis": "fecha_de_stock",
             "live_duration_ms": 250,
         },
-        uploaded_file_row={"file_name": "stock.xlsx", "user_id": "user-1", "team_id": "team-1"},
+        uploaded_file_row={"file_name": "stock.xlsx", "user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
         service_client=object(),
     )
 

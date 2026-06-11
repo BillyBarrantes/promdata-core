@@ -133,8 +133,8 @@ def test_phase8_extraction_service_builds_bundle_for_uploaded_csv() -> None:
     client.tables["uploaded_files"].append(
         {
             "id": "file-1",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "dataset.csv",
             "storage_path": "user-1/dataset.csv",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -157,8 +157,8 @@ def test_phase8_extraction_service_builds_bundle_for_uploaded_docx(monkeypatch) 
     client.tables["uploaded_files"].append(
         {
             "id": "file-2",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "memo.docx",
             "storage_path": "user-1/memo.docx",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -188,8 +188,8 @@ def test_phase8_extraction_service_promotes_document_table_when_quality_gate_pas
     client.tables["uploaded_files"].append(
         {
             "id": "file-2b",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "memo.docx",
             "storage_path": "user-1/memo-analytics.docx",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -237,8 +237,8 @@ def test_phase8_extraction_service_keeps_weak_document_table_in_document_mode(mo
     client.tables["uploaded_files"].append(
         {
             "id": "file-2c",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "weak.docx",
             "storage_path": "user-1/weak.docx",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -265,8 +265,8 @@ def test_phase8_pdf_parser_can_emit_table_frames_when_optional_dependency_and_fl
     client.tables["uploaded_files"].append(
         {
             "id": "file-3",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "report.pdf",
             "storage_path": "user-1/report.pdf",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -332,8 +332,8 @@ def test_phase8_pdf_parser_consolidates_fragmented_multipage_tables(monkeypatch)
     client.tables["uploaded_files"].append(
         {
             "id": "file-3b",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "report-multipage.pdf",
             "storage_path": "user-1/report-multipage.pdf",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -397,8 +397,8 @@ def test_phase8_image_parser_uses_ocr_gateway_when_enabled(monkeypatch) -> None:
     client.tables["uploaded_files"].append(
         {
             "id": "file-4",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "scan.png",
             "storage_path": "user-1/scan.png",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -453,8 +453,8 @@ def test_phase8_image_parser_promotes_ocr_table_when_quality_gate_passes(monkeyp
     client.tables["uploaded_files"].append(
         {
             "id": "file-4b",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "scan-table.png",
             "storage_path": "user-1/scan-table.png",
             "created_at": "2026-05-05T00:00:00+00:00",

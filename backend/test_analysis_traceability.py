@@ -77,7 +77,7 @@ def main() -> None:
     payload = build_traceability_payload(
         task_id="task-1",
         file_id="file-1",
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         raw_prompt='{"text":"top almacenes","parent_id":"task-0"}',
         actual_prompt="top almacenes",
         parent_task_id="task-0",

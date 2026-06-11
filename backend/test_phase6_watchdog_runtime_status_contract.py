@@ -56,7 +56,7 @@ def test_watchdog_runtime_status_reports_attention_for_pending_sync(monkeypatch)
         connections=[
             {
                 "provider": "google_drive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "status": "active",
                 "last_refreshed_at": "2026-04-28T10:00:00+00:00",
             }
@@ -64,7 +64,7 @@ def test_watchdog_runtime_status_reports_attention_for_pending_sync(monkeypatch)
         targets=[
             {
                 "provider": "google_drive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "is_active": True,
                 "updated_at": "2026-04-28T10:02:00+00:00",
                 "created_at": "2026-04-28T10:00:00+00:00",
@@ -80,7 +80,7 @@ def test_watchdog_runtime_status_reports_attention_for_pending_sync(monkeypatch)
         ],
     )
 
-    payload = get_watchdog_runtime_status(service_client=service_client, user_id="user-1")
+    payload = get_watchdog_runtime_status(service_client=service_client, user_id="00000000-0000-4000-8000-000000000001")
 
     assert payload["connected_provider_count"] == 1
     assert payload["active_target_count"] == 1
@@ -100,7 +100,7 @@ def test_watchdog_runtime_status_reports_idle_without_targets(monkeypatch) -> No
         connections=[
             {
                 "provider": "onedrive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "status": "active",
                 "last_refreshed_at": "2026-04-28T10:00:00+00:00",
             }
@@ -108,7 +108,7 @@ def test_watchdog_runtime_status_reports_idle_without_targets(monkeypatch) -> No
         targets=[],
     )
 
-    payload = get_watchdog_runtime_status(service_client=service_client, user_id="user-1")
+    payload = get_watchdog_runtime_status(service_client=service_client, user_id="00000000-0000-4000-8000-000000000001")
 
     assert payload["connected_provider_count"] == 1
     assert payload["active_target_count"] == 0
@@ -126,13 +126,13 @@ def test_watchdog_runtime_status_preserves_runtime_counts_when_env_disabled(monk
         connections=[
             {
                 "provider": "google_drive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "status": "active",
                 "last_refreshed_at": "2026-04-28T10:00:00+00:00",
             },
             {
                 "provider": "onedrive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "status": "active",
                 "last_refreshed_at": "2026-04-28T10:00:00+00:00",
             },
@@ -140,7 +140,7 @@ def test_watchdog_runtime_status_preserves_runtime_counts_when_env_disabled(monk
         targets=[
             {
                 "provider": "google_drive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "is_active": True,
                 "updated_at": "2026-04-28T10:02:00+00:00",
                 "created_at": "2026-04-28T10:00:00+00:00",
@@ -155,7 +155,7 @@ def test_watchdog_runtime_status_preserves_runtime_counts_when_env_disabled(monk
             },
             {
                 "provider": "onedrive",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "is_active": True,
                 "updated_at": "2026-04-28T10:02:00+00:00",
                 "created_at": "2026-04-28T10:00:00+00:00",
@@ -171,7 +171,7 @@ def test_watchdog_runtime_status_preserves_runtime_counts_when_env_disabled(monk
         ],
     )
 
-    payload = get_watchdog_runtime_status(service_client=service_client, user_id="user-1")
+    payload = get_watchdog_runtime_status(service_client=service_client, user_id="00000000-0000-4000-8000-000000000001")
 
     assert payload["enabled"] is False
     assert payload["connected_provider_count"] == 2

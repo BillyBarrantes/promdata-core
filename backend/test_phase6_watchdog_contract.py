@@ -93,14 +93,14 @@ class _FakeServiceClient:
             "cloud_oauth_connections": [
                 {
                     "id": "conn-onedrive",
-                    "user_id": "user-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
                     "provider": "onedrive",
                     "status": "active",
                     "access_token": "token-ms",
                 },
                 {
                     "id": "conn-google",
-                    "user_id": "user-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
                     "provider": "google_drive",
                     "status": "active",
                     "access_token": "token-google",
@@ -175,7 +175,7 @@ def run() -> None:
 
     try:
         onedrive_target = cloud_watchdog.upsert_watch_target(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             connection_row={"id": "conn-onedrive", "provider": "onedrive"},
             remote_item=remote_state["onedrive-file-1"],
@@ -186,7 +186,7 @@ def run() -> None:
         _assert(onedrive_target["watchdog_mode"] == "polling", "OneDrive debe quedar en polling")
 
         google_target = cloud_watchdog.upsert_watch_target(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="google_drive",
             connection_row={"id": "conn-google", "provider": "google_drive"},
             remote_item=remote_state["google-sheet-1"],
@@ -195,21 +195,21 @@ def run() -> None:
         _assert(google_target["contract_status"] == "pending_registration", "Google debe quedar con contrato pendiente")
 
         listed_targets = cloud_watchdog.list_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
         _assert(len(listed_targets) == 1, "Debe listar un target activo de OneDrive")
 
         cloud_watchdog.link_watch_target_to_uploaded_file(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             target_id="onedrive-file-1",
             uploaded_file_id="uploaded-123",
             service_client=service_client,
         )
         linked_targets = cloud_watchdog.list_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
@@ -220,7 +220,7 @@ def run() -> None:
         remote_state["onedrive-file-1"]["etag"] = "etag-v2"
         remote_state["onedrive-file-1"]["ctag"] = "ctag-v2"
         poll_result = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id=None,
             service_client=service_client,
         )
@@ -249,7 +249,7 @@ def run() -> None:
             "metadata": updated_metadata,
         }).eq("id", onedrive_target["id"]).execute()
         etag_only_poll = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
@@ -260,7 +260,7 @@ def run() -> None:
         remote_state["onedrive-file-1"]["etag"] = "etag-v4"
         remote_state["onedrive-file-1"]["ctag"] = "ctag-v4"
         repeated_pending_poll = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
@@ -269,7 +269,7 @@ def run() -> None:
             "Debe volver a notificar si el mismo archivo pendiente recibe una nueva revisión remota",
         )
         serialized_pending_targets = cloud_watchdog.list_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
@@ -280,7 +280,7 @@ def run() -> None:
         )
 
         second_poll = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             service_client=service_client,
         )
@@ -303,7 +303,7 @@ def run() -> None:
             "newStartPageToken": "page-1",
         }
         google_poll = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="google_drive",
             service_client=service_client,
         )
@@ -333,7 +333,7 @@ def run() -> None:
             "newStartPageToken": "page-2",
         }
         repeated_google_poll = cloud_watchdog.poll_user_watch_targets(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="google_drive",
             service_client=service_client,
         )
@@ -343,7 +343,7 @@ def run() -> None:
         )
 
         deactivated = cloud_watchdog.deactivate_watch_target(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="onedrive",
             watch_target_id=onedrive_target["id"],
             service_client=service_client,

@@ -139,8 +139,8 @@ def test_phase8_dark_runtime_orchestrator_runs_end_to_end_without_active_runtime
     client.tables["uploaded_files"].append(
         {
             "id": "file-1",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "memo.docx",
             "storage_path": "user-1/memo.docx",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -170,8 +170,8 @@ def test_phase8_dark_runtime_orchestrator_materializes_native_csv_when_parallel_
     client.tables["uploaded_files"].append(
         {
             "id": "file-native-csv",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "dataset.csv",
             "storage_path": "user-1/dataset.csv",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -230,8 +230,8 @@ def test_phase8_dark_runtime_orchestrator_compares_against_active_runtime(monkey
     client.tables["uploaded_files"].append(
         {
             "id": "file-2",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "memo.docx",
             "storage_path": "user-1/memo2.docx",
             "created_at": "2026-05-05T00:00:00+00:00",
@@ -259,8 +259,8 @@ def test_phase8_dark_runtime_orchestrator_runs_image_shadow_pipeline_with_ocr_ta
     client.tables["uploaded_files"].append(
         {
             "id": "file-image-1",
-            "user_id": "user-1",
-            "team_id": "team-1",
+            "user_id": "00000000-0000-4000-8000-000000000001",
+            "team_id": "00000000-0000-4000-8000-000000000002",
             "file_name": "scan.png",
             "storage_path": "user-1/scan.png",
             "created_at": "2026-05-05T00:00:00+00:00",

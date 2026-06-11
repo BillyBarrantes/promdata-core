@@ -70,7 +70,7 @@ def test_track_analysis_completed_emits_enterprise_metrics(monkeypatch) -> None:
     telemetry.track_analysis_completed(
         task_id="task-1",
         file_id="file-1",
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         status="completed",
         duration_ms=1450,
         final_struct={
@@ -100,7 +100,7 @@ def test_track_file_preview_generated_emits_quality_metrics(monkeypatch) -> None
     monkeypatch.setattr(telemetry, "_persist_enterprise_metric_event", lambda **_: None)
 
     telemetry.track_file_preview_generated(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         file_id="file-1",
         preview_payload={
             "row_count": 120,
@@ -133,8 +133,8 @@ def test_track_canary_runtime_route_observed_emits_route_metrics(monkeypatch) ->
     telemetry.track_canary_runtime_route_observed(
         task_id="task-1",
         file_id="file-1",
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_name="ventas.xlsx",
         prompt_type="complete_analysis",
         requested_runtime="universal_tabular",
@@ -151,8 +151,8 @@ def test_track_canary_runtime_route_observed_emits_route_metrics(monkeypatch) ->
     telemetry.track_canary_runtime_route_fallback(
         task_id="task-1",
         file_id="file-1",
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_name="ventas.xlsx",
         prompt_type="complete_analysis",
         requested_runtime="universal_tabular",
@@ -327,7 +327,7 @@ def test_summarize_enterprise_telemetry_events_builds_executive_buckets() -> Non
                 "dimensions": {
                     "task_id": "c1",
                     "file_name": "ventas.xlsx",
-                    "team_id": "team-1",
+                    "team_id": "00000000-0000-4000-8000-000000000002",
                     "prompt_type": "chart_request",
                     "requested_runtime": "universal_tabular",
                     "effective_runtime": "legacy",
@@ -341,7 +341,7 @@ def test_summarize_enterprise_telemetry_events_builds_executive_buckets() -> Non
                 "dimensions": {
                     "task_id": "c1",
                     "file_name": "ventas.xlsx",
-                    "team_id": "team-1",
+                    "team_id": "00000000-0000-4000-8000-000000000002",
                     "prompt_type": "chart_request",
                     "requested_runtime": "universal_tabular",
                     "fallback_runtime": "legacy",

@@ -10,8 +10,8 @@ def test_canary_router_defaults_to_legacy_when_disabled(monkeypatch):
         task_id="task-1",
         file_id="file-1",
         file_name="ventas.xlsx",
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         prompt="Analiza ventas por canal",
         health_summary={"status": "disabled", "ready_for_functional_canary": False},
     )
@@ -24,14 +24,14 @@ def test_canary_router_defaults_to_legacy_when_disabled(monkeypatch):
 def test_canary_router_allowlists_but_keeps_legacy_when_switch_is_off(monkeypatch):
     monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ROUTER_ENABLED", True)
     monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_FUNCTIONAL_SWITCH_ENABLED", False)
-    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ALLOWLIST_TEAM_IDS", "team-1")
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ALLOWLIST_TEAM_IDS", "00000000-0000-4000-8000-000000000002")
 
     route = build_canonical_tabular_canary_route(
         task_id="task-2",
         file_id="file-2",
         file_name="rrhh.csv",
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         prompt="Analiza headcount por área",
         health_summary={"status": "dry_run", "ready_for_functional_canary": False},
     )

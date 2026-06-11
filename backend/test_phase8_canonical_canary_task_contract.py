@@ -32,8 +32,8 @@ class _FakeSupabase:
             return _FakeQuery(
                 {
                     "id": "file-1",
-                    "user_id": "user-1",
-                    "team_id": "team-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
+                    "team_id": "00000000-0000-4000-8000-000000000002",
                     "file_name": "ventas.csv",
                     "storage_path": "dash-uploads/u/file.xlsx",
                     "created_at": "2026-05-09T00:00:00+00:00",

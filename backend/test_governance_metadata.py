@@ -9,8 +9,8 @@ from app.services.governance import (
 def main() -> None:
     report_content = stamp_report_content_governance(
         content={"layout": {"x": 0, "y": 0, "w": 6, "h": 4}},
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_id="file-1",
         presentation_id="presentation-1",
         revision_kind="create",
@@ -23,8 +23,8 @@ def main() -> None:
 
     updated_content = stamp_report_content_governance(
         content=report_content,
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_id="file-1",
         presentation_id="presentation-1",
         revision_kind="layout_update",
@@ -37,8 +37,8 @@ def main() -> None:
 
     document_metadata = build_document_governance_metadata(
         metadata={"ingestion_mode": "async"},
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         revision_kind="create",
     )
     doc_governance = document_metadata.get("governance") or {}
@@ -47,8 +47,8 @@ def main() -> None:
 
     indexed_metadata = build_document_governance_metadata(
         metadata=document_metadata,
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         revision_kind="index",
         increment_index_revision=True,
     )

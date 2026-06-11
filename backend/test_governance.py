@@ -55,8 +55,8 @@ class FakeServiceClient:
 def main() -> None:
     created_content = stamp_report_content_governance(
         content={"layout": {"x": 0, "y": 0, "w": 4, "h": 3}},
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_id="file-1",
         presentation_id="presentation-1",
         revision_kind="create",
@@ -68,8 +68,8 @@ def main() -> None:
 
     moved_content = stamp_report_content_governance(
         content=created_content,
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_id="file-1",
         presentation_id="presentation-1",
         revision_kind="layout_update",
@@ -82,21 +82,21 @@ def main() -> None:
 
     document_created = build_document_governance_metadata(
         metadata={"ingestion_mode": "async"},
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         revision_kind="create",
     )
     document_retry = build_document_governance_metadata(
         metadata=document_created,
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         revision_kind="retry_queue",
         increment_revision=True,
     )
     document_indexed = build_document_governance_metadata(
         metadata=document_retry,
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         revision_kind="index",
         increment_index_revision=True,
     )
@@ -110,8 +110,8 @@ def main() -> None:
         "uploaded_files": [
             {
                 "id": "file-1",
-                "user_id": "user-1",
-                "team_id": "team-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
+                "team_id": "00000000-0000-4000-8000-000000000002",
                 "file_name": "dataset.xlsx",
                 "storage_path": "user-1/dataset.xlsx",
                 "created_at": "2026-04-25T00:00:00Z",
@@ -120,7 +120,7 @@ def main() -> None:
         "presentations": [
             {
                 "id": "presentation-1",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "file_id": "file-1",
                 "name": "Tablero",
                 "created_at": "2026-04-25T00:00:00Z",
@@ -129,7 +129,7 @@ def main() -> None:
         "saved_reports": [
             {
                 "id": "report-1",
-                "user_id": "user-1",
+                "user_id": "00000000-0000-4000-8000-000000000001",
                 "file_id": "file-1",
                 "presentation_id": "presentation-1",
                 "title": "Widget",
@@ -140,20 +140,20 @@ def main() -> None:
     })
 
     uploaded = get_user_uploaded_file_scope_or_404(
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         file_id="file-1",
         service_client=fake_client,
     )
     presentation = get_user_presentation_scope_or_404(
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         presentation_id="presentation-1",
         service_client=fake_client,
     )
     report = get_user_report_scope_or_404(
-        user_id="user-1",
-        team_id="team-1",
+        user_id="00000000-0000-4000-8000-000000000001",
+        team_id="00000000-0000-4000-8000-000000000002",
         report_id="report-1",
         service_client=fake_client,
     )
@@ -163,7 +163,7 @@ def main() -> None:
 
     try:
         get_user_uploaded_file_scope_or_404(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             team_id="team-x",
             file_id="file-1",
             service_client=fake_client,

@@ -71,12 +71,12 @@ class _FakeServiceClient:
     def __init__(self):
         self.tables = {
             "team_members": [
-                {"user_id": "user-1", "team_id": "team-1"},
+                {"user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
             ],
             "cloud_watch_targets": [
                 {
                     "id": "wt-1",
-                    "user_id": "user-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
                     "provider": "google_drive",
                     "target_id": "remote-1",
                     "target_name": "Reporte Abril.xlsx",
@@ -100,7 +100,7 @@ class _FakeServiceClient:
                 },
                 {
                     "id": "wt-2",
-                    "user_id": "user-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
                     "provider": "onedrive",
                     "target_id": "remote-2",
                     "target_name": "Sin enlace.xlsx",
@@ -131,7 +131,7 @@ def run() -> None:
     client = _FakeServiceClient()
 
     enqueue_summary = cloud_sync_jobs.enqueue_cloud_sync_jobs_for_watchdog_changes(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         changes=[
             {
                 "watch_target_id": "wt-1",
@@ -160,7 +160,7 @@ def run() -> None:
     _assert(queued_watchdog["last_auto_sync_job_id"] == first_job["id"], "Debe persistir el último job asociado")
 
     pending_candidates = cloud_sync_jobs.collect_pending_auto_sync_candidates(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         provider_id="google_drive",
         service_client=client,
     )
@@ -170,7 +170,7 @@ def run() -> None:
     client.tables["cloud_watch_targets"][0]["metadata"]["watchdog"]["pending_change"] = False
     client.tables["cloud_watch_targets"][0]["metadata"]["watchdog"]["sync_state"] = "synced"
     synced_candidates = cloud_sync_jobs.collect_pending_auto_sync_candidates(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         provider_id="google_drive",
         service_client=client,
     )
@@ -179,7 +179,7 @@ def run() -> None:
     client.tables["cloud_watch_targets"][0]["metadata"]["watchdog"]["sync_state"] = "pending_sync"
 
     duplicate_while_active = cloud_sync_jobs.enqueue_cloud_sync_jobs_for_watchdog_changes(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         changes=[{
             "watch_target_id": "wt-1",
             "provider": "google_drive",
@@ -194,7 +194,7 @@ def run() -> None:
 
     client.tables["cloud_sync_jobs"][0]["status"] = "succeeded"
     duplicate_after_success = cloud_sync_jobs.enqueue_cloud_sync_jobs_for_watchdog_changes(
-        user_id="user-1",
+        user_id="00000000-0000-4000-8000-000000000001",
         changes=[{
             "watch_target_id": "wt-1",
             "provider": "google_drive",
@@ -208,8 +208,8 @@ def run() -> None:
     _assert(duplicate_after_success["skipped_duplicate_revision_count"] == 1, "Debe registrar dedupe por revisión")
 
     success_job_response = client.table("cloud_sync_jobs").insert({
-        "team_id": "team-1",
-        "user_id": "user-1",
+        "team_id": "00000000-0000-4000-8000-000000000002",
+        "user_id": "00000000-0000-4000-8000-000000000001",
         "watch_target_id": "wt-1",
         "linked_file_id": "uploaded-1",
         "provider": "google_drive",
@@ -223,7 +223,7 @@ def run() -> None:
     success_job_id = success_job_response.data[0]["id"]
 
     def fake_materialize_success(*, user_id, provider_id, item_id, service_client):
-        _assert(user_id == "user-1", "Usuario inesperado en ejecución exitosa")
+        _assert(user_id == "00000000-0000-4000-8000-000000000001", "Usuario inesperado en ejecución exitosa")
         _assert(provider_id == "google_drive", "Provider inesperado en ejecución exitosa")
         _assert(item_id == "remote-1", "Target inesperado en ejecución exitosa")
         return {
@@ -244,8 +244,8 @@ def run() -> None:
     _assert(success_watchdog["last_auto_sync_error"] is None, "El éxito debe limpiar errores previos")
 
     failure_job_response = client.table("cloud_sync_jobs").insert({
-        "team_id": "team-1",
-        "user_id": "user-1",
+        "team_id": "00000000-0000-4000-8000-000000000002",
+        "user_id": "00000000-0000-4000-8000-000000000001",
         "watch_target_id": "wt-1",
         "linked_file_id": "uploaded-1",
         "provider": "google_drive",

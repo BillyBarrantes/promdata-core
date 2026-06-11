@@ -97,13 +97,13 @@ class _FakeServiceClient:
     def __init__(self):
         self.tables = {
             "team_members": [
-                {"user_id": "user-1", "team_id": "team-1"},
+                {"user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
             ],
             "uploaded_files": [],
             "cloud_watch_targets": [
                 {
                     "id": "wt-1",
-                    "user_id": "user-1",
+                    "user_id": "00000000-0000-4000-8000-000000000001",
                     "provider": "google_drive",
                     "target_id": "remote-1",
                     "target_name": "Reporte Abril.xlsx",
@@ -230,7 +230,7 @@ def _run_logical_refresh_contract() -> None:
         return deepcopy(remote_state)
 
     def fake_get_connection(user_id, provider_id, service_client):
-        _assert(user_id == "user-1", "Usuario inesperado al resolver conexión")
+        _assert(user_id == "00000000-0000-4000-8000-000000000001", "Usuario inesperado al resolver conexión")
         _assert(provider_id == "google_drive", "Provider inesperado al resolver conexión")
         return {"id": "conn-1", "provider": "google_drive", "status": "active"}
 
@@ -241,7 +241,7 @@ def _run_logical_refresh_contract() -> None:
     client = _FakeServiceClient()
     try:
         first_import = cloud_imports.materialize_cloud_import(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="google_drive",
             item_id="remote-1",
             service_client=client,
@@ -267,7 +267,7 @@ def _run_logical_refresh_contract() -> None:
         remote_state["bytes"] = b"version-2"
 
         second_import = cloud_imports.materialize_cloud_import(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             provider_id="google_drive",
             item_id="remote-1",
             service_client=client,
@@ -297,7 +297,7 @@ def _run_logical_refresh_contract() -> None:
 
         remote_state["bytes"] = b"version-3"
         synced_uploaded_file = cloud_imports.sync_uploaded_file_from_pending_watch_target(
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             uploaded_file=deepcopy(client.tables["uploaded_files"][0]),
             service_client=client,
         )

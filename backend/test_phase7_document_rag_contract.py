@@ -121,7 +121,7 @@ class _FakeServiceClient:
     def __init__(self):
         self.tables = {
             "team_members": [
-                {"user_id": "user-1", "team_id": "team-1"},
+                {"user_id": "00000000-0000-4000-8000-000000000001", "team_id": "00000000-0000-4000-8000-000000000002"},
             ],
             "knowledge_documents": [],
             "knowledge_document_chunks": [],
@@ -156,8 +156,8 @@ def run() -> None:
     client = _FakeServiceClient()
 
     try:
-        team_id = document_rag.resolve_user_team_id(user_id="user-1", service_client=client)
-        _assert(team_id == "team-1", "Debe resolver team_id")
+        team_id = document_rag.resolve_user_team_id(user_id="00000000-0000-4000-8000-000000000001", service_client=client)
+        _assert(team_id == "00000000-0000-4000-8000-000000000002", "Debe resolver team_id")
 
         storage_path = "user-1/okr_contingencia_q4.txt"
         raw_text = (
@@ -168,8 +168,8 @@ def run() -> None:
         client.storage.from_("knowledge-documents").upload(storage_path, raw_text, {})
 
         document = document_rag.create_knowledge_document_record(
-            user_id="user-1",
-            team_id="team-1",
+            user_id="00000000-0000-4000-8000-000000000001",
+            team_id="00000000-0000-4000-8000-000000000002",
             title="Plan de Contingencia Q4",
             file_name="plan_q4.txt",
             mime_type="text/plain",
@@ -181,7 +181,7 @@ def run() -> None:
 
         indexed = document_rag.process_knowledge_document(
             document_id=document["id"],
-            user_id="user-1",
+            user_id="00000000-0000-4000-8000-000000000001",
             service_client=client,
         )
         _assert(indexed["status"] == "indexed", "El documento debe quedar indexado")
@@ -192,15 +192,15 @@ def run() -> None:
         )
 
         listed = document_rag.list_knowledge_documents(
-            user_id="user-1",
-            team_id="team-1",
+            user_id="00000000-0000-4000-8000-000000000001",
+            team_id="00000000-0000-4000-8000-000000000002",
             service_client=client,
         )
         _assert(len(listed) == 1, "Debe listar un documento")
 
         snippets = document_rag.search_knowledge_documents(
-            user_id="user-1",
-            team_id="team-1",
+            user_id="00000000-0000-4000-8000-000000000001",
+            team_id="00000000-0000-4000-8000-000000000002",
             query="Dada la caída de ventas en Q4, ¿qué dice el plan de contingencia?",
             service_client=client,
             limit=3,
