@@ -412,8 +412,17 @@ def _build_connection_payload(
     existing_connection: dict[str, Any] | None,
 ) -> dict[str, Any]:
     now_utc = _now_utc()
-    expires_in = token_payload.get("expires_in")
-    expires_at = now_utc + timedelta(seconds=int(expires_in)) if expires_in else None
+    # [FIX 2026-06-11] Si el proveedor no devuelve expires_in (raro, pero
+    # Google puede omitirlo en algunos grant types), asumimos el TTL
+    # estandar de Google (3600s). Sin esto, expires_at=None y
+    # connection_needs_refresh() nunca devuelve True, lo que deja
+    # el access_token permanente y rompe la conexion al expirar.
+    raw_expires_in = token_payload.get("expires_in")
+    try:
+        expires_in = int(raw_expires_in) if raw_expires_in is not None else 3600
+    except (TypeError, ValueError):
+        expires_in = 3600
+    expires_at = now_utc + timedelta(seconds=expires_in)
     refresh_token = token_payload.get("refresh_token") or (existing_connection or {}).get("refresh_token")
     metadata = {
         **((existing_connection or {}).get("metadata") or {}),
@@ -1016,9 +1025,21 @@ def upsert_oauth_connection(
 
 
 def connection_needs_refresh(connection_row: dict[str, Any]) -> bool:
+    """
+    Determina si una conexion OAuth necesita refresh del access_token.
+
+    [FIX 2026-06-11] Si expires_at es None o no parseable, ANTES retornabamos
+    False (asumiendo que la conexion estaba bien). Esto dejaba conexiones
+    rotas silenciosamente: el access_token expiraba sin que nadie lo
+    refrescara, hasta que Google rechazaba la llamada con 401.
+
+    Comportamiento nuevo: si expires_at es None, retornamos True
+    (forzar refresh). Es preferible refrescar innecesariamente a fallar
+    silenciosamente.
+    """
     expires_at = _parse_iso_datetime(connection_row.get("expires_at"))
     if not expires_at:
-        return False
+        return True
     skew_seconds = max(settings.OAUTH_TOKEN_REFRESH_SKEW_SECONDS, 0)
     return _now_utc() + timedelta(seconds=skew_seconds) >= expires_at
 
