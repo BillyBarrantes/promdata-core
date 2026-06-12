@@ -86,8 +86,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal test dependency
-        run: python -m pip install --upgrade pip pytest
+      - name: Install backend dependencies
+        # [FIX 2026-06-11] Antes: 'pip install pytest' (minimal). Esto fallaba
+        # porque los tests de gobernanza importan app.core.config que a su
+        # vez importa dotenv/httpx/pydantic, etc. La politica "minimal" no
+        # funciona cuando el modulo raiz arrastra todo el arbol de deps.
+        # Ahora: instalar requirements.txt completo (mismo approach que
+        # backend-ci.yml). Trade-off: ~200MB de deps vs tests confiables.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Validate phase 6 governance contracts
         run: bash ./run_phase6_governance_tests.sh
