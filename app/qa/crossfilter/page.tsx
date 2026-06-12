@@ -180,7 +180,17 @@ export default function CrossFilterQAPage() {
   };
 
   const handleCrossFilter = (filters: Record<string, string>) => {
-    const selected = filters.category ? normalizeValue(filters.category) : "";
+    // [FIX 2026-06-11] DrillDownMenu envia filtros con la convencion
+    // { global_chart_filter: category, global_cross_filter: secondary }.
+    // El handler anterior leia filters.category, que NUNCA existe
+    // (DrillDownMenu.tsx:166 pone 'global_chart_filter', no 'category').
+    // Resultado: selected="" siempre, return early, active-filter quedaba
+    // en "none" para siempre. 3 tests E2E crossfilter fallaban.
+    // Mismo patron que el handler de produccion en chat-interface.tsx:144:
+    //   filters.global_chart_filter || filters.global_cross_filter
+    const selectedRaw =
+      filters.global_chart_filter || filters.global_cross_filter || "";
+    const selected = selectedRaw ? normalizeValue(selectedRaw) : "";
     if (!selected) return;
     setActiveFilter((prev) => (prev === selected ? null : selected));
   };
