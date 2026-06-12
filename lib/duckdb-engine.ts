@@ -928,7 +928,8 @@ function scoreColumnForGlobalFilter(columnName: string, filterValue: string): nu
  */
 export async function crossFilter(
   filters: Record<string, string | null>,
-  tableName: string = 'analysis_data'
+  tableName: string = 'analysis_data',
+  crossFilterContext?: any
 ): Promise<Record<string, unknown>[]> {
   if (!state.tables.has(tableName)) {
     throw new Error(`Tabla '${tableName}' no cargada en DuckDB`);
@@ -974,6 +975,40 @@ export async function crossFilter(
   const columns = await getTableSchema(tableName);
 
   const conditions: string[] = [];
+
+  // FASE 4: Predicados estructurados del crossFilterContext
+  if (crossFilterContext) {
+    const predicates = [
+      ...(Array.isArray(crossFilterContext.base_predicates) ? crossFilterContext.base_predicates : []),
+      ...(Array.isArray(crossFilterContext.runtime_predicates) ? crossFilterContext.runtime_predicates : [])
+    ];
+    for (const pred of predicates) {
+      if (pred.column && pred.operator && pred.value !== undefined) {
+        const hasColumn = columns.some((c: any) => String(c.column_name) === pred.column);
+        if (hasColumn) {
+          let op = String(pred.operator).toUpperCase();
+          if (op === '==') op = '=';
+          let condition = '';
+          
+          if (op === 'IN' && Array.isArray(pred.value)) {
+            const listStr = pred.value.map((v: any) => `'${String(v).replace(/'/g, "''")}'`).join(', ');
+            condition = `"${pred.column}" IN (${listStr})`;
+          } else if (op === 'BETWEEN' && Array.isArray(pred.value) && pred.value.length === 2) {
+            const val1 = String(pred.value[0]).replace(/'/g, "''");
+            const val2 = String(pred.value[1]).replace(/'/g, "''");
+            condition = `"${pred.column}" BETWEEN '${val1}' AND '${val2}'`;
+          } else {
+            const escapedValue = String(pred.value).replace(/'/g, "''");
+            condition = `"${pred.column}" ${op} '${escapedValue}'`;
+          }
+          console.log(`🧠 [CROSS-FILTER] context_predicate_added:`, condition);
+          conditions.push(condition);
+        } else {
+          console.warn(`⚠️ [CROSS-FILTER] Predicado estructural omitido, columna '${pred.column}' no existe en '${tableName}'`);
+        }
+      }
+    }
+  }
 
   if (syntheticBucketFilter) {
     const syntheticCondition = buildSyntheticBucketCondition(columns, syntheticBucketFilter);
