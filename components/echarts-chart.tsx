@@ -757,6 +757,7 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
         ...params,
         rawCategory,
         rawSecondaryCategory,
+        crossFilterContext: fullOpt?.cross_filter_context,
         eventCoordinates: { x: clientX, y: clientY }
       };
 

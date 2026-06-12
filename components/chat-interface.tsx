@@ -1340,6 +1340,8 @@ export function ChatInterface() {
           series: safeSeries,
           tableName: tableName,
           secondaryCategory: rawSecondaryCategory || undefined,
+          crossFilterContext: params?.crossFilterContext || undefined,
+          option: params?.option || undefined
         }
       });
     }
@@ -1351,7 +1353,7 @@ export function ChatInterface() {
   }, [triggerAnalysis, setDrillDown]);
 
   // 🦆 [FASE 4] Cross-Filter Handler (DuckDB-WASM local, Multidimensional)
-  const handleCrossFilter = useCallback(async (filters: Record<string, string>, tableName?: string) => {
+  const handleCrossFilter = useCallback(async (filters: Record<string, string>, tableName?: string, crossFilterContext?: any) => {
     // ── PURE LOCAL CROSS-FILTER (DuckDB-WASM, <50ms) ────────────────
     // Filters directly on loaded pd_chart_* tables in WASM memory.
     // If tableName is undefined, probes ALL loaded tables to find the match.
@@ -1363,7 +1365,7 @@ export function ChatInterface() {
       const loadedTables = duckdbEngine.getTableNames();
 
       // ── Step 1: Resolve the target table ──
-      let tName = tableName;
+      let tName = crossFilterContext?.source_table || tableName;
 
       if (!tName || !loadedTables.includes(tName)) {
         // tableName missing or not loaded — find it from visual components
@@ -1584,9 +1586,9 @@ export function ChatInterface() {
       // ── Step 3: Execute local DuckDB cross-filter ──
       console.log(
         `🦆 [CROSS-FILTER] Filtrando: ${filterSummary} en tabla '${tName}'`,
-        { baseFilters, clickFilters: filters, merged: mergedFilters }
+        { baseFilters, clickFilters: filters, merged: mergedFilters, crossFilterContext }
       );
-      let filtered = await duckdbEngine.crossFilter(effectiveFilters, tName);
+      let filtered = await duckdbEngine.crossFilter(effectiveFilters, tName, crossFilterContext);
 
       // [FIX 2026-06-09 4ta iteracion] FALLBACK al per-chart si el snapshot
       // retorna 0 rows. Esto pasa cuando el snapshot de 10K head() no
@@ -1601,7 +1603,8 @@ export function ChatInterface() {
         );
         const fallbackFiltered = await duckdbEngine.crossFilter(
           effectiveFilters,
-          originalChartTableName
+          originalChartTableName,
+          crossFilterContext
         );
         if (fallbackFiltered.length > 0) {
           filtered = fallbackFiltered;
@@ -1635,7 +1638,7 @@ export function ChatInterface() {
       if (clickFilterSummary) {
         filterDescription += `➕ **Filtros del clic:** ${clickFilterSummary}\n`;
       }
-      if (!baseFilterSummary && !clickFilterSummary) {
+      if (!baseFilterSummary && !clickFilterSummary && !crossFilterContext?.base_predicates?.length && !crossFilterContext?.runtime_predicates?.length) {
         filterDescription += `🔍 Sin filtros activos\n`;
       }
       if (isAggregatedFallback) {

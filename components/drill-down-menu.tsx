@@ -27,7 +27,7 @@ interface DrillDownMenuProps {
     onClose: () => void;
     // 🦆 [FASE 4] Cross-filter support (Multidimensional)
     isDuckDBReady?: boolean;
-    onCrossFilter?: (filters: Record<string, string>, tableName?: string) => void;
+    onCrossFilter?: (filters: Record<string, string>, tableName?: string, crossFilterContext?: any) => void;
 }
 
 export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onClose, isDuckDBReady, onCrossFilter }: DrillDownMenuProps) {
@@ -185,8 +185,9 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                                     ? `+ ${baseFilterKeys.length} base`
                                                     : '';
 
-                                                console.log("1. Iniciando filtro. Tabla:", dataContext.tableName, "Filtros:", filters, "Base filters:", baseFilters);
-                                                onCrossFilter(filters, dataContext.tableName);
+                                                const crossFilterContext = (dataContext as any)?.crossFilterContext;
+                                                console.log("1. Iniciando filtro. Tabla:", dataContext.tableName, "Filtros:", filters, "Base filters:", baseFilters, "CrossFilterContext:", crossFilterContext);
+                                                onCrossFilter(filters, dataContext.tableName, crossFilterContext);
                                                 onClose();
                                             }}
                                             className="flex items-center gap-2.5 w-full p-2 rounded-lg bg-primary/5 hover:bg-primary/15 transition-all text-left group border border-primary/20 hover:border-primary/40 relative overflow-hidden mb-1"

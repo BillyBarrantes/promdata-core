@@ -48,6 +48,8 @@ export interface DrillDownState {
     series: string;
     tableName?: string;
     secondaryCategory?: string;
+    crossFilterContext?: any;
+    option?: any;
   };
 }
 export const drillDownAtom = atom<DrillDownState>({
