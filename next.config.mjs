@@ -3,9 +3,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // [FIX 2026-06-11] Removido `eslint: { ignoreDuringBuilds: true }` —
+  // Next.js 15+ ya no soporta esta opcion en next.config.mjs. Si se
+  // necesita silenciar errores de lint en build, usar ESLINT_NO_DEV_ERRORS
+  // o NEXT_DISABLE_ESLINT en env vars, o ejecutar eslint por separado.
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -52,6 +53,12 @@ const nextConfig = {
 //   - Las variables SENTRY_ORG, SENTRY_PROJECT y SENTRY_AUTH_TOKEN se
 //     inyectan desde Vercel → Settings → Environment Variables.
 // ---------------------------------------------------------------------------
+// [FIX 2026-06-11] Las opciones `disableLogger` y `automaticVercelMonitors`
+// fueron deprecadas en @sentry/nextjs >=9. Las nuevas opciones viven
+// dentro de `webpack.*` y se pasan como objeto anidado:
+//   - disableLogger: true           → webpack.treeshake.removeDebugLogging: true
+//   - automaticVercelMonitors:false → webpack.automaticVercelMonitors: false
+// (No soportado con Turbopack — mantener webpack config para builds prod.)
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
@@ -65,9 +72,14 @@ export default withSentryConfig(nextConfig, {
   // Ocultar source maps del bundle público — solo existen en Sentry.
   hideSourceMaps: true,
 
-  // Eliminar el logger de Sentry del bundle de producción (ahorra ~3KB).
-  disableLogger: true,
-
-  // No crear monitores automáticos de Vercel Cron (no usamos cron jobs en Vercel).
-  automaticVercelMonitors: false,
+  // Las opciones deprecadas se movieron a `webpack.*`.
+  // Ver https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/tree-shaking/
+  webpack: {
+    // Eliminar el logger de Sentry del bundle de producción (ahorra ~3KB).
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    // No crear monitores automáticos de Vercel Cron (no usamos cron jobs en Vercel).
+    automaticVercelMonitors: false,
+  },
 });
