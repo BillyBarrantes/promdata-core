@@ -350,6 +350,16 @@ def _build_chart_option(
     # se serializan como "op value" para que el frontend los pueda parsear.
     plan_filters: dict[str, str] = {}
     intent = getattr(plan, "main_intent", None)
+    
+    cross_filter_context = {
+        "base_predicates": [],
+        "runtime_predicates": [],
+        "query_contract": query_contract or {}
+    }
+    table_name = schema_profile.get("table_name") if schema_profile else None
+    if table_name:
+        cross_filter_context["source_table"] = table_name
+
     if intent is not None:
         for f in getattr(intent, "filters", []) or []:
             col = str(getattr(f, "column", "") or "").strip()
@@ -357,8 +367,16 @@ def _build_chart_option(
             op = str(getattr(f, "operator", "==") or "==").strip()
             if col and val:
                 plan_filters[col] = f"{op} {val}" if op != "==" else val
+                cross_filter_context["base_predicates"].append({
+                    "column": col,
+                    "operator": op,
+                    "value": val
+                })
+    
     if plan_filters:
         option["chart_base_filters"] = plan_filters
+    
+    option["cross_filter_context"] = cross_filter_context
 
     filtered_granular_df = result_payload.get("filtered_granular_df")
     if filtered_granular_df is None:
