@@ -17,7 +17,20 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env*
+#
+# [FIX 2026-06-11] Antes: `.env*` bloqueaba TODO (incluidos los templates
+# `.env*.example`). Esto rompio el test_phase6_platform_env_contract
+# porque CI no podia leer los archivos de ejemplo que el test espera.
+#
+# Politica correcta (estandar de la industria, ver Next.js / Vercel / GH Actions):
+#   - Bloquear `.env` y `.env.*` (archivos reales con secretos)
+#   - Permitir `!.env*.example` (templates publicos, sin secretos reales)
+#
+# Verificacion: el contenido actual de los .env*.example solo tiene
+# placeholders (your-*, URLs localhost, config publica) — seguro de commitear.
+.env
+.env.*
+!.env*.example
 
 # vercel
 .vercel
