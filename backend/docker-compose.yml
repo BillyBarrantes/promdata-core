@@ -9,7 +9,7 @@ services:
     volumes:
       - ./app:/code/app
       - ./.shadow_runtime_report.json:/code/.shadow_runtime_report.json:ro
-      - ./google-credentials.json:/code/google-credentials.json:ro
+      - ${PROMDATA_GOOGLE_CREDENTIALS_PATH:-${HOME}/.promdata-secrets/google-credentials.json}:/code/google-credentials.json:ro
     environment:
       - PYTHONPATH=/code
       - GOOGLE_APPLICATION_CREDENTIALS=/code/google-credentials.json
@@ -34,7 +34,7 @@ services:
     volumes:
       - ./app:/code/app
       - ./.shadow_runtime_report.json:/code/.shadow_runtime_report.json:ro
-      - ./google-credentials.json:/code/google-credentials.json:ro
+      - ${PROMDATA_GOOGLE_CREDENTIALS_PATH:-${HOME}/.promdata-secrets/google-credentials.json}:/code/google-credentials.json:ro
     environment:
       - PYTHONPATH=/code
       - GOOGLE_APPLICATION_CREDENTIALS=/code/google-credentials.json

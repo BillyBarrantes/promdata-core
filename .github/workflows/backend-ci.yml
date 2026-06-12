@@ -23,6 +23,9 @@ jobs:
       run:
         working-directory: backend
 
+    env:
+      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -38,6 +41,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Create Google Cloud credentials file
+        if: env.GCP_CREDENTIALS != ''
+        run: |
+          printf '%s' "$GCP_CREDENTIALS" > google-credentials.json
+          chmod 600 google-credentials.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/backend/google-credentials.json" >> "$GITHUB_ENV"
 
       - name: Run backend test suite
         run: ./run_backend_tests.sh

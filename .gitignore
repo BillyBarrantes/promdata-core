@@ -43,3 +43,6 @@ next-env.d.ts
 backend/venv/
 .venv/
 venv/backend/google-credentials.json
+
+# Google Cloud service account credentials (local-only secret)
+backend/google-credentials.json

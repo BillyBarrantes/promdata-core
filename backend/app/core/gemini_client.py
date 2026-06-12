@@ -9,6 +9,12 @@ from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 
 _HTTP_TIMEOUT_MS = int(os.getenv("GEMINI_HTTP_TIMEOUT_MS", "60000") or "60000")
+_DEFAULT_VERTEX_CREDENTIALS_PATH = os.path.expanduser(
+    os.getenv(
+        "PROMDATA_GOOGLE_CREDENTIALS_PATH",
+        "~/.promdata-secrets/google-credentials.json",
+    )
+)
 
 _HAS_GENAI_SDK = False
 _GENAI_SDK = None
@@ -119,6 +125,18 @@ def _extract_embedding_values(response: Any) -> list[float] | None:
     return None
 
 
+def _ensure_vertex_adc_credentials() -> None:
+    if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        return
+    if not os.path.isfile(_DEFAULT_VERTEX_CREDENTIALS_PATH):
+        return
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _DEFAULT_VERTEX_CREDENTIALS_PATH
+    emit_structured_log(
+        "gemini_vertex_credentials_path_resolved",
+        source="promdata_default_local_path",
+    )
+
+
 @dataclass
 class _CompatGenerateResponse:
     text: str
@@ -169,6 +187,7 @@ class _GenAiRuntime:
             kwargs["api_key"] = self._api_key
         else:
             # Modo Vertex AI Enterprise — autenticación por ADC
+            _ensure_vertex_adc_credentials()
             kwargs["enterprise"] = True
             if self._vertex_project:
                 kwargs["project"] = self._vertex_project
