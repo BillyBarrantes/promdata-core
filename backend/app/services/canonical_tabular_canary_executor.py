@@ -378,6 +378,34 @@ def _build_chart_option(
     
     option["cross_filter_context"] = cross_filter_context
 
+    # --- [FIX 2026-06-12] Capturar filtros RUNTIME que IbisEngine aplicó implícitamente ---
+    # El Snapshot Guard filtra por is_latest_snapshot == True cuando se cumplen
+    # las condiciones del contrato semántico (dataset tipo snapshot + métricas
+    # de stock/inventario). Sin registrar este predicado en runtime_predicates,
+    # el frontend pierde el contexto temporal y el drill-down muestra todo el
+    # histórico en lugar del periodo correcto del gráfico.
+    # Consulta la MISMA función que IbisEngine usa para tomar su decisión,
+    # sin modificar ningún guard existente (lectura, no mutación).
+    try:
+        from app.services.snapshot_guard import should_apply_latest_snapshot_filter
+        intent_for_snapshot = getattr(plan, "main_intent", None)
+        available_columns = list(schema_profile.keys()) if schema_profile else []
+        dataset_contract = schema_profile.get("semantic_contract") if schema_profile else None
+        if intent_for_snapshot and should_apply_latest_snapshot_filter(
+            intent_for_snapshot, available_columns, dataset_contract
+        ):
+            cross_filter_context["runtime_predicates"].append({
+                "column": "is_latest_snapshot",
+                "operator": "==",
+                "value": True
+            })
+            print(
+                f"🧠 [CROSS-FILTER-CONTEXT] runtime_predicate inyectado: "
+                f"is_latest_snapshot == True"
+            )
+    except Exception as snapshot_guard_exc:
+        print(f"⚠️ [CROSS-FILTER-CONTEXT] No se pudo evaluar Snapshot Guard: {snapshot_guard_exc}")
+
     filtered_granular_df = result_payload.get("filtered_granular_df")
     if filtered_granular_df is None:
         # [FIX 2026-06-08] Fallback: si el plan no inyecta filtered_granular_df

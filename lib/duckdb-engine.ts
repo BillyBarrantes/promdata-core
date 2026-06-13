@@ -997,6 +997,9 @@ export async function crossFilter(
             const val1 = String(pred.value[0]).replace(/'/g, "''");
             const val2 = String(pred.value[1]).replace(/'/g, "''");
             condition = `"${pred.column}" BETWEEN '${val1}' AND '${val2}'`;
+          } else if (typeof pred.value === 'boolean') {
+            // Booleanos: emitir como literal SQL (true/false), no como string
+            condition = `"${pred.column}" ${op} ${pred.value}`;
           } else {
             const escapedValue = String(pred.value).replace(/'/g, "''");
             condition = `"${pred.column}" ${op} '${escapedValue}'`;
