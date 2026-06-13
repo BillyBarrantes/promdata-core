@@ -753,20 +753,11 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
         applyFilterPreview(params);
       }
 
-      // 🔍 [DIAG] Captura diagnóstica del cross_filter_context en el momento del clic
-      const resolvedCrossFilterContext = fullOpt?.cross_filter_context;
-      console.log('🔍 [DIAG echarts-chart] click context:', {
-        hasFullOpt: !!fullOpt,
-        fullOptKeys: fullOpt ? Object.keys(fullOpt).filter(k => k.includes('cross') || k.includes('filter') || k.includes('chart_base')) : [],
-        cross_filter_context: resolvedCrossFilterContext,
-        chart_base_filters: fullOpt?.chart_base_filters,
-      });
-
       const callbackPayload = {
         ...params,
         rawCategory,
         rawSecondaryCategory,
-        crossFilterContext: resolvedCrossFilterContext,
+        crossFilterContext: fullOpt?.cross_filter_context,
         eventCoordinates: { x: clientX, y: clientY }
       };
 

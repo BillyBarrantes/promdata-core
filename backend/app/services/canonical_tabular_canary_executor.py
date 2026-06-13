@@ -529,6 +529,20 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
     _MAX_PAYLOAD_BYTES = 4 * 1024 * 1024  # 4MB max para PostgREST
 
     if isinstance(candidate_df, pd.DataFrame) and not candidate_df.empty:
+        # [FIX 2026-06-13] Inyección sintética de is_latest_snapshot.
+        # El pipeline canónico construye candidate_df desde artefactos extraídos
+        # (CanonicalMaterializedBundle), NO desde DataEngine.unify_and_clean(),
+        # por lo que la columna sintética is_latest_snapshot no está presente.
+        # Si el contrato semántico lo permite, la derivamos desde el eje temporal
+        # para que el Snapshot Guard y el cross-filter del frontend funcionen.
+        if "is_latest_snapshot" not in candidate_df.columns:
+            if dataset_contract.get("snapshot_guard_allowed"):
+                time_axis = str(dataset_contract.get("time_axis") or "").strip()
+                if time_axis and time_axis in candidate_df.columns:
+                    parsed_dates = pd.to_datetime(candidate_df[time_axis], errors="coerce")
+                    if not parsed_dates.isna().all():
+                        candidate_df["is_latest_snapshot"] = parsed_dates == parsed_dates.max()
+
         snapshot_df = candidate_df
         if "is_latest_snapshot" in candidate_df.columns:
             latest_mask = candidate_df["is_latest_snapshot"] == True
