@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input"
 // Modificado en QA: ahora lee duckdbReadyAtom directamente para evitar pérdida de inyección
 const DrillDownMenuBridge = ({ onSelect, onCrossFilter }: {
   onSelect: (prompt: string) => void;
-  onCrossFilter: (filters: Record<string, string>, tableName?: string) => void;
+  onCrossFilter: (filters: Record<string, string>, tableName?: string, crossFilterContext?: any) => void;
 }) => {
   const drillDown = useAtomValue(drillDownAtom);
   const isDuckDBReady = useAtomValue(duckdbReadyAtom);
