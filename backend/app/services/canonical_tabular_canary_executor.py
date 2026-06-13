@@ -306,6 +306,7 @@ def _build_chart_option(
     result_payload: dict[str, Any],
     currency_meta: dict[str, Any],
     schema_profile: dict[str, Any],
+    dataset_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     chart_type = _normalize_chart_type(result_payload.get("chart_type"))
     ui_chart_type = normalize_visual_id(result_payload.get("chart_type"))
@@ -389,10 +390,15 @@ def _build_chart_option(
     try:
         from app.services.snapshot_guard import should_apply_latest_snapshot_filter
         intent_for_snapshot = getattr(plan, "main_intent", None)
+        # Reconstruir la lista de columnas incluyendo is_latest_snapshot
+        # (DataEngine la excluye del schema_profile por ser sintética,
+        #  pero el Snapshot Guard la necesita para tomar su decisión)
         available_columns = list(schema_profile.keys()) if schema_profile else []
-        dataset_contract = schema_profile.get("semantic_contract") if schema_profile else None
+        effective_contract = dataset_contract or {}
+        if effective_contract.get("snapshot_guard_allowed"):
+            available_columns.append("is_latest_snapshot")
         if intent_for_snapshot and should_apply_latest_snapshot_filter(
-            intent_for_snapshot, available_columns, dataset_contract
+            intent_for_snapshot, available_columns, effective_contract
         ):
             cross_filter_context["runtime_predicates"].append({
                 "column": "is_latest_snapshot",
@@ -472,6 +478,7 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 result_payload=result_payload,
                 currency_meta=currency_meta,
                 schema_profile=_safe_dict(attrs.get("schema_profile")),
+                dataset_contract=dataset_contract,
             )
             if option:
                 final_struct["chart_options"].append(option)
