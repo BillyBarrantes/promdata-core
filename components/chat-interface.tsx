@@ -1311,6 +1311,14 @@ export function ChatInterface() {
     // Leer via ref para no depender del closure
     if (isAnalyzingRef.current) return;
 
+    // 🔍 [DIAG] Verificar qué recibe handleChartDrillDown
+    console.log('🔍 [DIAG handleChartDrillDown] params received:', {
+      hasCrossFilterContext: !!params?.crossFilterContext,
+      crossFilterContext: params?.crossFilterContext,
+      hasOption: !!params?.option,
+      paramsKeys: params ? Object.keys(params).filter((k: string) => k.includes('cross') || k.includes('filter') || k.includes('option') || k.includes('Context')) : [],
+    });
+
     const rawCategory = extractRawChartCategory(params);
     if (rawCategory) {
       const rawSecondaryCategory = typeof params?.rawSecondaryCategory === 'string'
