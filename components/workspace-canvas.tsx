@@ -258,6 +258,8 @@ export function WorkspaceCanvas() {
           series: safeSeries,
           tableName: tableName,
           secondaryCategory: rawSecondaryCategory || undefined,
+          crossFilterContext: params?.crossFilterContext || undefined,
+          option: params?.option || undefined
         }
       });
     }

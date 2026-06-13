@@ -1637,6 +1637,9 @@ export function buildReactiveChartOption(
         value: toNumber(item?.value),
       }))
     );
+    if ((baseOption as any).cross_filter_context) {
+      (nextOption as any).cross_filter_context = (baseOption as any).cross_filter_context;
+    }
     return finalizeReactiveChartOption(nextOption);
   }
 
@@ -1666,6 +1669,10 @@ export function buildReactiveChartOption(
       value: toNumber((values[index] as any)?.value),
     }))
   );
+
+  if ((baseOption as any).cross_filter_context) {
+    (nextOption as any).cross_filter_context = (baseOption as any).cross_filter_context;
+  }
 
   return finalizeReactiveChartOption(nextOption);
 }
