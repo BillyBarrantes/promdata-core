@@ -22,6 +22,7 @@ from app.core.structured_logging import emit_structured_log
 from app.services.ai_response_cache import build_cache_key, get_cached_json, set_cached_json
 from app.services.metric_semantics import infer_metric_unit_from_column_name, normalize_semantic_text
 from app.services.visual_recommendation_engine import extract_prompt_visual_requests
+from app.services.direction_detector import should_split_by_flow_direction
 
 # @deprecated("Eliminado por cirugía de sesgos domain-agnostic — mayo 2026")
 # Las agrupaciones semánticas hardcodeadas generaban favoritismo hacia
@@ -198,6 +199,15 @@ class SemanticTranslator:
                 if 'value_column' in intent and isinstance(intent['value_column'], str):
                     if payload_mode == "multi" and intent['value_column'] not in available_columns:
                         intent['value_column'] = None
+
+                # [SANITIZE] Strip visual-only fields before Pydantic validation.
+                # These fields belong to chart rendering config, not semantic intents.
+                # Keeping them in the dict silently passes Pydantic init (extra=ignore)
+                # but would crash if a post-init guard (e.g. direction_guard) later
+                # tries setattr on an intent model that doesn't declare the field.
+                _VISUAL_ONLY_FIELDS = {"barmode", "chart_type", "chart_orientation"}
+                for _vf in _VISUAL_ONLY_FIELDS:
+                    intent.pop(_vf, None)
 
         if 'filters' in item and isinstance(item['filters'], list):
             item['filters'] = [
@@ -1002,6 +1012,13 @@ class SemanticTranslator:
                 value = clean_values
 
             operator = filter_row.get("operator") or "=="
+            # [METADATA GOVERNANCE] Dimension columns accept partial text matches.
+            # Users naturally write "marketing" when real data stores "CC-Marketing".
+            # Promoting == to ilike ensures flexibility without breaking exact-match
+            # semantics for identifiers (codes, IDs) or metrics (numeric values).
+            role = schema_profile.get(resolved_column, {}).get("role")
+            if operator in ("==", "=") and role == "dimension":
+                operator = "ilike"
             try:
                 validated = DataFilter.model_validate(
                     {
@@ -1218,6 +1235,7 @@ class SemanticTranslator:
                     metric_polarity=MetricPolarity.NEUTRAL,
                 )
             ]
+            return SemanticTranslator._apply_direction_guard_to_distribution_plans(plans, schema_profile)
 
         if intent == "descriptive":
             dimension_column = SemanticTranslator._resolve_contract_column(
@@ -2199,6 +2217,92 @@ class SemanticTranslator:
         return [plan]
 
     @staticmethod
+    def _apply_direction_guard_to_distribution_plans(
+        plans: list[AnalysisPlan],
+        schema_profile: dict | None,
+    ) -> list[AnalysisPlan]:
+        """
+        Post-processor: injects direction column into DistributionIntent (via
+        group_by) and TimeTrendIntent (via split_dimension) when a direction
+        column (e.g., Ingreso/Egreso) is detected with high confidence.
+        """
+        if not plans or not schema_profile:
+            return plans
+
+        decision = should_split_by_flow_direction(schema_profile)
+        if not decision["should_split"]:
+            return plans
+
+        direction_column = decision["column_name"]
+        for plan in plans:
+            main_intent = getattr(plan, "main_intent", None)
+            if not main_intent:
+                continue
+            intent_type = getattr(main_intent, "type", None)
+
+            # ── DistributionIntent & DescriptiveIntent: inject into group_by for stacked bars ──
+            if intent_type in {"distribution", "descriptive"}:
+                current_dimension = getattr(main_intent, "dimension", None)
+                if current_dimension == direction_column:
+                    continue
+                current_group_by = list(getattr(main_intent, "group_by", None) or [])
+                if direction_column not in current_group_by:
+                    current_group_by.append(direction_column)
+                    setattr(main_intent, "group_by", current_group_by)
+                    if "barmode" in main_intent.model_fields:
+                        main_intent.barmode = "stacked"
+                    emit_structured_log(
+                        "direction_guard_injected_group_by",
+                        plan_type="distribution",
+                        dimension=current_dimension,
+                        group_by=direction_column,
+                        confidence=decision["confidence"],
+                        rationale=decision["rationale"],
+                    )
+
+            # ── TimeTrendIntent: inject split_dimension to separate series ──
+            elif intent_type == "trend":
+                existing_split = getattr(main_intent, "split_dimension", None)
+                # Only inject if direction column is NOT already the split
+                if existing_split == direction_column:
+                    continue
+                # Override: direction is more important than any existing split
+                setattr(main_intent, "split_dimension", direction_column)
+                setattr(main_intent, "split_limit", 2)
+                setattr(main_intent, "top_n_aggregation_mode", "split")
+                emit_structured_log(
+                    "direction_guard_injected_trend_split",
+                    plan_type="trend",
+                    split_dimension=direction_column,
+                    replaced_split=existing_split,
+                    confidence=decision["confidence"],
+                    rationale=decision["rationale"],
+                )
+        return plans
+
+    @staticmethod
+    def _finalize_plans(
+        plans: list[AnalysisPlan],
+        schema_profile: dict | None,
+    ) -> list[AnalysisPlan]:
+        """
+        Central architectural hook — applied to ALL plan returns in translate().
+        Guarantees that every analysis path (SIMPLE, COMPLEJO, cache, bundles,
+        LLM primary, LLM fallback) inherits the direction guard automatically.
+        """
+        decision = should_split_by_flow_direction(schema_profile or {})
+        emit_structured_log(
+            "direction_guard_decision",
+            level="critical",
+            should_split=decision["should_split"],
+            column_name=decision.get("column_name"),
+            confidence=decision.get("confidence"),
+            rationale=decision.get("rationale"),
+            schema_keys=list((schema_profile or {}).keys())[:15],
+        )
+        return SemanticTranslator._apply_direction_guard_to_distribution_plans(plans, schema_profile)
+
+    @staticmethod
     def _build_explicit_distribution_plan(
         prompt: str,
         columns: list[str],
@@ -2337,7 +2441,8 @@ class SemanticTranslator:
             dimension=dimension_column,
             limit=limit,
         )
-        return [plan]
+        plans = [plan]
+        return SemanticTranslator._apply_direction_guard_to_distribution_plans(plans, schema_profile)
 
     @staticmethod
     def _build_deterministic_visual_plan(
@@ -2585,7 +2690,7 @@ class SemanticTranslator:
                     semantic_contract=router_decision.get("semantic_contract"),
                     plan_count=len(fast_path_plans),
                 )
-                return fast_path_plans
+                return SemanticTranslator._finalize_plans(fast_path_plans, schema_profile)
             force_deep_planner = True
             emit_structured_log(
                 "semantic_translator_simple_contract_delegated",
@@ -2610,7 +2715,7 @@ class SemanticTranslator:
                 dataset_contract=dataset_contract,
             )
             if dimension_bundle_plans:
-                return dimension_bundle_plans
+                return SemanticTranslator._finalize_plans(dimension_bundle_plans, schema_profile)
 
             macro_bundle_plans = SemanticTranslator._build_macro_analysis_bundle(
                 prompt,
@@ -2619,7 +2724,7 @@ class SemanticTranslator:
                 dataset_contract=dataset_contract,
             )
             if macro_bundle_plans:
-                return macro_bundle_plans
+                return SemanticTranslator._finalize_plans(macro_bundle_plans, schema_profile)
 
         translator_cache_key = build_cache_key(
             "semantic_translator",
@@ -2658,7 +2763,7 @@ class SemanticTranslator:
                     cache_key_prefix=translator_cache_key[:16],
                 )
                 print(f"⚡ [SEMANTIC TRANSLATOR CACHE] Hit ({len(restored_plans)} planes)")
-                return restored_plans
+                return SemanticTranslator._finalize_plans(restored_plans, schema_profile)
             except Exception as cache_restore_error:
                 emit_structured_log(
                     "semantic_translator_cache_restore_error",
@@ -2877,7 +2982,7 @@ class SemanticTranslator:
                 settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
             )
             print(f"🧠 [SEMANTIC KERNEL] {len(plans)} plan(es) validado(s)")
-            return plans
+            return SemanticTranslator._finalize_plans(plans, schema_profile)
             
         except Exception as e:
             if SemanticTranslator._is_recoverable_translator_model_error(e):
@@ -2915,7 +3020,7 @@ class SemanticTranslator:
                             reason_codes=router_decision.get("reason_codes"),
                             fallback_priority="quota_first",
                         )
-                        return router_contract_plans
+                        return SemanticTranslator._finalize_plans(router_contract_plans, schema_profile)
 
                 if fallback_model_name:
                     try:
@@ -2938,7 +3043,7 @@ class SemanticTranslator:
                                 fallback_model=fallback_model_name,
                                 plan_count=len(fallback_plans),
                             )
-                            return fallback_plans
+                            return SemanticTranslator._finalize_plans(fallback_plans, schema_profile)
                     except Exception as fallback_error:
                         emit_structured_log(
                             "semantic_translator_model_fallback_error",
@@ -2970,7 +3075,7 @@ class SemanticTranslator:
                         plan_count=len(router_contract_plans),
                         reason_codes=router_decision.get("reason_codes"),
                     )
-                    return router_contract_plans
+                    return SemanticTranslator._finalize_plans(router_contract_plans, schema_profile)
 
             print(f"⚠️ [TRANSLATOR ERROR]: {e}")
             return None
@@ -3154,7 +3259,9 @@ class SemanticTranslator:
         # Combinar: frases entrecomilladas primero, luego tokens
         search_terms = [(phrase, True) for phrase in quoted_phrases] + [(token, False) for token in clean_tokens]
         
-        matched_columns = set()  # Evitar duplicados por columna
+        # Track (column, value) pairs to avoid exact duplicates while
+        # allowing multiple distinct values on the same column.
+        matched_pairs: set[tuple[str, str]] = set()
         
         # 🧠 [FASE 4B] Dynamic Cardinality Indexer
         # Pre-procesamiento Optimizado: Convertir listas a SETS para búsqueda O(1)
@@ -3178,8 +3285,10 @@ class SemanticTranslator:
                 continue
                 
             for col_name, val_map in columns_sets.items():
-                if col_name in matched_columns:
-                    continue  # Ya matcheamos esta columna
+                # [V2] Check for (column, value) duplicate — allows multiple
+                # distinct values on the same column (e.g., "egresos" + "ingresos")
+                if (col_name, term_upper) in matched_pairs:
+                    continue
                 
                 # 🚀 Fase 1: Búsqueda O(1) en Hash Map — coincidencia exacta
                 if term_upper in val_map:
@@ -3192,7 +3301,7 @@ class SemanticTranslator:
                             value=str(original_value)
                         )
                     )
-                    matched_columns.add(col_name)
+                    matched_pairs.add((col_name, term_upper))
                     print(f"🎯 [LITERAL FILTER] Match exacto: '{term}' → {col_name} == '{original_value}'")
                     break  # Un token solo puede matchear una columna
 
@@ -3228,7 +3337,7 @@ class SemanticTranslator:
                                 value=str(best_match)
                             )
                         )
-                        matched_columns.add(col_name)
+                        matched_pairs.add((col_name, best_match.upper()))
                         print(
                             f"🎯 [LITERAL FILTER] Match fuzzy-form: '{term}' → "
                             f"{col_name} == '{best_match}' (dif={best_diff} chars)"
@@ -3237,6 +3346,32 @@ class SemanticTranslator:
         
         if detected_filters:
             print(f"🎯 [LITERAL FILTER] {len(detected_filters)} filtro(s) detectado(s)")
+        
+        # [FIX] Collapse multiple EQUALS on the same column into a single IN_LIST.
+        # When the user mentions multiple values for the same column (e.g.,
+        # "egresos e ingresos"), applying individual EQUALS creates a contradiction.
+        # An IN_LIST with all values preserves user intent without over-filtering.
+        collapsed: List[DataFilter] = []
+        col_values: dict[str, set[str]] = {}
+        for f in detected_filters:
+            op = str(getattr(f.operator, "value", f.operator) or "").strip()
+            if op == "==":
+                col = str(f.column or "")
+                val = str(f.value or "")
+                col_values.setdefault(col, set()).add(val)
+            else:
+                collapsed.append(f)
+        for col, vals in col_values.items():
+            if len(vals) == 1:
+                collapsed.append(DataFilter(
+                    column=col, operator=FilterOperator.EQUALS, value=list(vals)[0]
+                ))
+            else:
+                collapsed.append(DataFilter(
+                    column=col, operator=FilterOperator.IN_LIST, value=sorted(vals)
+                ))
+                print(f"🔀 [LITERAL FILTER] Collapsed {len(vals)} values → {col} IN {sorted(vals)}")
+        detected_filters = collapsed
         
         return detected_filters
 

@@ -253,7 +253,7 @@ class IbisEngine:
         else:
             coerced_values = IbisEngine._coerce_filter_scalar(col_type, val)
 
-        if operator in {"in", "not_in"}:
+        if operator in {"in", "not_in", "in_list"}:
             values = coerced_values if isinstance(coerced_values, list) else [coerced_values]
             if is_string_col:
                 expr = col.upper().isin([str(item).upper() for item in values])
@@ -270,7 +270,8 @@ class IbisEngine:
             # [V2] Operadores de texto case-insensitive
             if operator in {"contains", "like", "ilike"}:
                 # ilike y like se tratan como contains case-insensitive (DuckDB lo ejecuta nativamente)
-                return col.upper().contains(val.upper())
+                clean_val = val.strip("%") if isinstance(val, str) else val
+                return col.upper().contains(clean_val.upper())
             if operator == "starts_with":
                 return col.upper().startswith(val.upper())
             if operator == "ends_with":

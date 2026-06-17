@@ -20,7 +20,9 @@ init_sentry()
 celery_app = Celery(
     "tasks",
     broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND
+    backend=settings.CELERY_RESULT_BACKEND,
+    timezone='UTC',
+    enable_utc=True,
 )
 
 # ⚠️ NO AGREGAR `socket_keepalive_options` (TCP_KEEPIDLE/INTVL/CNT) aquí.
@@ -71,6 +73,8 @@ celery_app.conf.update(
     # de tareas completadas. NO afecta a la API: el frontend consulta el
     # status de una tarea en los primeros segundos tras el submit.
     result_expires=24 * 3600,
+    timezone='UTC',
+    enable_utc=True,
 )
 
 

@@ -1196,6 +1196,63 @@ async function resolveFilterCondition(
       rememberResolvedCondition(conditionCacheKey, resolvedCondition);
       return resolvedCondition;
     }
+    // [GUARD] Columna existe pero count=0: preservar filtro exacto para
+    // evitar que L2 enlace el valor contra otra columna incorrecta.
+    // Sin esto, un filtro "tipo_movimiento='Ingreso'" que no matchee
+    // filas caería a L2 donde 'Ingreso' podría matchear en otra columna
+    // (ej. centro_costo) produciendo mezcla de dimensiones heterogéneas.
+    console.warn(
+      `[DuckDB-Engine] L1 columna '${dimension}' existe pero 0 filas para '${value}'. ` +
+      `Preservando filtro exacto para evitar caída L2 → columna incorrecta.`
+    );
+    const resolvedCondition = `"${dimension}" = '${escapedValue}'`;
+    rememberResolvedCondition(conditionCacheKey, resolvedCondition);
+    return resolvedCondition;
+  }
+
+  // ─── FASE A: NORMALIZACIÓN DE NOMBRE (Display → Físico) ──────────────
+  // Si L1 falló (columna no encontrada por nombre exacto), la clave del
+  // filtro puede venir con nombre display (ej. "Tipo Movimiento") mientras
+  // DuckDB espera el nombre físico (ej. "tipo_movimiento"). Normalizamos
+  // ambos a lowercase+underscore para resolver la discrepancia.
+  {
+    const normalizedKey = dimension.toLowerCase().trim()
+      .replace(/[\s\-\.]+/g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+    let resolvedCol: string | null = null;
+    for (const col of columns) {
+      const colName = String(col.column_name);
+      const normalizedCol = colName.toLowerCase().trim()
+        .replace(/[\s\-\.]+/g, '_')
+        .replace(/[^a-z0-9_]/g, '');
+      if (normalizedCol === normalizedKey) {
+        resolvedCol = colName;
+        break;
+      }
+    }
+    if (resolvedCol) {
+      console.warn(
+        `[DuckDB-Engine] Normalizando filtro dinámico: '${dimension}' → '${resolvedCol}'`
+      );
+      const result = await query(
+        `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE "${resolvedCol}" = '${escapedValue}'`, true
+      );
+      if (result.length > 0 && Number(result[0].cnt) > 0) {
+        console.log(`🦆 [CROSS-FILTER] Fase A columna normalizada: "${resolvedCol}" ✅`);
+        const resolvedCondition = `"${resolvedCol}" = '${escapedValue}'`;
+        rememberResolvedCondition(conditionCacheKey, resolvedCondition);
+        return resolvedCondition;
+      }
+      // Columna normalizada encontrada pero count=0 — preservar filtro
+      console.warn(
+        `[DuckDB-Engine] Fase A: columna '${resolvedCol}' (desde '${dimension}') ` +
+        `tiene 0 filas para '${value}'. Preservando filtro exacto.`
+      );
+      const resolvedCondition = `"${resolvedCol}" = '${escapedValue}'`;
+      rememberResolvedCondition(conditionCacheKey, resolvedCondition);
+      return resolvedCondition;
+    }
+    console.log(`🦆 [CROSS-FILTER] Fase A sin columna normalizada para: "${dimension}"`);
   }
 
   // ─── L2: COINCIDENCIA EXACTA EN COLUMNAS TEXTO ───────────────────────

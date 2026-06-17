@@ -158,7 +158,7 @@ def build_canonical_tabular_production_execution(
                             intent_filters.append(lf)
                             print(
                                 f"🔄 [LITERAL FILTER → INJECT] "
-                                f"Nuevo filtro: {lf.column} == '{lf.value}'"
+                                f"Nuevo filtro: {lf.column} {getattr(lf.operator, 'value', lf.operator)} {lf.value}"
                             )
                         else:
                             # Columna ya filtrada por Gemini → verificar compatibilidad
@@ -172,7 +172,7 @@ def build_canonical_tabular_production_execution(
                                 print(
                                     f"🔄 [LITERAL FILTER → REPLACE] "
                                     f"Operador '{gemini_op}' no soportado. "
-                                    f"Reemplazado: {lf.column} == '{lf.value}'"
+                                    f"Reemplazado: {lf.column} {getattr(lf.operator, 'value', lf.operator)} {lf.value}"
                                 )
                             elif gemini_op in {"in", "not_in"} and isinstance(gemini_match.value, list):
                                 # [V4] GUARD: Filtro multi-valor (IN/NOT_IN con lista) del LLM
@@ -188,7 +188,7 @@ def build_canonical_tabular_production_execution(
                                 intent_filters.append(lf)
                                 print(
                                     f"🔄 [LITERAL FILTER → REPLACE] "
-                                    f"Valor corregido: '{gemini_match.value}' → '{lf.value}' "
+                                    f"Valor corregido: '{gemini_match.value}' → {lf.value} "
                                     f"en columna '{lf.column}'"
                                 )
                     plan.main_intent.filters = intent_filters

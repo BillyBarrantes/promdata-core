@@ -172,6 +172,14 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                                     dataContext.secondaryCategory !== dataContext.category
                                                 ) {
                                                     filters['global_cross_filter'] = String(dataContext.secondaryCategory);
+                                                } else if (
+                                                    dataContext.series &&
+                                                    dataContext.series !== 'undefined' &&
+                                                    dataContext.series !== 'valor' &&
+                                                    dataContext.series !== String(dataContext.category)
+                                                ) {
+                                                    filters['global_cross_filter'] = String(dataContext.series);
+                                                    console.log("🎯 [Cross-Filter UI] Propagando serie split detectada:", dataContext.series);
                                                 }
 
                                                 // [FIX 2026-06-08] Preview los filtros base del chart original

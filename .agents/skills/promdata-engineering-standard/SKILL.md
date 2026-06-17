@@ -1,281 +1,148 @@
 ---
-name: promdata-fortress-standard
-description: >
-  Protocolo de ingeniería blindado para PromData. Garantiza que cada cambio sea a nivel
-  de ingeniería (no parches), protege contra regresiones, y prepara el sistema para
-  escalar a múltiples usuarios con datos heterogéneos.
+name: promdata-engineering-standard
+description: Standards and protocols for PromData development, focusing on data integrity, scalability, and visual consistency.
 ---
 
-# PromData Fortress Standard
-**Version:** 3.0 (Fortress Edition)  
-**Status:** Active  
-**Context:** Production-Grade Multi-Tenant Analytics Platform (Python/FastAPI + Next.js)
-
-## 🔑 PRINCIPIO FUNDAMENTAL: AUTORIDAD DEL DESARROLLADOR
-
-Todas las reglas de este SKILL protegen contra cambios **accidentales del agente**.
-El desarrollador humano tiene **autoridad absoluta** para ordenar cualquier cambio,
-incluyendo modificar, reemplazar o eliminar código protegido, cuando lo solicita explícitamente.
-
-**Jerarquía de Autoridad:**
-1. **Orden explícita del usuario** → Se ejecuta (el SKILL se flexibiliza)
-2. **Reglas del SKILL** → El agente las sigue cuando no hay orden contraria
-3. **Criterio del agente** → Se subordina siempre a los dos anteriores
-
----
+# PromData Engineering Standard
+**Version:** 2.0 (Titanium Guard)
+**Status:** Active
+**Context:** Production-Grade Python/Next.js Architecture
 
 ## 🚨 PROTOCOLO DE ACTIVACIÓN
-
-Este Skill se activa **automáticamente** cuando el agente necesita modificar:
-- Backend: `/backend/app/services/`, `/backend/app/core/`, `/backend/app/api/`
-- Frontend: `/components/`, `/app/`, `/lib/`, `/hooks/`
-- Infraestructura: `Dockerfile`, `docker-compose.yml`, `requirements.txt`, `package.json`
-- Cualquier archivo que contenga lógica de negocio o procesamiento de datos
+Este Skill se activa automáticamente cuando el usuario solicita cambios en:
+- Lógica de Backend (`/app/services`, `/app/core`)
+- Componentes de Visualización (`/components/charts`)
+- Migración de Datos (Pandas -> Ibis)
 
 ---
 
-## ⚡ MODO OVERRIDE (Solo bajo orden explícita)
-
-Si el usuario inicia su solicitud con **`[OVERRIDE]`**:
-1. Suspender las validaciones de este Skill.
-2. Ejecutar la orden literalmente.
-3. Marcar todo código generado con `# TODO: REFACTOR (Technical Debt from Override)`.
-4. Advertir al usuario qué reglas se están violando.
-
-**Sin `[OVERRIDE]`, TODAS las reglas son obligatorias sin excepción.**
+## ⚡ MODO DIOS (Emergency Override)
+Si el usuario inicia su solicitud con **`[OVERRIDE_PROTOCOL]`**:
+1.  **Suspender** todas las validaciones de este Skill.
+2.  Ejecutar la orden literalmente (útil para Prototipado Rápido o Hotfixes).
+3.  **Advertencia:** El agente debe agregar el comentario `# TODO: REFACTOR (Technical Debt)` en el código generado.
 
 ---
 
-## 🏛️ MÓDULO 1: THE FORTRESS (Protección Anti-Regresión Absoluta)
+## 🏛️ MÓDULO 1: THE GUARDIAN (Integridad & Anti-Regresión)
+*Objetivo: Proteger el Core de PromData de "Mejoras Destructivas".*
 
-*Objetivo: Ningún cambio puede destruir, degradar ni alterar funcionalidad existente sin orden explícita.*
+### 1.1 Ley de Inmutabilidad Funcional
+Antes de modificar una función existente en `ibis_engine.py` o `data_engine.py`:
+1.  **Check de Referencias:** Busca en todo el proyecto quién usa esta función.
+2.  **Si hay dependencias:** NO cambies el `return type` ni los argumentos obligatorios. Crea un `wrapper` o un nuevo argumento opcional.
+3.  **Deprecation Protocol:** Si una función ya no sirve, **NO LA BORRES**. Márcala con el decorador `@deprecated("Usar nueva_funcion() en su lugar")`. Solo el usuario humano puede borrar código.
 
-### 1.1 Ley de Inmutabilidad del Core
+### 1.2 Ley del "ID Shield" (Anti-Float)
+Los identificadores (SKU, DNI, RUC, Codigo Almacén) son **Etiquetas**, NO números.
+- **Prohibido:** Permitir inferencia de tipos que convierta "0130" en `130.0`.
+- **Obligatorio:** Forzar `dtype=str` o casting explícito `str().zfill()`.
 
-Antes de modificar **cualquier función existente**:
-
-1. **Auditoría de Impacto:**
-   - Buscar en TODO el proyecto quién invoca esta función (grep de nombre + alias).
-   - Identificar los contratos de entrada (argumentos) y salida (return type/shape).
-   
-2. **Prohibición de Cambio Destructivo:**
-   - **PROHIBIDO** cambiar el `return type`, la estructura del return, o los argumentos obligatorios.
-   - **PROHIBIDO** eliminar parámetros existentes.
-   - Si se necesita nueva funcionalidad: agregar **argumentos opcionales** con valores por defecto.
-   - Si la firma debe cambiar: crear una **función nueva** y marcar la anterior con `# @deprecated`.
-
-3. **Protocolo de Deprecación:**
-   - Las funciones obsoletas se marcan con `# @deprecated("Usar nueva_funcion()")`.
-   - **NUNCA** borrar código — solo el usuario humano puede eliminar código.
-
-### 1.2 Ley de No-Eliminación (Zero Deletion Policy)
-
-- **PROHIBIDO** eliminar archivos, clases, funciones, imports o bloques de lógica existentes.
-- **PROHIBIDO** reemplazar implementaciones completas (rewrite) sin orden explícita del usuario.
-- **PROHIBIDO** hacer refactoring masivo que mueva lógica entre archivos sin aprobación.
-- Si algo "ya no sirve", agregar el comentario `# DEPRECATED` pero **no borrar**.
-
-### 1.3 Ley de Preservación de Guards y Shields
-
-Los mecanismos de protección existentes son **INTOCABLES** salvo orden explícita:
-- `ID Shield` (Anti-Float para identificadores)
-- `Text Guard` (Preservación de texto vs números)
-- `Mixed Content Guard` (Detección de contenido mixto)
-- `Date Guard` (Protección contra falsos positivos temporales)
-- `Entropy Sanitization` (Degradación de columnas de baja entropía)
-- `Snapshot Logic` (Prevención de sumas ciegas en inventarios)
-
-**Regla:** Si el agente necesita modificar un Guard/Shield, debe:
-1. Explicar por qué el guard actual falla.
-2. Mostrar un caso de prueba donde falla.
-3. Proponer la mejora **como extensión**, no como reemplazo.
-
-### 1.4 Ley de Verificación Pre-Commit
-
-Antes de presentar cambios como "listos":
-1. Verificar que los imports existentes siguen funcionando.
-2. Verificar que las funciones modificadas mantienen compatibilidad de firma.
-3. Verificar que no se eliminó ningún bloque de código.
+### 1.3 Ley del "Snapshot Isolation" (Anti-Suma Ciega)
+En logística, el stock es una foto (Snapshot), no un flujo.
+- **Regla:** Nunca sumar columnas de `stock` o `balance` a través del tiempo.
+- **Validación:** Si detectas una agregación (`SUM`) sobre inventario, verifica que exista un filtro `date == MAX(date)`.
 
 ---
 
-## 🏗️ MÓDULO 2: THE ENGINEER (Estándar de Ingeniería, No Parches)
+## 🏗️ MÓDULO 2: THE SCALABILITY ARCHITECT (Big Data 12 Pillars)
+*Objetivo: Preparar el sistema para Gigabytes de datos.*
 
-*Objetivo: Cada cambio debe ser una solución de ingeniería escalable, no un hotfix temporal.*
+### 2.1 Lazy Evaluation First
+- **Preferencia:** Utilizar expresiones de Ibis/DuckDB (Lazy) sobre DataFrames de Pandas (Eager) para operaciones de transformación pesada.
+- **Límite:** Si la operación implica >100,000 filas, Pandas está prohibido en el hilo principal.
 
-### 2.1 Ley Anti-Parche (Engineering-First)
+### 2.2 Analítica Diagnóstica (El "Por Qué")
+- **Regla:** Todo KPI numérico debe ir acompañado de un desglose.
+- **Ejemplo:** Si calculas "Ventas Totales", el código debe estar preparado para responder "¿Qué región bajó más?" (Drill-down).
 
-Todo cambio debe cumplir **TODOS** estos criterios:
+---
 
-| Criterio | Pregunta de Validación | Ejemplo Prohibido |
-|----------|----------------------|-------------------|
-| **Generalizable** | ¿Funciona para CUALQUIER archivo de CUALQUIER usuario? | `if col == 'ventas': ...` |
-| **Data-Driven** | ¿La decisión se basa en DATA, no en nombres? | `if 'stock' in col_name: ...` |
-| **Escalable** | ¿Funciona con 10 filas Y con 10 millones? | Usar `.apply()` con lambda en loops |
-| **Resiliente** | ¿Qué pasa si la data viene vacía/corrupta? | No manejar `df.empty` o `NaN` |
-| **Documentado** | ¿El código explica el POR QUÉ, no solo el QUÉ? | Función sin docstring ni comentarios |
+## 📊 MÓDULO 3: THE VISUAL STRATEGIST (El Arquitecto de la Información)
+*Objetivo: La visualización debe servir a la intención del dato, no a un dogma estético.*
 
-**Si un cambio no cumple los 5 criterios, es un parche y debe ser rechazado.**
+### 3.1 Matriz de Decisión Gráfica (NUEVO ESTÁNDAR)
+- **Evolución Temporal:** → SIEMPRE Línea (Tendencias).
+- **Comparación de Magnitudes:** → Preferir Barras (Ranking).
+- **Composición / Parte-Todo:**
+    - **Treemap:** Para jerarquías complejas o > 5 categorías.
+    - **Pie Chart (Donut):** PERMITIDO SOLO SI:
+        - El usuario lo solicita explícitamente.
+        - O hay menos de 5 categorías principales. Nota: Si hay más datos, usar agrupación "Otros".
+- **Flujo Financiero / P&L:** → OBLIGATORIO Waterfall (Ingresos vs Egresos).
+- **Correlación / Densidad:** → Usar Scatter Plot o Heatmap.
 
-### 2.1.1 Cláusula de Repotenciación Controlada
+### 3.2 Regla de Soberanía del Usuario
+Si el usuario solicita un tipo de gráfico específico (ej: "Quiero un Pie Chart"), **OBEDECE inmediatamente**, ignorando las preferencias del sistema. Tu rol es aconsejar, no bloquear.
 
-Se **PERMITE** modificar código estable y actualmente funcional **solo si** la repotenciación cumple todas estas condiciones:
+---
 
-1. **Objetivo estructural:** La mejora resuelve un problema real de latencia, escalabilidad, resiliencia, multi-tenant, observabilidad o mantenibilidad del core.
-2. **Contrato intacto:** Se preservan firmas, payloads, retornos, side-effects esperados y compatibilidad con los consumidores actuales.
-3. **Extensión, no reemplazo:** La mejora se implementa como extensión, fast-path, guard adicional, caché, router, feature flag o fallback compatible. **No** como rewrite total.
-4. **Evidencia previa:** Debe existir señal objetiva del cuello o riesgo: logs, métricas, trazas, profiling, errores repetibles o evidencia funcional concreta.
-5. **Alcance mínimo:** Se toca el módulo correcto y la menor superficie posible. Está **prohibido** modificar rutas sanas no relacionadas solo por simetría o limpieza cosmética.
-6. **Validación proporcional:** Debe verificarse como mínimo compilación/imports, smoke test, compatibilidad del flujo anterior y evidencia de que no hubo regresión funcional.
+## ⚡ MÓDULO 4: THE PERFORMANCE ENGINEER (Python Best Practices)
+*Objetivo: Código Limpio y Profesional.*
 
-**Regla operativa:** Si una optimización macro exige tocar una pieza sana del sistema para evitar duplicación, eliminar rutas lentas o preservar consistencia arquitectónica, el agente **debe hacerlo** bajo esta cláusula.
-
-**Prohibiciones explícitas bajo esta cláusula:**
-- No usarla para justificar refactors amplios sin evidencia.
-- No usarla para sustituir Guards/Shields existentes en vez de extenderlos.
-- No usarla para cambiar comportamiento de runtime no relacionado con el cuello diagnosticado.
-- No usarla para introducir deuda técnica silenciosa o atajos hardcodeados.
-
-**Estándar de decisión:** Entre:
-- duplicar lógica para “no tocar lo que funciona”, o
-- mejorar el módulo correcto manteniendo compatibilidad,
-
-el agente debe elegir la **segunda opción**.
-
-### 2.2 Ley del Código Hardcodeado (Zero Hardcode)
-
-- **PROHIBIDO** hardcodear nombres de columnas, valores, IDs de tenant, o rutas.
-- **PROHIBIDO** usar `if col_name == 'precio': ...` — siempre usar detección por comportamiento de datos (cardinality, dtype, statistical properties).
-- **PROHIBIDO** hardcodear credenciales, URLs o configuraciones en el código fuente.
-- Toda configuración variable va en `.env` o en constantes con nombre descriptivo.
-
-### 2.3 Ley de Tipado Estricto
-
-Todo código nuevo **DEBE** incluir Type Hints:
+### 4.1 Tipado Estricto (Type Hinting)
+Todo código nuevo debe incluir Type Hints para entradas y salidas.
 ```python
-# ✅ CORRECTO
+# Correcto
 def calcular_kpi(data: pd.DataFrame, target: str) -> float: ...
-def classify_column(series: pd.Series) -> dict[str, str]: ...
-
-# ❌ PROHIBIDO
-def calcular_kpi(data, target): ...
 ```
 
-### 2.4 Ley de Lazy Evaluation (Rendimiento)
+## 🛡️ MÓDULO 6: ZERO COLLATERAL DAMAGE (Edición Quirúrgica y Anti-Amnesia)
+*Objetivo: Proteger el código funcional existente de alteraciones no solicitadas o reescrituras perezosas.*
 
-- Si la operación toca >100,000 filas, Pandas en el hilo principal está **PROHIBIDO**.
-- Preferir Ibis/DuckDB (Lazy) para transformaciones pesadas.
-- Evitar `.iterrows()`, `.apply()` con lambda, y loops sobre DataFrames.
-- Preferir operaciones vectorizadas.
+### 6.1 Principio de Aislamiento Estricto
+- **Regla de Oro:** Si el usuario solicita modificar o agregar la "Funcionalidad A" en un archivo, está **ESTRICTAMENTE PROHIBIDO** alterar, refactorizar, mover o borrar la "Funcionalidad B" que vive en ese mismo archivo, a menos que se solicite explícitamente.
+- **Acción:** Antes de guardar un cambio, haz un auto-check: *"¿Este cambio rompe o altera la lógica de los imports, estados o componentes hermanos?"* Si la respuesta es sí, aborta y replantea usando React Portals o abstracciones.
 
-### 2.5 Ley de Manejo de Errores
+### 6.2 Prohibición de "Lazy Coding" (Código Perezoso)
+- Los LLMs tienden a omitir código funcional existente para ahorrar tokens al mostrar un archivo (ej. usar comentarios como `// ... resto del código anterior ...`).
+- **Regla:** Al modificar un componente complejo (como `app/dashboard/page.tsx`), debes asegurarte de que el código generado mantenga **intacta** toda la lógica previa de importaciones, hooks, contextos y providers. Nunca asumas que el usuario unirá los fragmentos correctamente si tú omites las partes vitales.
 
-- **PROHIBIDO** usar `except: pass` o `except Exception: continue` sin logging.
-- Todo error debe ser capturado con contexto: qué columna, qué operación, qué tipo de dato.
-- Los errores deben ser graceful: nunca crashear, siempre retornar un estado seguro.
-
----
-
-## 📊 MÓDULO 3: THE STRATEGIST (Visual & Analítico)
-
-*Objetivo: Gráficos empresariales profesionales y análisis correcto.*
-
-### 3.1 Matriz de Decisión Visual
-
-El agente debe sugerir la alternativa profesional:
-- **Evolución Temporal** → Gráfico de Líneas o Área (**nunca** barras o pie para tiempo).
-- **Comparación de Magnitudes** → Barras Horizontales.
-- **Composición / Partes de un Todo** → Donut (máximo 6 categorías, agrupar el resto en "Otros").
-- **Flujo Financiero** → Cascada (Waterfall).
-- **Correlación** → Scatter Plot.
-
-### 3.2 Reglas de KPI
-
-- Todo KPI numérico debe poder responder "¿por qué?" (drill-down).
-- Los porcentajes se muestran como `%`, las monedas con su símbolo detectado.
-- Los números grandes usan formato legible: `1,250,000` no `1250000`.
-
-### 3.3 Ley del ID Shield Visual
-
-- En gráficos: los IDs y códigos son **ejes/etiquetas**, nunca valores a graficar.
-- Si una columna tipo `dimension` aparece en un eje de valores, el agente debe rechazarlo.
+### 6.3 Las "Bóvedas Intocables" (Core Inviolable)
+Cualquier optimización UI/UX debe construirse **alrededor** de estos motores, nunca a través de ellos. Bajo ninguna circunstancia puedes alterar la mecánica de:
+1.  **Motor DuckDB-Wasm:** (Inicialización, Workers, persistencia en memoria).
+2.  **Transporte Apache Arrow:** (Serialización IPC y deserialización en cliente).
+3.  **React Grid Layout:** (Mecánicas de Drag & Drop, ResizeObserver, persistencia de coordenadas `x,y,w,h`).
+Si una nueva mejora interfiere con las Bóvedas Intocables, debes detenerte, advertir al usuario, y proponer una solución arquitectónica que las evada (ej. `createPortal`, Z-index absolutos, contextos separados).
 
 ---
 
-## 🔒 MÓDULO 4: THE SENTINEL (Integridad de Datos Multi-Tenant)
+## 🏗️ MÓDULO 7: THE ENTERPRISE ARCHITECT (Cero Parches y Deuda Técnica)
+*Objetivo: Construir software que dure 10 años, no 10 días.*
 
-*Objetivo: Preparar para múltiples usuarios con datos completamente diferentes.*
+### 7.1 Prohibición de "Hack/Band-Aid Coding"
+- Está **ESTRICTAMENTE PROHIBIDO** usar parches temporales para resolver problemas arquitectónicos.
+- **Evitar a toda costa:** 
+  - `!important` en CSS para forzar estilos.
+  - `setTimeout` mágicos para esperar que algo renderice (usar useEffect o callbacks reales).
+  - Anidamiento excesivo de `divs` solo para alinear algo.
+  - `any` en TypeScript (usar interfaces estrictas).
+- **Acción:** Si la solución requiere un "parche feo", detente. Explícale al usuario que hay un error de arquitectura subyacente y propón la refactorización profunda (Ej: usar React Portals en lugar de pelear con el z-index).
 
-### 4.1 Ley de Schema-Agnostic Absoluto
-
-- El sistema **NUNCA** puede asumir estructura de datos.
-- Toda decisión debe basarse en: `dtype`, `cardinality`, `cardinality_ratio`, propiedades estadísticas.
-- Los nombres de columnas son **decorativos** — la clasificación se hace por CONTENIDO.
-
-### 4.2 Ley de Aislamiento de Tenant
-
-- Los datos de un usuario NUNCA pueden filtrarse a otro.
-- Cada operación debe validar `tenant_id` / `report_id`.
-- Las rutas de archivos temporales deben incluir el `file_id` como namespace.
-
-### 4.3 Ley de Snapshot vs Flow
-
-- Antes de agregar (`SUM`) una columna métrica a través del tiempo, verificar si es `SNAPSHOT` o `FLOW`.
-- Si es SNAPSHOT (inventario, balance, stock): filtrar por `MAX(date)` antes de sumar.
-- Si es FLOW (ventas, gastos, transacciones): se puede sumar libremente.
+### 7.2 Solución de Causa Raíz (Root Cause Analysis)
+- Cuando algo falle (ej. un gráfico se deforma o el Grid salta), no ataques el síntoma (ej. forzar un ancho fijo). Ataca la **enfermedad** (ej. investigar el Stacking Context o el flujo flexbox del ancestro).
 
 ---
 
-## 📋 MÓDULO 5: THE PROTOCOL (Flujo de Trabajo Obligatorio)
+## 🛡️ MÓDULO 8: THE DEFENSIVE PROGRAMMER (Resiliencia y Manejo de Errores)
+*Objetivo: El software Enterprise no se "crashea", se degrada con gracia.*
 
-*Objetivo: Proceso estándar que el agente debe seguir en cada tarea.*
+### 8.1 Fin de la programación "Happy Path"
+- Los LLMs asumen que los datos siempre llegan perfectos y la red siempre es rápida. En la vida real, las APIs fallan y los datos vienen nulos.
+- **Regla:** Todo fetch a Supabase, toda llamada a FastAPI y toda consulta a DuckDB-WASM **DEBE** estar envuelta en bloques `try/catch`.
+- **UI/UX Obligatoria:** Siempre debes proveer 3 estados en tus componentes React:
+  1. `Loading` (Skeleton loaders, no simples textos de "cargando...").
+  2. `Error` (Mensajes amigables y botón de reintento, nunca una pantalla en blanco).
+  3. `Success` (El componente renderizado).
 
-### 5.1 Checklist Pre-Cambio (Obligatorio)
-
-Antes de escribir cualquier línea de código, el agente debe:
-
-1. [ ] **Leer** los archivos afectados completos (no solo la zona del cambio).
-2. [ ] **Identificar** todas las funciones/componentes que serán impactados.
-3. [ ] **Verificar** que el cambio es Schema-Agnostic (sin hardcodes).
-4. [ ] **Confirmar** que no viola ninguna ley de los módulos anteriores.
-
-### 5.2 Checklist Post-Cambio (Obligatorio)
-
-Después de cada cambio, el agente debe verificar:
-
-1. [ ] No se eliminó código existente (salvo override explícito).
-2. [ ] Los Guards/Shields siguen intactos.
-3. [ ] Las firmas de funciones existentes no cambiaron.
-4. [ ] El código nuevo tiene Type Hints y docstrings.
-5. [ ] No hay valores hardcodeados.
-
-### 5.3 Protocolo de Comunicación
-
-- El agente debe informar **qué cambiará y por qué** antes de hacerlo.
-- Si un cambio toca más de 2 archivos, solicitar confirmación del usuario.
-- Siempre mostrar el diff o resumen de cambios al finalizar.
+### 8.2 Fallbacks de Datos Seguros
+- Nunca accedas a propiedades de objetos anidados sin seguridad. En lugar de `data.user.profile.name`, usa Optional Chaining (`data?.user?.profile?.name ?? 'Usuario Desconocido'`).
 
 ---
 
-## 🧬 MÓDULO 6: THE EVOLVER (Evolución Controlada)
+## 🧩 MÓDULO 9: THE CLEAN CODER (Modularidad y Contención)
+*Objetivo: Evitar archivos monolíticos y espagueti.*
 
-*Objetivo: El código crece de manera orgánica y versionada.*
-
-### 6.1 Ley de Extensión sobre Modificación
-
-- Preferir **agregar** funciones nuevas sobre **modificar** las existentes.
-- Preferir **wrappers** sobre cambios directos a firmas.
-- Preferir **argumentos opcionales** sobre argumentos nuevos obligatorios.
-
-### 6.2 Ley de Versionamiento Semántico del Código
-
-- Cuando se agrega funcionalidad nueva, actualizar el docstring con versión:
-  ```python
-  """Motor de Datos V7.1 — Agregado soporte para archivos JSON."""
-  ```
-- Los comments de versión (`V3`, `V7`, etc.) ya existentes son parte de la historia y **NO se borran**.
-
-### 6.3 Ley de Coexistencia
-
-- Si se crea un nuevo motor/approach, el anterior debe seguir funcionando.
-- Ejemplo: Si se crea `ibis_engine_v2.py`, `ibis_engine.py` sigue activo hasta migración explícita.
+### 9.1 Regla del Archivo Liviano
+- Si un componente (ej. `app/dashboard/page.tsx`) está creciendo descontroladamente porque le agregas nuevas funciones (como paneles laterales, modales o gestores de estado complejos), **TIENES PROHIBIDO** seguir inyectando código allí.
+- **Acción:** Debes extraer la nueva funcionalidad en un componente independiente dentro de la carpeta `/components` y simplemente importarlo en la página principal. Mantén las páginas limpias como orquestadores, no como basureros de lógica.

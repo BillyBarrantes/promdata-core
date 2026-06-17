@@ -552,10 +552,28 @@ class ChartFactory:
         return ChartFactory._sanitize_for_json(option)
 
     @staticmethod
+    def _is_multiseries_pie_data(data) -> bool:
+        """Detect multi-series pivot data that a Pie chart cannot render properly."""
+        if not isinstance(data, list) or len(data) == 0:
+            return False
+        first = data[0]
+        if not isinstance(first, dict):
+            return False
+        numeric_keys = {k for k, v in first.items() if isinstance(v, (int, float))}
+        return len(numeric_keys) >= 2
+
+    @staticmethod
     def create_chart(chart_type, title, data, x_label=None, y_label=None, currency_meta=None, barmode=None):
         """
         Dispatcher Centralizado (Factory Method).
         """
+        # ── Geometric fallback: Pie is 2D (name + value). Multi-series data
+        #     needs a 3rd dimension → redirect to stacked bar automatically.
+        if chart_type == 'pie' and ChartFactory._is_multiseries_pie_data(data):
+            print(f"🔄 [CHART FACTORY] Pie → Stacked Bar (multi-series data detected)")
+            chart_type = 'bar'
+            barmode = barmode or 'stacked'
+
         factory = ChartFactory()
         if chart_type == 'bar': return factory.build_bar_chart(title, data, currency_meta=currency_meta, barmode=barmode)
         elif chart_type == 'line': return factory.build_line_chart(title, data, currency_meta=currency_meta, barmode=barmode)

@@ -229,7 +229,7 @@ const sanitizeTableToken = (value: string): string => {
 // Esta función defensiva limpia cualquier prefijo "FilterOperator.X "
 // (case-insensitive) o prefijo de operador canónico ("== ", "!= ", "> ", "< ")
 // para que el valor puro quede como DuckDB lo espera ("ingreso").
-const FILTER_OPERATOR_RE = /^(?:filteroperator\.(?:equals|not_equals|greater_than|less_than|greater_equal|less_equal|in|not_in|like|not_like|contains|starts_with|ends_with)\s+|[!=><~]+\s+)/i
+const FILTER_OPERATOR_RE = /^(?:filteroperator\.(?:equals|not_equals|greater_than|less_than|greater_equal|less_equal|in|not_in|like|not_like|contains|starts_with|ends_with)\s+|[!=><~]+\s+|(?:in|ilike|not_in|like|contains|not_contains|starts_with|ends_with)\s+)/i
 const sanitizeFilterValue = (value: string): string => {
   if (typeof value !== "string") return value
   return value.replace(FILTER_OPERATOR_RE, "").trim()

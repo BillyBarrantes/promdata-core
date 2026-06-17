@@ -1440,3 +1440,59 @@ inflados que saturarían 256).
 vs `--update-env-vars` ADDS) + §6.7 manual deploy procedure + §2.1
 flagged missing `promdata-backend-auto-deploy` trigger + §2.2
 flagged worker `--concurrency=4` regression in `cloudbuild.worker.yaml`.
+
+---
+
+## 4. Protocolo Obligatorio de Operación y Verificación
+
+Antes de proponer un plan técnico o aplicar modificaciones en el código, el agente debe:
+
+1. Cargar y procesar de forma secuencial las directrices del skill maestro `.agents/skills/promdata-orchestrator/SKILL.md`.
+2. Generar un plan numerado de cambios atómicos especificando archivos, funciones afectadas y comandos de prueba.
+3. Finalizar obligatoriamente cada respuesta que contenga un plan o solución con el siguiente bloque:
+   `Skills cargados: [Lista de skills] | Verificación técnica: [Comando ejecutado + Estado Pass/Fail]`
+
+## 5. Integración con Validadores Locales y Git Hooks
+
+- Todo plan generado bajo el comando `/plan-promdata` se evaluará de forma mandatoria mediante el script local `validate_plan.py`.
+- Si `validate_plan.py` o la suite de pruebas locales devuelven un exit code distinto de 0, el cambio se rechaza automáticamente.
+- Ninguna tarea se considera finalizada si el hook de pre-commit de Git bloquea el commit local debido a fallos en la suite de 32/32 tests.
+
+---
+
+## 6. Protocolo de Honestidad Absoluta en Testing
+
+### 6.1 Principio
+
+Ninguna respuesta del agente puede incluir la frase "tests passed" ni "32/32 tests passed" sin haber ejecutado físicamente la suite de pruebas en la terminal y capturado la salida literal. Queda prohibido:
+- Reportar tests como "passed" basándose en ejecuciones anteriores.
+- Simular resultados exitosos.
+- Omitir deliberadamente la ejecución de pruebas.
+- Usar frases como "asumiendo que los tests pasan" para cerrar la tarea.
+
+### 6.2 Sanción automática
+
+Si un agente reporta que los tests pasaron sin evidencia terminal:
+- El bloque de verificación técnica en su respuesta (Skills cargados + Verificación técnica) debe ser ignorado.
+- La tarea se considera automáticamente no finalizada.
+- El agente debe re-ejecutar la suite completa y mostrar las últimas 3 líneas literales de la terminal.
+
+### 6.3 Procedimiento obligatorio
+
+1. Al terminar los cambios de código, ejecutar:
+   ```bash
+   cd backend && ./run_backend_tests.sh
+   ```
+2. Capturar las últimas 3 líneas de la salida de la terminal.
+3. Insertar esas líneas literales en la respuesta como evidencia.
+
+### 6.4 Manejo de fallos
+
+Si el conteo final es menor a 32:
+- Imprimir las últimas 20 líneas de error de la terminal (incluyendo tracebacks).
+- La tarea se bloquea automáticamente.
+- No se puede cerrar la tarea hasta que el conteo sea 32/32.
+
+---
+
+**Last updated:** 2026-06-16 — feat(governance): add mandatory protocol §4 and validation hooks §5, add testing honesty protocol §6

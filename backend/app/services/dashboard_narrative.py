@@ -162,6 +162,7 @@ def generate_dashboard_executive_summary(
     presentation_name: str,
     global_filters: dict[str, str],
     widgets: list[dict[str, Any]],
+    data_notes: str | None = None,
 ) -> dict[str, Any]:
     normalized_presentation_name = _normalize_text(presentation_name) or "dashboard"
     filter_scope = [
@@ -169,6 +170,7 @@ def generate_dashboard_executive_summary(
         for key, value in (global_filters or {}).items()
         if _normalize_text(key) and _normalize_text(value)
     ]
+    data_notes_block = f"\n    NOTAS SOBRE LOS DATOS:\n    {data_notes}\n" if data_notes else ""
     normalized_widgets = [widget for widget in widgets if isinstance(widget, dict)]
 
     if not normalized_widgets:
@@ -200,6 +202,7 @@ def generate_dashboard_executive_summary(
             "mixed_sources": mixed_sources,
             "widgets_context": widgets_context,
             "widget_count": len(normalized_widgets),
+            "data_notes": data_notes,
         },
     )
     cached_summary = get_cached_json("dashboard_executive_summary", cache_key)
@@ -231,7 +234,7 @@ def generate_dashboard_executive_summary(
     - nombre: {normalized_presentation_name}
     - widgets: {len(normalized_widgets)}
     - mezcla_multiples_archivos: {"si" if mixed_sources else "no"}
-    - filtros_activos: {", ".join(filter_scope) if filter_scope else "sin filtros activos"}
+    - filtros_activos: {", ".join(filter_scope) if filter_scope else "sin filtros activos"}{data_notes_block}
 
     WIDGETS DISPONIBLES:
     {widgets_context}
@@ -251,6 +254,7 @@ def generate_dashboard_executive_summary(
     - Cada hallazgo debe referenciar al menos un widget o dato visible.
     - Si hay filtros activos, incorporalos en overview o caveats.
     - Si mezcla_multiples_archivos = si, debes advertirlo en caveats.
+    - Si las NOTAS SOBRE LOS DATOS indican flujos opuestos (ej: Ingreso vs Egreso), NUNCA sumes ambos valores en la narrativa. Reporta cada flujo por separado o menciona ambos explicitamente.
     - No inventes porcentajes, totales o tendencias que no esten explicitamente visibles.
     - Maximos: 3 hallazgos, 2 riesgos, 3 acciones, 2 caveats.
     """

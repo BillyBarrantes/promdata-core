@@ -299,6 +299,33 @@ def _format_executive_summary(summary: dict[str, Any]) -> str:
     return "\n\n".join(blocks).strip()
 
 
+def _extract_direction_notes(plans: list) -> str | None:
+    """Extract flow-direction context from plans for the dashboard narrative."""
+    direction_cols: set[str] = set()
+    for plan in plans:
+        intent = getattr(plan, "main_intent", None)
+        if not intent:
+            continue
+        # DistributionIntent: direction injected as group_by
+        for col in _safe_list(getattr(intent, "group_by", None)):
+            direction_cols.add(str(col))
+        # TimeTrendIntent: direction injected as split_dimension
+        split_dim = getattr(intent, "split_dimension", None)
+        if split_dim:
+            direction_cols.add(str(split_dim))
+    if not direction_cols:
+        return None
+    cols_str = ", ".join(sorted(direction_cols))
+    return (
+        f"La(s) columna(s) '{cols_str}' contiene(n) flujos opuestos contrapuestos. "
+        "Cuando analices dimensiones con flujos opuestos contrapuestos "
+        "(como Ingreso vs. Egreso, Entrada vs. Salida), reporta cada flujo por "
+        "separado y evita consolidar su suma como un único monto total de negocio. "
+        "Para cualquier otra métrica estándar del dataset que no sea un flujo "
+        "opuesto, las reglas normales de agregación y suma total son válidas."
+    )
+
+
 def _build_chart_option(
     *,
     plan: Any,
@@ -353,10 +380,24 @@ def _build_chart_option(
     if intent is not None:
         for f in getattr(intent, "filters", []) or []:
             col = str(getattr(f, "column", "") or "").strip()
-            val = str(getattr(f, "value", "") or "").strip()
+            val = getattr(f, "value", None)
             op = str(getattr(f, "operator", "==") or "==").strip()
-            if col and val:
-                plan_filters[col] = f"{op} {val}" if op != "==" else val
+            if not col or val is None:
+                continue
+            val_str = str(val)
+            op_lower = op.lower()
+            # Multi-value filters (IN_LIST): skip — frontend cross-filter
+            # engine only supports single-value equality matching.
+            if op_lower == "in" and isinstance(val, list):
+                continue
+            # Text search operators (ILIKE, LIKE, CONTAINS): strip operator
+            # prefix and pass the raw search term to the frontend. The
+            # sanitizeFilterValue regex handles the rest.
+            if op_lower in {"ilike", "like", "contains", "starts_with", "ends_with", "not_contains", "not_like"}:
+                plan_filters[col] = val_str
+                continue
+            # Standard: equals without prefix, other operators with prefix
+            plan_filters[col] = f"{op} {val_str}" if op != "==" else val_str
     if plan_filters:
         option["chart_base_filters"] = plan_filters
 
@@ -581,6 +622,7 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
         presentation_name="Analisis Universal",
         global_filters=extracted_filters,
         widgets=summary_widgets,
+        data_notes=_extract_direction_notes(list(execution.plans or [])),
     )
     narrative_text = _format_executive_summary(executive_summary)
     final_struct["analysis"] = narrative_text or "\n\n".join(analysis_blocks)
