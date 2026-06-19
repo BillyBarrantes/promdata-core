@@ -457,6 +457,8 @@ export function ChatInterface() {
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingAbortRef = useRef<AbortController | null>(null);
   const pollingInFlightRef = useRef(false);
+  const [pollingFallbackEnabled, setPollingFallbackEnabled] = useState(false);
+  const pendingTaskResultRef = useRef<{ taskId: string; data: any } | null>(null);
   const activeAnalysisRequestRef = useRef<{ key: string; taskId: string | null } | null>(null);
   const workspaceVisualsRef = useRef<AnalysisComponent[]>([]);
   const workspacePreloadPromiseRef = useRef<Promise<void> | null>(null);
@@ -811,9 +813,91 @@ export function ChatInterface() {
     prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
-  // --- EFFECT: Polling ---
+  // --- EFFECT: SSE primary path + polling fallback ---
   useEffect(() => {
     if (!isAnalyzing || !activeTaskId) return;
+
+    pendingTaskResultRef.current = null;
+    setPollingFallbackEnabled(false);
+
+    if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
+      setPollingFallbackEnabled(true);
+      return;
+    }
+
+    let closed = false;
+    let opened = false;
+    const eventSource = new EventSource(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}/stream`);
+
+    const fallbackToPolling = () => {
+      if (closed) return;
+      closed = true;
+      eventSource.close();
+      setPollingFallbackEnabled(true);
+    };
+
+    const connectGuard = window.setTimeout(() => {
+      if (!opened) {
+        console.warn('⚠️ [SSE] No conectó a tiempo; fallback a polling.');
+        fallbackToPolling();
+      }
+    }, 4000);
+
+    eventSource.onopen = () => {
+      opened = true;
+      window.clearTimeout(connectGuard);
+    };
+
+    eventSource.onerror = () => {
+      console.warn('⚠️ [SSE] Stream no disponible; fallback a polling.');
+      fallbackToPolling();
+    };
+
+    eventSource.onmessage = async (event) => {
+      if (closed) return;
+      let payload: any = null;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      const status = String(payload?.status || '').toLowerCase();
+      if (!['completed', 'success', 'failed', 'timeout'].includes(status)) {
+        return;
+      }
+
+      closed = true;
+      window.clearTimeout(connectGuard);
+      eventSource.close();
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
+          cache: 'no-store',
+        });
+        if (response.ok) {
+          pendingTaskResultRef.current = {
+            taskId: activeTaskId,
+            data: await response.json(),
+          };
+        }
+      } catch (error) {
+        console.warn('⚠️ [SSE] No se pudo resolver resultado final; fallback a polling.', error);
+      } finally {
+        setPollingFallbackEnabled(true);
+      }
+    };
+
+    return () => {
+      closed = true;
+      window.clearTimeout(connectGuard);
+      eventSource.close();
+    };
+  }, [isAnalyzing, activeTaskId]);
+
+  // --- EFFECT: Polling fallback ---
+  useEffect(() => {
+    if (!isAnalyzing || !activeTaskId || !pollingFallbackEnabled) return;
     let cancelled = false;
 
     const clearPollingState = () => {
@@ -844,18 +928,24 @@ export function ChatInterface() {
       pollingAbortRef.current = controller;
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        if (!response.ok) {
-          scheduleNextPoll(1800);
-          return;
+        let data: any = null;
+        if (pendingTaskResultRef.current?.taskId === activeTaskId) {
+          data = pendingTaskResultRef.current.data;
+          pendingTaskResultRef.current = null;
+        } else {
+          const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
+            signal: controller.signal,
+            cache: 'no-store',
+          });
+          if (!response.ok) {
+            scheduleNextPoll(1800);
+            return;
+          }
+
+          data = await response.json();
         }
 
-        const data = await response.json();
-
-        if (data.status === 'completed' || data.status === 'failed') {
+        if (data.status === 'completed' || data.status === 'failed' || data.status === 'timeout') {
           clearPollingState();
 
           const componentsList: AnalysisComponent[] = [];
@@ -1070,7 +1160,7 @@ export function ChatInterface() {
             if (componentsList.length > 0) {
               saveMessageToBackend('assistant', componentsList);
               processedTasksRef.current.add(activeTaskId!);
-            } else if (data.status === 'failed') {
+            } else if (data.status === 'failed' || data.status === 'timeout') {
               saveMessageToBackend('assistant', [{ type: 'error', content: finalContent }]);
               processedTasksRef.current.add(activeTaskId!);
             }
@@ -1092,7 +1182,7 @@ export function ChatInterface() {
           }
           setActiveTaskId(null);
           setIsAnalyzing(false);
-          if (data.status === 'failed') {
+          if (data.status === 'failed' || data.status === 'timeout') {
             setWorkspaceRenderState({
               status: 'idle',
               message: null,
@@ -1127,7 +1217,7 @@ export function ChatInterface() {
       cancelled = true;
       clearPollingState();
     }
-  }, [isAnalyzing, activeTaskId, saveMessageToBackend, setWorkspaceRenderState, stageWorkspaceVisuals]);
+  }, [isAnalyzing, activeTaskId, pollingFallbackEnabled, saveMessageToBackend, setWorkspaceRenderState, stageWorkspaceVisuals]);
 
 
 
@@ -1270,6 +1360,8 @@ export function ChatInterface() {
           taskId: data.task_id,
         };
       }
+      pendingTaskResultRef.current = null;
+      setPollingFallbackEnabled(false);
       setActiveTaskId(data.task_id);
 
       // ... (Resto de tu lógica de mensajes de carga) ...
@@ -1292,6 +1384,8 @@ export function ChatInterface() {
       };
       setMessages(prev => [...prev, errorMessage]);
       activeAnalysisRequestRef.current = null;
+      pendingTaskResultRef.current = null;
+      setPollingFallbackEnabled(false);
       setIsAnalyzing(false);
       setActiveTaskId(null);
       setWorkspaceRenderState({
@@ -1693,12 +1787,16 @@ export function ChatInterface() {
             renderedVisuals: 0,
           });
           activeAnalysisRequestRef.current = null;
+          pendingTaskResultRef.current = null;
+          setPollingFallbackEnabled(false);
           toast.success("Cancelado.");
         } catch (e) {
           console.error("Error al cancelar tarea:", e);
         }
       }
       activeAnalysisRequestRef.current = null;
+      pendingTaskResultRef.current = null;
+      setPollingFallbackEnabled(false);
       setActiveTaskId(null);
       return;
     }

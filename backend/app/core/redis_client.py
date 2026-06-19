@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import threading
 from typing import Optional
 
 from redis import Redis
+from redis.client import PubSub
 from redis.connection import ConnectionPool
 
 from app.core.config import settings
@@ -19,6 +21,7 @@ _PURPOSE_MAX_CONNECTIONS: dict[str, int] = {
     "rate_limit": 6,
     "ai_response_cache": 6,
     "healthcheck": 2,
+    "pubsub": 2,
 }
 
 
@@ -29,6 +32,8 @@ def _resolve_max_connections(purpose: str) -> int:
         return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_AI_CACHE", 6) or 6), 1)
     if purpose == "healthcheck":
         return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_HEALTHCHECK", 2) or 2), 1)
+    if purpose == "pubsub":
+        return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_PUBSUB", 2) or 2), 1)
     return max(int(getattr(settings, "REDIS_MAX_CONNECTIONS_DEFAULT", 3) or 3), 1)
 
 
@@ -110,6 +115,39 @@ def reset_redis_pools() -> None:
         _CLIENTS.clear()
 
 
+def get_pubsub_client() -> Optional[PubSub]:
+    """Retorna un objeto PubSub del pool dedicado."""
+    client = get_redis_client("pubsub")
+    if not client:
+        return None
+    return client.pubsub(ignore_subscribe_messages=True)
+
+
+def publish_task_progress(task_id: str, payload: dict) -> bool:
+    """Wrapper seguro para publicar progreso de una task en Redis Pub/Sub.
+    
+    Retorna True si se publicó correctamente, False si Redis no está disponible
+    o si hubo un error al serializar.
+    """
+    client = get_redis_client("pubsub")
+    if not client:
+        return False
+        
+    try:
+        channel = f"{getattr(settings, 'TASK_PROGRESS_CHANNEL_PREFIX', 'task_progress')}:{task_id}"
+        message = json.dumps(payload)
+        client.publish(channel, message)
+        return True
+    except Exception as e:
+        emit_structured_log(
+            "redis_pubsub_publish_failed",
+            level="warning",
+            task_id=task_id,
+            error=str(e)[:180]
+        )
+        return False
+
+
 def get_pool_stats() -> dict[str, dict[str, int]]:
     """Snapshot de uso de pools. Útil para /health/ready y debugging."""
     stats: dict[str, dict[str, int]] = {}
@@ -129,4 +167,6 @@ __all__ = [
     "get_redis_client",
     "reset_redis_pools",
     "get_pool_stats",
+    "get_pubsub_client",
+    "publish_task_progress",
 ]

@@ -158,6 +158,110 @@ def enforce_rate_limit(
     )
 
 
+def enforce_burst_limit(
+    *,
+    request: Request,
+    token: str,
+    scope: str,
+    limit: int,
+    window_seconds: int,
+) -> None:
+    """Implementa protección contra ráfagas (Burst Protection)."""
+    enforce_rate_limit(
+        request=request,
+        token=token,
+        scope=f"burst:{scope}",
+        limit=limit,
+        window_seconds=window_seconds,
+    )
+
+
+def acquire_concurrency_slot(token: str, limit: int, ttl_seconds: int) -> bool:
+    """Intenta adquirir un slot de concurrencia. Retorna True si se adquirió, False si excedió el límite."""
+    if not settings.RATE_LIMIT_ENABLED or limit <= 0:
+        return True
+
+    user_id = _extract_user_id_from_token(token)
+    if not user_id:
+        return True
+
+    key = f"concurrency:user:{user_id}"
+    redis_client = _get_redis_client()
+    
+    if redis_client:
+        try:
+            count = int(redis_client.incr(key))
+            if count == 1:
+                redis_client.expire(key, ttl_seconds)
+            if count > limit:
+                redis_client.decr(key)
+                emit_structured_log(
+                    "api_concurrency_limit_exceeded",
+                    level="warning",
+                    user_id=user_id,
+                    count=count,
+                    limit=limit,
+                )
+                return False
+            return True
+        except RedisError as error:
+            emit_structured_log(
+                "rate_limit_concurrency_redis_error",
+                level="warning",
+                user_id=user_id,
+                error=str(error)[:180],
+            )
+
+    # Fallback a memoria
+    now_epoch = int(time.time())
+    with _MEMORY_LOCK:
+        current_count, expires_at = _MEMORY_STORE.get(key, (0, now_epoch + ttl_seconds))
+        if expires_at <= now_epoch:
+            current_count = 0
+            expires_at = now_epoch + ttl_seconds
+            
+        if current_count >= limit:
+            emit_structured_log(
+                "api_concurrency_limit_exceeded_memory",
+                level="warning",
+                user_id=user_id,
+                count=current_count + 1,
+                limit=limit,
+            )
+            return False
+            
+        _MEMORY_STORE[key] = (current_count + 1, expires_at)
+        return True
+
+
+def release_concurrency_slot(user_id: str) -> None:
+    """Libera un slot de concurrencia al terminar la tarea."""
+    if not settings.RATE_LIMIT_ENABLED or not user_id:
+        return
+
+    key = f"concurrency:user:{user_id}"
+    redis_client = _get_redis_client()
+    
+    if redis_client:
+        try:
+            count = int(redis_client.decr(key))
+            if count < 0:
+                redis_client.set(key, 0)
+        except RedisError as error:
+            emit_structured_log(
+                "rate_limit_concurrency_release_error",
+                level="warning",
+                user_id=user_id,
+                error=str(error)[:180],
+            )
+            
+    with _MEMORY_LOCK:
+        if key in _MEMORY_STORE:
+            current_count, expires_at = _MEMORY_STORE[key]
+            new_count = max(0, current_count - 1)
+            _MEMORY_STORE[key] = (new_count, expires_at)
+
+
 def _reset_rate_limit_state_for_tests() -> None:
     with _MEMORY_LOCK:
         _MEMORY_STORE.clear()

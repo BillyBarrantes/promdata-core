@@ -3,6 +3,17 @@ import json
 import app.services.semantic_translator as semantic_translator_module
 from app.services.semantic_translator import SemanticTranslator
 from app.core.semantic_grammar import AnalysisPlan
+import pytest
+import app.core.gemini_client as gemini_client
+
+@pytest.fixture(autouse=True)
+def block_network_llm_calls(monkeypatch):
+    class _BlockedModel:
+        def __init__(self, *args, **kwargs):
+            pass
+        def generate_content(self, *args, **kwargs):
+            raise RuntimeError("NETWORK CALL BLOCKED: You must mock the LLM or fix the fastpath.")
+    monkeypatch.setattr(gemini_client.genai, "GenerativeModel", _BlockedModel)
 
 
 def test_phase8_semantic_translator_prefers_requested_ubicacion_over_lote() -> None:
@@ -255,12 +266,10 @@ def test_phase8_semantic_router_forces_complex_on_mixed_reason_codes() -> None:
 
 def test_phase8_semantic_router_simple_route_allows_temporal_fastpath_without_graph_keyword(monkeypatch) -> None:
     monkeypatch.setattr(
-        SemanticTranslator,
-        "_route_prompt_with_semantic_router",
-        staticmethod(
-            lambda *args, **kwargs: {
-                "route": "SIMPLE",
-                "confidence": 0.96,
+        "app.services.semantic_translator.planner.route_prompt_with_semantic_router",
+        lambda *args, **kwargs: {
+            "route": "SIMPLE",
+            "confidence": 0.96,
             "detected_intent": "trend",
             "requires_time": True,
             "reason_codes": [],
@@ -278,7 +287,6 @@ def test_phase8_semantic_router_simple_route_allows_temporal_fastpath_without_gr
             },
             "original_route": "SIMPLE",
         }
-        ),
     )
 
     plans = SemanticTranslator.translate(
@@ -304,12 +312,10 @@ def test_phase8_semantic_router_simple_route_allows_temporal_fastpath_without_gr
 
 def test_phase8_semantic_router_simple_route_prioritizes_temporal_total_products_prompt(monkeypatch) -> None:
     monkeypatch.setattr(
-        SemanticTranslator,
-        "_route_prompt_with_semantic_router",
-        staticmethod(
-            lambda *args, **kwargs: {
-                "route": "SIMPLE",
-                "confidence": 0.97,
+        "app.services.semantic_translator.planner.route_prompt_with_semantic_router",
+        lambda *args, **kwargs: {
+            "route": "SIMPLE",
+            "confidence": 0.97,
             "detected_intent": "trend",
             "requires_time": True,
             "reason_codes": [],
@@ -327,7 +333,6 @@ def test_phase8_semantic_router_simple_route_prioritizes_temporal_total_products
             },
             "original_route": "SIMPLE",
         }
-        ),
     )
 
     plans = SemanticTranslator.translate(
@@ -409,44 +414,41 @@ def test_phase8_semantic_translator_retries_cancelled_deep_planner_with_fast_mod
             )
 
     monkeypatch.setattr(
-        SemanticTranslator,
-        "_route_prompt_with_semantic_router",
-        staticmethod(
-            lambda *args, **kwargs: {
-                "route": "COMPLEJO",
-                "confidence": 0.98,
-                "detected_intent": "trend",
+        "app.services.semantic_translator.planner.route_prompt_with_semantic_router",
+        lambda *args, **kwargs: {
+            "route": "COMPLEJO",
+            "confidence": 0.98,
+            "detected_intent": "trend",
+            "requires_time": True,
+            "reason_codes": ["explicit_split_instruction", "multi_value_filter"],
+            "semantic_contract": {
+                "intent": "trend",
+                "metric": "gasto_combustible_s",
+                "time_axis": "fecha_operacion",
+                "dimension": "placa_unidad",
+                "positive_filters": [
+                    {
+                        "column": "placa_unidad",
+                        "operator": "in",
+                        "value": ["F3B-144", "F3B-197"],
+                    }
+                ],
+                "top_n": 2,
+                "series_mode": "split",
+                "grain": "month",
+                "aggregation": "sum",
+                "visual_protocol": "line_chart",
                 "requires_time": True,
-                "reason_codes": ["explicit_split_instruction", "multi_value_filter"],
-                "semantic_contract": {
-                    "intent": "trend",
-                    "metric": "gasto_combustible_s",
-                    "time_axis": "fecha_operacion",
-                    "dimension": "placa_unidad",
-                    "positive_filters": [
-                        {
-                            "column": "placa_unidad",
-                            "operator": "in",
-                            "value": ["F3B-144", "F3B-197"],
-                        }
-                    ],
-                    "top_n": 2,
-                    "series_mode": "split",
-                    "grain": "month",
-                    "aggregation": "sum",
-                    "visual_protocol": "line_chart",
-                    "requires_time": True,
-                },
-                "original_route": "COMPLEJO",
-            }
-        ),
+            },
+            "original_route": "COMPLEJO",
+        }
     )
-    monkeypatch.setattr(semantic_translator_module.genai, "GenerativeModel", _FakeGenerativeModel)
-    monkeypatch.setattr(semantic_translator_module, "record_llm_call", lambda *args, **kwargs: _DummySpan())
-    monkeypatch.setattr(semantic_translator_module, "get_cached_json", lambda *args, **kwargs: None)
-    monkeypatch.setattr(semantic_translator_module, "set_cached_json", lambda *args, **kwargs: None)
-    monkeypatch.setattr(semantic_translator_module.settings, "AI_MODEL_NAME", "gemini-3.1-pro-preview")
-    monkeypatch.setattr(semantic_translator_module.settings, "NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
+    monkeypatch.setattr(gemini_client.genai, "GenerativeModel", _FakeGenerativeModel)
+    monkeypatch.setattr("app.services.semantic_translator.validator.record_llm_call", lambda *args, **kwargs: _DummySpan())
+    monkeypatch.setattr("app.services.semantic_translator.planner.get_cached_json", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.services.semantic_translator.planner.set_cached_json", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.services.semantic_translator.planner.settings.AI_MODEL_NAME", "gemini-3.1-pro-preview")
+    monkeypatch.setattr("app.services.semantic_translator.validator.settings.NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
 
     plans = SemanticTranslator.translate(
         "realiza un gráfico con detallando la evolución de gasto de combustible de la placa F3B-144 y F3B-197. las lineas de evolucion deben estar por separado",

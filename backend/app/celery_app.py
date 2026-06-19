@@ -1,10 +1,10 @@
 # En: backend/app/celery_app.py
 
 from celery import Celery
-from celery.signals import worker_init
+from celery.signals import worker_init, task_prerun, task_postrun, task_failure
 
 from app.core.config import settings
-from app.core.redis_client import reset_redis_pools
+from app.core.redis_client import reset_redis_pools, publish_task_progress
 from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
 
@@ -75,6 +75,8 @@ celery_app.conf.update(
     result_expires=24 * 3600,
     timezone='UTC',
     enable_utc=True,
+    task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
+    task_time_limit=settings.CELERY_TASK_HARD_TIME_LIMIT,
 )
 
 
@@ -97,6 +99,66 @@ def _on_celery_worker_init(**_kwargs) -> None:
             level="warning",
             error=str(exc)[:180],
         )
+
+
+@task_prerun.connect
+def _on_task_prerun(task_id, task, *args, **kwargs):
+    """Publica evento de inicio en Pub/Sub"""
+    publish_task_progress(task_id, {
+        "task_id": task_id,
+        "task_name": task.name,
+        "status": "started",
+        "message": "Analizando los datos..."
+    })
+
+
+@task_postrun.connect
+def _on_task_postrun(task_id, task, *args, retval=None, state=None, **kwargs):
+    """Publica evento de finalización en Pub/Sub"""
+    final_status = retval if isinstance(retval, str) else (state.lower() if state else "unknown")
+    payload = {
+        "task_id": task_id,
+        "task_name": task.name,
+        "status": final_status,
+        "message": "Análisis finalizado."
+    }
+    publish_task_progress(task_id, payload)
+    
+    # Liberar slot de concurrencia
+    try:
+        from app.core.rate_limit import release_concurrency_slot, _extract_user_id_from_token
+        
+        # Celery pasa los argumentos originales de la tarea en 'args' y 'kwargs' (del signal, no de la tarea en sí, 
+        # para eso miramos task_args / task_kwargs que pasan en **kwargs)
+        task_args = kwargs.get('args', args)
+        task_kwargs = kwargs.get('kwargs', {})
+        
+        user_token = task_kwargs.get('user_token')
+        if not user_token and len(task_args) >= 4:
+            user_token = task_args[3]
+            
+        if user_token:
+            user_id = _extract_user_id_from_token(user_token)
+            if user_id:
+                release_concurrency_slot(user_id)
+    except Exception as e:
+        pass
+
+
+@task_failure.connect
+def _on_task_failure(task_id, exception, args, kwargs, traceback, einfo, **kw):
+    """Publica evento de fallo (incluyendo timeouts) en Pub/Sub"""
+    error_message = "Ocurrió un error inesperado durante el análisis."
+    if type(exception).__name__ == "SoftTimeLimitExceeded":
+        error_message = "Tu análisis fue demasiado complejo. Intenta con un filtro más específico."
+        
+    payload = {
+        "task_id": task_id,
+        "status": "failed",
+        "error": error_message,
+        "message": error_message
+    }
+    publish_task_progress(task_id, payload)
 
 
 # --- LA SOLUCIÓN DEFINITIVA ---

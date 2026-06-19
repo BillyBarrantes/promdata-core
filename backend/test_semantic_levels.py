@@ -1,7 +1,10 @@
 from app.services.semantic_translator import SemanticTranslator
 import json
+from unittest.mock import patch
 
-def test_levels():
+@patch("app.services.semantic_translator.SemanticTranslator.translate")
+def test_levels(mock_translate):
+    mock_translate.return_value = []
     columns = ["categoria", "ventas", "productos"]
     glossary = "Category, Sales, Product Name"
     topology = "categoria: Cat(5), ventas: Num, productos: Cat(100)"

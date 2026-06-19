@@ -24,7 +24,7 @@ from app.tasks.analysis_tasks import (
 from app.tasks.cloud_sync_tasks import perform_cloud_sync_job_task
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.core.rate_limit import enforce_rate_limit
+from app.core.rate_limit import enforce_rate_limit, enforce_burst_limit, acquire_concurrency_slot
 from app.core.structured_logging import emit_structured_log
 from app.services.cloud_connectors import get_cloud_connector_catalog, get_watchdog_runtime_status
 from app.services.cloud_oauth import (
@@ -95,12 +95,15 @@ from app.services.governance import (
 )
 from app.core.supabase_client import get_supabase_service_client, get_supabase_user_client
 from app.tasks.document_tasks import process_knowledge_document_task
+from app.api.sse_progress import router as sse_router
 from supabase import create_client, Client
 import uuid
 import time
 import json # <-- Aseguramos que la importación está aquí
 
 router = APIRouter()
+router.include_router(sse_router)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -464,6 +467,15 @@ def start_analysis(
             limit=settings.RATE_LIMIT_ANALYZE_LIMIT,
             window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
         )
+        
+        # Burst Limit Protection
+        enforce_burst_limit(
+            request=request,
+            token=token,
+            scope="analyze",
+            limit=settings.RATE_LIMIT_BURST_ANALYZE_LIMIT,
+            window_seconds=settings.RATE_LIMIT_BURST_WINDOW_SECONDS,
+        )
 
         supabase: Client = get_supabase_user_client(token)
         user_response = supabase.auth.get_user()
@@ -471,6 +483,13 @@ def start_analysis(
 
         if not current_user_id:
             raise HTTPException(status_code=401, detail="Token de usuario inválido o expirado.")
+
+        # Concurrency Limit Protection
+        if not acquire_concurrency_slot(token, settings.CONCURRENT_TASKS_PER_USER, settings.CONCURRENT_TASKS_TTL_SECONDS):
+            raise HTTPException(
+                status_code=429,
+                detail="Tienes demasiados análisis en curso. Por favor, espera a que terminen antes de solicitar uno nuevo.",
+            )
 
         team_id = resolve_user_team_scope(user_id=current_user_id, service_client=supabase)
         uploaded_file_row = get_user_uploaded_file_scope_or_404(
@@ -598,7 +617,7 @@ def get_task_status(task_id: str):
 
         response = supabase.table('analysis_tasks').select('status, results_json').eq('id', task_id).single().execute()
 
-        if response.data and response.data.get('status') in ['completed', 'failed']:
+        if response.data and response.data.get('status') in ['completed', 'failed', 'timeout']:
             results_payload = response.data.get('results_json')
 
             if isinstance(results_payload, str):

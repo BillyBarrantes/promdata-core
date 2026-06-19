@@ -1,9 +1,11 @@
 import pytest
+import json
 from types import SimpleNamespace
 
 pytest.importorskip("celery")
 
-from app.tasks import analysis_tasks
+from app.tasks.analysis_pipeline import orchestrator
+import app.tasks.analysis_tasks as analysis_tasks
 
 
 class _FakeQuery:
@@ -68,10 +70,10 @@ class _CaptureSupabase:
 def test_canary_task_falls_back_to_legacy_on_executor_error(monkeypatch):
     captured = {}
 
-    monkeypatch.setattr(analysis_tasks.settings, "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED", False)
-    monkeypatch.setattr(analysis_tasks, "get_supabase_client", lambda: _FakeSupabase())
+    monkeypatch.setattr(orchestrator.settings, "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED", False)
+    monkeypatch.setattr(orchestrator, "get_supabase_client", lambda: _FakeSupabase())
     monkeypatch.setattr(
-        analysis_tasks,
+        orchestrator,
         "execute_canonical_tabular_canary_analysis",
         lambda **_: (_ for _ in ()).throw(RuntimeError("boom")),
     )
@@ -117,20 +119,22 @@ def test_universal_tabular_task_uses_production_executor_and_async_canary(monkey
         ),
     )
 
-    monkeypatch.setattr(analysis_tasks.settings, "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED", True)
-    monkeypatch.setattr(analysis_tasks.settings, "CANONICAL_SHADOW_TRAFFIC_MIRROR_ENABLED", True)
-    monkeypatch.setattr(analysis_tasks, "get_supabase_client", lambda: _FakeSupabase())
+    monkeypatch.setattr(orchestrator.settings, "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED", True)
+    monkeypatch.setattr(orchestrator.settings, "CANONICAL_SHADOW_TRAFFIC_MIRROR_ENABLED", True)
+    monkeypatch.setattr(orchestrator, "get_supabase_client", lambda: _FakeSupabase())
+    monkeypatch.setattr(orchestrator, "get_cached_analysis", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(orchestrator, "set_cached_analysis", lambda *_args, **_kwargs: None)
     def _fake_production_executor(**kwargs):
         captured["production_kwargs"] = kwargs
         return runtime_result
 
     monkeypatch.setattr(
-        analysis_tasks,
+        orchestrator,
         "execute_canonical_tabular_production_analysis",
         _fake_production_executor,
     )
     monkeypatch.setattr(
-        analysis_tasks,
+        orchestrator,
         "execute_canonical_tabular_canary_analysis",
         lambda **_: (_ for _ in ()).throw(AssertionError("canary must run only in background")),
     )
@@ -139,8 +143,8 @@ def test_universal_tabular_task_uses_production_executor_and_async_canary(monkey
         "delay",
         lambda *args: captured.setdefault("background_args", args),
     )
-    monkeypatch.setattr(analysis_tasks, "track_analysis_completed", lambda **_: None)
-    monkeypatch.setattr(analysis_tasks, "track_canary_runtime_execution_observed", lambda **_: None)
+    monkeypatch.setattr(orchestrator, "track_analysis_completed", lambda **_: None)
+    monkeypatch.setattr(orchestrator, "track_canary_runtime_execution_observed", lambda **_: None)
 
     result = analysis_tasks.perform_analysis_task_universal_tabular.run(
         "task-1",
@@ -171,7 +175,7 @@ def test_payload_shedding_preserves_granular_arrow_when_snapshot_strip_is_enough
         },
     )
 
-    monkeypatch.setattr(analysis_tasks.settings, "UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", 1000)
+    monkeypatch.setattr(orchestrator.settings, "UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", 1000)
 
     analysis_tasks._save_analysis_task_result_with_payload_shedding(
         sb,
@@ -179,7 +183,7 @@ def test_payload_shedding_preserves_granular_arrow_when_snapshot_strip_is_enough
         runtime_result,
     )
 
-    saved = analysis_tasks.json.loads(sb.capture["payload"]["results_json"])
+    saved = json.loads(sb.capture["payload"]["results_json"])
     assert "snapshot_arrow" not in saved
     assert "arrow_data" not in saved
     assert "granular_arrow" not in saved["chart_options"][0]
