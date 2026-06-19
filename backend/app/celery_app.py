@@ -2,6 +2,7 @@
 
 from celery import Celery
 from celery.signals import worker_init, task_prerun, task_postrun, task_failure
+from kombu import Queue
 
 from app.core.config import settings
 from app.core.redis_client import reset_redis_pools, publish_task_progress
@@ -77,6 +78,20 @@ celery_app.conf.update(
     enable_utc=True,
     task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
     task_time_limit=settings.CELERY_TASK_HARD_TIME_LIMIT,
+    task_default_queue=settings.CELERY_QUEUE_DEFAULT,
+    task_queues=(
+        Queue(settings.CELERY_QUEUE_DEFAULT),
+        Queue(settings.CELERY_QUEUE_ANALYSIS),
+        Queue(settings.CELERY_QUEUE_BACKGROUND),
+    ),
+    task_routes={
+        "perform_analysis_task": {"queue": settings.CELERY_QUEUE_ANALYSIS},
+        "perform_analysis_task_universal_tabular": {"queue": settings.CELERY_QUEUE_ANALYSIS},
+        "observe_canonical_shadow_runtime": {"queue": settings.CELERY_QUEUE_BACKGROUND},
+        "observe_canonical_tabular_canary_runtime": {"queue": settings.CELERY_QUEUE_BACKGROUND},
+        "perform_cloud_sync_job_task": {"queue": settings.CELERY_QUEUE_BACKGROUND},
+        "process_knowledge_document_task": {"queue": settings.CELERY_QUEUE_DEFAULT},
+    },
 )
 
 

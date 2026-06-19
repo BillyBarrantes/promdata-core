@@ -5,6 +5,7 @@ All business logic has been extracted to backend/app/tasks/analysis_pipeline/.
 """
 
 from app.celery_app import celery_app
+from app.core.config import settings
 from app.core.serializers import convert_keys_to_str
 from app.core.structured_logging import emit_structured_log
 
@@ -20,13 +21,21 @@ from app.tasks.analysis_pipeline.payload_shedder import (
 # CELERY TASKS (Thin wrappers — delegates to pipeline)
 # ─────────────────────────────────────────────────────────
 
-@celery_app.task(name="perform_analysis_task")
+@celery_app.task(
+    name="perform_analysis_task",
+    soft_time_limit=settings.CELERY_TASK_HEAVY_SOFT_TIME_LIMIT,
+    time_limit=settings.CELERY_TASK_HEAVY_HARD_TIME_LIMIT,
+)
 def perform_analysis_task(task_id, file_id, prompt, user_token, runtime_route=None):
     """Legacy Celery task wrapper — delegates to orchestrator."""
     return execute_legacy_task(task_id, file_id, prompt, user_token, runtime_route)
 
 
-@celery_app.task(name="perform_analysis_task_universal_tabular")
+@celery_app.task(
+    name="perform_analysis_task_universal_tabular",
+    soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.CELERY_TASK_HARD_TIME_LIMIT,
+)
 def perform_analysis_task_universal_tabular(task_id, file_id, prompt, user_token, runtime_route=None):
     """Universal tabular Celery task — delegates to orchestrator."""
     return execute_universal_tabular_task(task_id, file_id, prompt, user_token, runtime_route)
