@@ -86,7 +86,7 @@ def test_recoverable_gemini_errors_are_classified_without_sdk_dependency():
 
 def test_circuit_opens_after_threshold_and_fails_fast():
     clock = _FakeClock()
-    circuit = GeminiCircuitBreaker(failure_threshold=2, recovery_timeout_seconds=30, clock=clock)
+    circuit = GeminiCircuitBreaker(failure_threshold=2, recovery_timeout_seconds=30, clock=clock, max_retries=0)
     calls = {"count": 0}
 
     def _failing_call():

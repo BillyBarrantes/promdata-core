@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import math
+import random
 import threading
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar
+
+from app.core.structured_logging import emit_structured_log
 
 
 T = TypeVar("T")
@@ -59,12 +62,20 @@ class GeminiCircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout_seconds: int = 30,
         half_open_max_calls: int = 1,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 15.0,
+        jitter: float = 0.5,
         clock: Callable[[], float] | None = None,
     ) -> None:
         self.enabled = bool(enabled)
         self.failure_threshold = max(int(failure_threshold), 1)
         self.recovery_timeout_seconds = max(int(recovery_timeout_seconds), 1)
         self.half_open_max_calls = max(int(half_open_max_calls), 1)
+        self._max_retries = max(int(max_retries), 0)
+        self._base_delay = max(float(base_delay), 0.1)
+        self._max_delay = max(float(max_delay), self._base_delay)
+        self._jitter = max(float(jitter), 0.0)
         self._clock = clock or time.monotonic
         self._lock = threading.RLock()
         self._state = self.CLOSED
@@ -93,14 +104,65 @@ class GeminiCircuitBreaker:
             }
 
     def call(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+        """Wraps a callable with circuit breaker protection + retry with backoff.
+
+        Retry policy:
+        - Only recoverable errors (429, timeout, 503, etc.) trigger retries.
+        - Non-recoverable errors (ValueError, JSON parse, 400) fail immediately.
+        - After exhausting all retries, the error is recorded as a real failure
+          in the circuit breaker and re-raised.
+        - If the circuit is OPEN, raises GeminiCircuitOpenError without retrying.
+        """
         self.before_call()
-        try:
-            result = fn(*args, **kwargs)
-        except Exception as error:
-            self.record_failure(error)
-            raise
-        self.record_success()
-        return result
+        total_attempts = 1 + self._max_retries  # 1 original + N retries
+
+        for attempt in range(1, total_attempts + 1):
+            try:
+                result = fn(*args, **kwargs)
+                self.record_success()
+                return result
+            except Exception as error:
+                is_last = attempt == total_attempts
+                is_recoverable = is_recoverable_gemini_error(error)
+
+                if not is_recoverable or is_last:
+                    # Error no-recuperable o reintentos agotados → fallo real
+                    self.record_failure(error)
+                    raise
+
+                # ── Exponential Backoff + Jitter ──
+                # TODO: Evaluar parseo de header Retry-After de Vertex AI
+                #       para respetar el delay sugerido por Google en lugar
+                #       del backoff propio. Requiere envolver el SDK.
+                delay = min(
+                    self._base_delay * (2 ** (attempt - 1))
+                    + random.uniform(0, self._jitter),
+                    self._max_delay,
+                )
+
+                # ── TRADE-OFF: time.sleep() vs SoftTimeLimitExceeded ──
+                # Este sleep consume tiempo del budget del task de Celery.
+                # Con max_retries=3, el peor caso acumula ~7.9s de backoff
+                # (1+2+4 + jitter). Si un task tiene soft_time_limit=180s,
+                # quedan ~172s para la lógica real — impacto marginal.
+                # Si Celery lanza SoftTimeLimitExceeded durante el sleep,
+                # la excepción interrumpe el sleep inmediatamente (Python
+                # raises en el thread principal) y el orquestador ya la
+                # captura con su handler de timeout. No hay riesgo de
+                # task zombie.
+                time.sleep(delay)
+
+                emit_structured_log(
+                    "gemini_retry_backoff",
+                    level="info",
+                    attempt=attempt,
+                    max_retries=self._max_retries,
+                    delay_seconds=round(delay, 2),
+                    error_snippet=str(error)[:120],
+                )
+
+        # Unreachable — the loop always returns or raises. Defensive guard.
+        raise RuntimeError("GeminiCircuitBreaker.call: unreachable code reached")  # pragma: no cover
 
     def before_call(self) -> None:
         if not self.enabled:

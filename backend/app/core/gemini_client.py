@@ -170,6 +170,10 @@ class _GenAiRuntime:
             failure_threshold=int(settings.GEMINI_CIRCUIT_FAILURE_THRESHOLD),
             recovery_timeout_seconds=int(settings.GEMINI_CIRCUIT_RECOVERY_TIMEOUT_SECONDS),
             half_open_max_calls=int(settings.GEMINI_CIRCUIT_HALF_OPEN_MAX_CALLS),
+            max_retries=int(settings.GEMINI_RETRY_MAX_RETRIES),
+            base_delay=float(settings.GEMINI_RETRY_BASE_DELAY_SECONDS),
+            max_delay=float(settings.GEMINI_RETRY_MAX_DELAY_SECONDS),
+            jitter=float(settings.GEMINI_RETRY_JITTER_SECONDS),
         )
 
     def _build_client(self) -> Any:
