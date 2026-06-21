@@ -459,6 +459,7 @@ def start_analysis(
     request_body: AnalysisRequest,
     token: str = Depends(oauth2_scheme)
 ):
+    print(f"🕵️\u200d♂️ [ESPÍA BACKEND] Petición POST recibida en el endpoint | {__import__('datetime').datetime.utcnow().isoformat()}Z")
     try:
         enforce_rate_limit(
             request=request,

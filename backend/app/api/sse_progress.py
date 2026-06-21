@@ -25,7 +25,7 @@ async def sse_generator(request: Request, task_id: str):
 
     try:
         # Timeout safety
-        for _ in range(1200): # Máximo 2 minutos (1200 iteraciones x 0.1s)
+        for _ in range(150): # Máximo 15 segundos (150 iteraciones x 0.1s)
             if await request.is_disconnected():
                 break
                 

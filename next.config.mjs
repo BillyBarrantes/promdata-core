@@ -13,6 +13,21 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages: ['@duckdb/duckdb-wasm'],
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: [
+          '**/backend/**',
+          '**/test_env/**',
+          '**/test-results/**',
+        ],
+      };
+      console.log('[Webpack] watchOptions.ignored aplicado:', JSON.stringify(config.watchOptions.ignored));
+    }
+    return config;
+  },
   async headers() {
     return [
       {

@@ -14,10 +14,12 @@ from typing import Any
 
 from celery.exceptions import SoftTimeLimitExceeded
 
+from app.core.circuit_breaker import GeminiCircuitOpenError
 from app.core.config import settings
 from app.core.supabase_client import get_supabase_client
 from app.core.structured_logging import emit_structured_log
 from app.core.serializers import CustomEncoder, convert_keys_to_str
+from app.core.redis_client import publish_task_progress
 
 from app.services.enterprise_telemetry import (
     track_analysis_completed,
@@ -43,6 +45,7 @@ from app.services.visual_recommendation_engine import (
     normalize_visual_id,
 )
 from app.services.file_cache import get_cached_analysis, set_cached_analysis
+from app.services.analysis_memory_context import unwrap_prompt_payload
 
 from app.tasks.analysis_pipeline.data_loader import (
     load_dataset_for_task, _compute_queue_wait_ms,
@@ -75,6 +78,66 @@ def _extract_cached_result_payload(cached_payload: dict[str, Any]) -> tuple[str,
     return status, result_payload
 
 
+def _safe_json_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _normalize_cache_compare_text(value: str | None) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _load_cache_parent_context(
+    *,
+    sb: Any,
+    file_id: str,
+    prompt: str,
+    runtime: str,
+) -> tuple[dict[str, Any] | None, bool]:
+    actual_prompt, parent_task_id = unwrap_prompt_payload(prompt)
+    if not parent_task_id:
+        return None, False
+    try:
+        response = (
+            sb.table("analysis_tasks")
+            .select("id,file_id,prompt,results_json")
+            .eq("id", parent_task_id)
+            .single()
+            .execute()
+        )
+    except Exception as cache_parent_error:
+        emit_structured_log(
+            "analysis_file_cache_parent_context_error",
+            level="warning",
+            file_id=file_id,
+            runtime=runtime,
+            error=str(cache_parent_error)[:240],
+        )
+        return None, False
+    parent_row = dict(getattr(response, "data", None) or {})
+    if not parent_row or str(parent_row.get("file_id") or "") != str(file_id):
+        return None, False
+    parent_prompt, _ = unwrap_prompt_payload(str(parent_row.get("prompt") or ""))
+    exact_prompt_repeat = (
+        _normalize_cache_compare_text(actual_prompt)
+        == _normalize_cache_compare_text(parent_prompt)
+    )
+    return (
+        {
+            "parent_prompt": parent_prompt or "",
+            "result_payload": _safe_json_dict(parent_row.get("results_json")),
+        },
+        exact_prompt_repeat,
+    )
+
+
 def _try_restore_cached_analysis(
     *,
     sb: Any,
@@ -82,9 +145,16 @@ def _try_restore_cached_analysis(
     file_id: str,
     prompt: str,
     runtime: str,
+    parent_context: dict[str, Any] | None = None,
+    allow_unscoped_fallback: bool = False,
 ) -> str | None:
     try:
-        cached_payload = get_cached_analysis(file_id, prompt)
+        cached_payload = get_cached_analysis(
+            file_id,
+            prompt,
+            parent_context=parent_context,
+            allow_unscoped_fallback=allow_unscoped_fallback,
+        )
         parsed = _extract_cached_result_payload(cached_payload or {})
         if not parsed:
             emit_structured_log(
@@ -126,6 +196,8 @@ def _try_store_completed_analysis_cache(
     status: str,
     result_payload: dict[str, Any],
     runtime: str,
+    parent_context: dict[str, Any] | None = None,
+    write_unscoped_alias: bool = False,
 ) -> None:
     if status != "completed" or not isinstance(result_payload, dict):
         return
@@ -137,6 +209,8 @@ def _try_store_completed_analysis_cache(
                 "status": status,
                 "result": result_payload,
             },
+            parent_context=parent_context,
+            write_unscoped_alias=write_unscoped_alias,
         )
         emit_structured_log(
             "analysis_file_cache_stored",
@@ -268,12 +342,20 @@ def execute_legacy_task(task_id: str, file_id: str, prompt: str, user_token: str
         task_data_resp = sb.table('analysis_tasks').select('user_id').eq('id', task_id).single().execute()
         user_id = task_data_resp.data.get('user_id') if task_data_resp.data else None
 
+        parent_cache_context, allow_unscoped_cache_fallback = _load_cache_parent_context(
+            sb=sb,
+            file_id=file_id,
+            prompt=prompt,
+            runtime="legacy",
+        )
         cached_status = _try_restore_cached_analysis(
             sb=sb,
             task_id=task_id,
             file_id=file_id,
             prompt=prompt,
             runtime="legacy",
+            parent_context=parent_cache_context,
+            allow_unscoped_fallback=allow_unscoped_cache_fallback,
         )
         if cached_status:
             return cached_status
@@ -315,6 +397,26 @@ def execute_legacy_task(task_id: str, file_id: str, prompt: str, user_token: str
         response = [{"type": "error", "content": "Tu análisis fue demasiado complejo. Intenta con un filtro más específico."}]
         status = 'timeout'
         parquet_path = ""
+    except GeminiCircuitOpenError as e:
+        final_error_message = str(e)
+        emit_structured_log(
+            "gemini_circuit_open_task_rate_limited",
+            level="warning",
+            task_id=task_id,
+            file_id=file_id,
+            runtime="legacy",
+            recovery_seconds=e.recovery_seconds,
+        )
+        response = [{
+            "type": "error",
+            "content": (
+                "## ⚠️ Servicio de IA saturado\n\n"
+                "El servicio de análisis está temporalmente saturado. "
+                "Intenta nuevamente en unos segundos."
+            ),
+        }]
+        status = 'rate_limited'
+        parquet_path = ""
     except Exception as e:
         final_error_message = str(e)
         response = [{"type": "error", "content": f"Error del sistema: {str(e)}"}]
@@ -348,6 +450,8 @@ def execute_legacy_task(task_id: str, file_id: str, prompt: str, user_token: str
         status=status,
         result_payload=final_struct or {},
         runtime="legacy",
+        parent_context=parent_cache_context if 'parent_cache_context' in locals() else None,
+        write_unscoped_alias=allow_unscoped_cache_fallback if 'allow_unscoped_cache_fallback' in locals() else False,
     )
 
     live_duration_ms = int((perf_counter() - task_started_at) * 1000)
@@ -386,6 +490,8 @@ def execute_legacy_task(task_id: str, file_id: str, prompt: str, user_token: str
                 level="warning", task_id=task_id, file_id=file_id,
                 status=status, error=str(shadow_observer_error)[:240],
             )
+    if status == "completed":
+        publish_task_progress(task_id, {"status": "completed"})
     return status
 
 
@@ -473,12 +579,20 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
         _record_stage_latency("uploaded_file_lookup", started_at=uploaded_file_lookup_started_at)
 
         file_cache_started_at = perf_counter()
+        parent_cache_context, allow_unscoped_cache_fallback = _load_cache_parent_context(
+            sb=sb,
+            file_id=file_id,
+            prompt=prompt,
+            runtime=runtime_label,
+        )
         cached_status = _try_restore_cached_analysis(
             sb=sb,
             task_id=task_id,
             file_id=file_id,
             prompt=prompt,
             runtime=runtime_label,
+            parent_context=parent_cache_context,
+            allow_unscoped_fallback=allow_unscoped_cache_fallback,
         )
         if cached_status:
             _record_stage_latency("file_cache_lookup", started_at=file_cache_started_at, status="completed")
@@ -517,6 +631,8 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             status=canary_result.status,
             result_payload=canary_result.final_struct,
             runtime=runtime_label,
+            parent_context=parent_cache_context,
+            write_unscoped_alias=allow_unscoped_cache_fallback,
         )
         _record_stage_latency(
             "persist_analysis_result",
@@ -583,6 +699,8 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             candidate_id=canary_result.execution.metadata.get("candidate_id"),
             prompt_strategy=canary_result.execution.prompt_strategy,
         )
+        if canary_result.status == "completed":
+            publish_task_progress(task_id, {"status": "completed"})
         return canary_result.status
     except SoftTimeLimitExceeded as timeout_error:
         _record_stage_latency("worker_task_failed", started_at=task_started_at, status="timeout")
@@ -609,6 +727,34 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             }, cls=CustomEncoder),
         }).eq('id', task_id).execute()
         return "timeout"
+    except GeminiCircuitOpenError as circuit_error:
+        _record_stage_latency("worker_task_failed", started_at=task_started_at, status="rate_limited")
+        _flush_stage_latency_buffer()
+        emit_structured_log(
+            "gemini_circuit_open_task_rate_limited",
+            level="warning",
+            task_id=task_id,
+            file_id=file_id,
+            runtime=runtime_label,
+            recovery_seconds=circuit_error.recovery_seconds,
+        )
+        sb.table('analysis_tasks').update({
+            'status': 'rate_limited',
+            'results_json': json.dumps({
+                "analysis": (
+                    "## ⚠️ Servicio de IA saturado\n\n"
+                    "El servicio de análisis está temporalmente saturado. "
+                    "Intenta nuevamente en unos segundos."
+                ),
+                "metrics": {},
+                "chart_options": [],
+                "data": [],
+                "recommendations": [],
+                "explainability": [],
+                "error_trace": str(circuit_error)[:300],
+            }, cls=CustomEncoder),
+        }).eq('id', task_id).execute()
+        return "rate_limited"
     except Exception as canary_error:
         _record_stage_latency("worker_task_failed", started_at=task_started_at, status="failed")
         _flush_stage_latency_buffer()

@@ -293,6 +293,47 @@ const buildAnalysisRequestKey = (
   ].join("::")
 }
 
+const POLLING_IMMEDIATE_DELAY_MS = 0;
+const POLLING_FAST_INTERVAL_MS = 1000;
+const POLLING_ERROR_RETRY_MS = 1500;
+const POLLING_REQUEST_TIMEOUT_MS = 5000;
+const MAX_POLL_RETRIES = 30;
+
+const parseTaskResultPayload = (value: any): any => {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+const normalizeTaskStatusPayload = (payload: any): { status: string; result: any } => {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const nestedData = source.data && typeof source.data === "object" ? source.data : {};
+  const rawStatus = source.status ?? nestedData.status ?? source.task_status ?? nestedData.task_status ?? "";
+  const result =
+    source.result ??
+    source.results_json ??
+    source.final_struct ??
+    nestedData.result ??
+    nestedData.results_json ??
+    nestedData.final_struct ??
+    null;
+
+  const parsedResult = parseTaskResultPayload(result);
+  const hasMaterializedResult =
+    parsedResult !== null &&
+    parsedResult !== undefined &&
+    !(typeof parsedResult === "object" && !Array.isArray(parsedResult) && Object.keys(parsedResult).length === 0);
+
+  return {
+    ...source,
+    status: String(rawStatus || (hasMaterializedResult ? "completed" : "")).toLowerCase(),
+    result: parsedResult,
+  };
+}
+
 export function ChatInterface() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -457,6 +498,7 @@ export function ChatInterface() {
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingAbortRef = useRef<AbortController | null>(null);
   const pollingInFlightRef = useRef(false);
+  const pollRetryCountRef = useRef(0);
   const [pollingFallbackEnabled, setPollingFallbackEnabled] = useState(false);
   const pendingTaskResultRef = useRef<{ taskId: string; data: any } | null>(null);
   const activeAnalysisRequestRef = useRef<{ key: string; taskId: string | null } | null>(null);
@@ -863,7 +905,7 @@ export function ChatInterface() {
       }
 
       const status = String(payload?.status || '').toLowerCase();
-      if (!['completed', 'success', 'failed', 'timeout'].includes(status)) {
+      if (!['completed', 'success', 'failed', 'timeout', 'rate_limited'].includes(status)) {
         return;
       }
 
@@ -921,10 +963,22 @@ export function ChatInterface() {
     };
 
     const runPoll = async () => {
-      if (cancelled || pollingInFlightRef.current) return;
+      if (cancelled) return;
+      pollRetryCountRef.current++;
+      if (pollRetryCountRef.current > MAX_POLL_RETRIES) {
+        console.error('⛔ [Polling] Máximo de reintentos alcanzado. Abortando.');
+        setIsAnalyzing(false);
+        setActiveTaskId(null);
+        return;
+      }
+      if (pollingInFlightRef.current) {
+        scheduleNextPoll(POLLING_FAST_INTERVAL_MS);
+        return;
+      }
 
       pollingInFlightRef.current = true;
       const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), POLLING_REQUEST_TIMEOUT_MS);
       pollingAbortRef.current = controller;
 
       try {
@@ -938,15 +992,22 @@ export function ChatInterface() {
             cache: 'no-store',
           });
           if (!response.ok) {
-            scheduleNextPoll(1800);
+            scheduleNextPoll(POLLING_FAST_INTERVAL_MS);
             return;
           }
 
           data = await response.json();
+          if (cancelled) return;
         }
 
-        if (data.status === 'completed' || data.status === 'failed' || data.status === 'timeout') {
+        data = normalizeTaskStatusPayload(data);
+        const resolvedStatus = data.status;
+        console.log('[Polling] Estado recibido:', resolvedStatus, '| task:', activeTaskId);
+        console.log('[SPY] Terminal condition:', resolvedStatus, 'activeTaskId:', activeTaskId, 'isAnalyzing:', isAnalyzing);
+        if (resolvedStatus === 'completed' || resolvedStatus === 'success' || resolvedStatus === 'failed' || resolvedStatus === 'timeout' || resolvedStatus === 'rate_limited') {
           clearPollingState();
+          pollRetryCountRef.current = 0;
+          data.status = resolvedStatus === 'success' ? 'completed' : resolvedStatus;
 
           const componentsList: AnalysisComponent[] = [];
 
@@ -1129,6 +1190,7 @@ export function ChatInterface() {
           // --- FASE 5: Separación de Responsabilidades ---
           const visualComponents = componentsList.filter(c => VISUAL_COMPONENT_TYPES.includes(c.type as (typeof VISUAL_COMPONENT_TYPES)[number]));
           const chatComponents = componentsList.filter(c => !VISUAL_COMPONENT_TYPES.includes(c.type as (typeof VISUAL_COMPONENT_TYPES)[number]));
+          console.log('[SPY] componentsList:', componentsList.length, 'visualComponents:', visualComponents.length, 'chatComponents:', chatComponents.length, '| data.status:', data.status);
 
           if (visualComponents.length > 0) {
             stageWorkspaceVisuals(visualComponents);
@@ -1160,12 +1222,13 @@ export function ChatInterface() {
             if (componentsList.length > 0) {
               saveMessageToBackend('assistant', componentsList);
               processedTasksRef.current.add(activeTaskId!);
-            } else if (data.status === 'failed' || data.status === 'timeout') {
+            } else if (data.status === 'failed' || data.status === 'timeout' || data.status === 'rate_limited') {
               saveMessageToBackend('assistant', [{ type: 'error', content: finalContent }]);
               processedTasksRef.current.add(activeTaskId!);
             }
           }
 
+          console.log('[SPY] Before setMessages — activeTaskId:', activeTaskId, 'finalContent length:', finalContent.length, 'chatComponents:', chatComponents.length, 'visualComponents:', visualComponents.length);
           setMessages(prevMessages => prevMessages.map(msg =>
             msg.id === activeTaskId
               ? {
@@ -1182,7 +1245,8 @@ export function ChatInterface() {
           }
           setActiveTaskId(null);
           setIsAnalyzing(false);
-          if (data.status === 'failed' || data.status === 'timeout') {
+          console.log('[SPY] After setActiveTaskId(null) + setIsAnalyzing(false) — status:', data.status);
+          if (data.status === 'completed' || data.status === 'failed' || data.status === 'timeout' || data.status === 'rate_limited') {
             setWorkspaceRenderState({
               status: 'idle',
               message: null,
@@ -1197,14 +1261,18 @@ export function ChatInterface() {
           return;
         }
 
-        scheduleNextPoll(1800);
+        scheduleNextPoll(POLLING_FAST_INTERVAL_MS);
       } catch (error: any) {
         if (error?.name === 'AbortError') {
+          if (!cancelled) {
+            scheduleNextPoll(POLLING_ERROR_RETRY_MS);
+          }
           return;
         }
-        console.error(`Error durante el polling:`, error);
-        scheduleNextPoll(2200);
+        console.error('[SPY] Polling error catch — name:', error?.name, 'message:', error?.message, 'cancelled:', cancelled);
+        scheduleNextPoll(POLLING_ERROR_RETRY_MS);
       } finally {
+        clearTimeout(requestTimeout);
         pollingInFlightRef.current = false;
         if (pollingAbortRef.current === controller) {
           pollingAbortRef.current = null;
@@ -1212,7 +1280,7 @@ export function ChatInterface() {
       }
     };
 
-    scheduleNextPoll(600);
+    scheduleNextPoll(POLLING_IMMEDIATE_DELAY_MS);
     return () => {
       cancelled = true;
       clearPollingState();
@@ -1278,6 +1346,7 @@ export function ChatInterface() {
     }
 
     const currentMessage = textToSend.trim();
+    console.time('🕵️\u200d♂️ [ESPÍA TOTAL] triggerAnalysis');
     const analysisRequestKey = buildAnalysisRequestKey(
       analysisFileId,
       currentMessage,
@@ -1323,7 +1392,9 @@ export function ChatInterface() {
     // Guardamos historial visual limpio
     saveMessageToBackend('user', currentMessage);
 
+    console.time('🕵️\u200d♂️ [ESPÍA AUTH] getChatAccessToken');
     const accessToken = await getChatAccessToken();
+    console.timeEnd('🕵️\u200d♂️ [ESPÍA AUTH] getChatAccessToken');
     if (!accessToken) {
       toast.error("Sesión expirada");
       activeAnalysisRequestRef.current = null;
@@ -1346,6 +1417,7 @@ export function ChatInterface() {
       });
 
       // 3. Enviamos el paquete enriquecido al backend
+      console.time('🕵️‍♂️ [ESPÍA POST] Tiempo Total Petición');
       const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -1354,6 +1426,7 @@ export function ChatInterface() {
 
       if (!response.ok) throw new Error("Error en petición");
       const data = await response.json();
+      console.timeEnd('🕵️‍♂️ [ESPÍA POST] Tiempo Total Petición');
       if (activeAnalysisRequestRef.current?.key === analysisRequestKey) {
         activeAnalysisRequestRef.current = {
           key: analysisRequestKey,
@@ -1373,8 +1446,10 @@ export function ChatInterface() {
         taskId: data.task_id,
       };
       setMessages(prev => [...prev, assistantLoadingMessage]);
+      console.timeEnd('🕵️\u200d♂️ [ESPÍA TOTAL] triggerAnalysis');
 
     } catch (error: any) {
+      console.timeEnd('🕵️\u200d♂️ [ESPÍA TOTAL] triggerAnalysis');
       console.error(error);
       const errorMessage: ChatMessage = {
         id: Date.now().toString() + "-error",

@@ -5,6 +5,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.circuit_breaker import GeminiCircuitBreaker
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 
@@ -144,7 +145,10 @@ class _GenAiModelAdapter:
         }
         if config:
             request["config"] = config
-        response = self._runtime.client.models.generate_content(**request)
+        response = self._runtime.circuit_breaker.call(
+            self._runtime.client.models.generate_content,
+            **request,
+        )
         return _CompatGenerateResponse(text=_extract_text_from_response(response), raw=response)
 
 
@@ -161,6 +165,12 @@ class _GenAiRuntime:
         self._vertex_location = str(settings.GEMINI_VERTEX_LOCATION or "global")
         self._client_lock = threading.Lock()
         self._client = None
+        self.circuit_breaker = GeminiCircuitBreaker(
+            enabled=bool(settings.GEMINI_CIRCUIT_BREAKER_ENABLED),
+            failure_threshold=int(settings.GEMINI_CIRCUIT_FAILURE_THRESHOLD),
+            recovery_timeout_seconds=int(settings.GEMINI_CIRCUIT_RECOVERY_TIMEOUT_SECONDS),
+            half_open_max_calls=int(settings.GEMINI_CIRCUIT_HALF_OPEN_MAX_CALLS),
+        )
 
     def _build_client(self) -> Any:
         kwargs: dict[str, Any] = {}
