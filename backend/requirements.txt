@@ -22,3 +22,5 @@ python-multipart
 pytest
 sentry-sdk[fastapi]>=2.0.0
 langfuse>=2.0.0
+python-dotenv
+httpx
