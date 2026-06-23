@@ -618,7 +618,7 @@ def get_task_status(task_id: str):
 
         response = supabase.table('analysis_tasks').select('status, results_json').eq('id', task_id).single().execute()
 
-        if response.data and response.data.get('status') in ['completed', 'failed', 'timeout']:
+        if response.data and response.data.get('status') in ['completed', 'failed', 'timeout', 'rate_limited']:
             results_payload = response.data.get('results_json')
 
             if isinstance(results_payload, str):

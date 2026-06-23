@@ -14,6 +14,10 @@ async def sse_generator(request: Request, task_id: str):
     """
     Generador SSE que se suscribe al canal de Redis de una task
     y emite eventos al frontend.
+
+    Timeout alineado con soft_time_limit de Celery (180s).
+    Heartbeat cada 3s para mantener la conexión viva a través
+    de proxies (Cloud Run, nginx, CDN).
     """
     pubsub = get_pubsub_client()
     if not pubsub:
@@ -24,8 +28,8 @@ async def sse_generator(request: Request, task_id: str):
     pubsub.subscribe(channel)
 
     try:
-        # Timeout safety
-        for _ in range(150): # Máximo 15 segundos (150 iteraciones x 0.1s)
+        # 1800 iteraciones × 0.1s = 180 segundos (= soft_time_limit de Celery)
+        for tick in range(1800):
             if await request.is_disconnected():
                 break
                 
@@ -43,10 +47,18 @@ async def sse_generator(request: Request, task_id: str):
                     or '"status": "completed"' in data
                     or '"status": "failed"' in data
                     or '"status": "timeout"' in data
+                    or '"status": "rate_limited"' in data
                 ):
                     break
             
             await asyncio.sleep(0.1)
+
+            # Heartbeat cada 3 segundos para mantener la conexión viva.
+            # El comentario SSE (línea que empieza con ':') es ignorado
+            # por EventSource pero impide que Cloud Run / proxies cierren
+            # la conexión por inactividad.
+            if tick % 30 == 0 and tick > 0:
+                yield ": heartbeat\n\n"
     finally:
         pubsub.unsubscribe(channel)
         pubsub.close()
@@ -63,5 +75,10 @@ async def stream_task_progress(task_id: str, request: Request):
         
     return StreamingResponse(
         sse_generator(request, task_id),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
