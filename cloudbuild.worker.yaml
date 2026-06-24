@@ -31,7 +31,7 @@ steps:
       - '--instances=1'
       - '--memory=4Gi'
       - '--command=celery'
-      - '--args=-A,app.celery_app,worker,--loglevel=info,--pool=prefork,--concurrency=20,--max-tasks-per-child=50,-Ofair,--prefetch-multiplier=1,-Q,default,analysis,background'
+      - '--args=^|^-A|app.celery_app|worker|--loglevel=info|--pool=prefork|--concurrency=20|--max-tasks-per-child=50|-Ofair|--prefetch-multiplier=1|-Q|default,analysis,background'
       - '--update-env-vars=^|^REDIS_MAX_CONNECTIONS_RATE_LIMIT=20|REDIS_MAX_CONNECTIONS_AI_CACHE=20|REDIS_MAX_CONNECTIONS_HEALTHCHECK=5|REDIS_MAX_CONNECTIONS_DEFAULT=20|CELERY_BROKER_POOL_LIMIT=20|CELERY_RESULT_BACKEND_MAX_CONNECTIONS=20|GEMINI_RETRY_MAX_RETRIES=3|GEMINI_RETRY_BASE_DELAY_SECONDS=1.0|GEMINI_RETRY_MAX_DELAY_SECONDS=15.0|GEMINI_RETRY_JITTER_SECONDS=0.5'
     waitFor: ['push-worker-image']
 
