@@ -41,7 +41,7 @@ def _before_send(event: dict, hint: dict) -> dict | None:
             return event
 
         # Otros transitorios (503, timeout) → agrupar
-        transient_markers = ("503", "504", "timeout", "cancelled", "unavailable")
+        transient_markers = ("503", "504", "timeout", "timed out", "cancelled", "unavailable")
         if any(m in error_text for m in transient_markers):
             event["level"] = "warning"
             event["fingerprint"] = ["gemini-transient-error"]
