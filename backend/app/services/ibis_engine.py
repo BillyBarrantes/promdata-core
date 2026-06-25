@@ -247,6 +247,21 @@ class IbisEngine:
             except Exception as e:
                 print(f"⚠️ Error en resolución simbólica: {e}")
 
+        import re as _re
+        if isinstance(val, str):
+            _agg_match = _re.match(r'^(max|min|avg|sum)\((\w+)\)$', val.strip())
+            if _agg_match:
+                _agg_func, _agg_col = _agg_match.group(1), _agg_match.group(2)
+                if _agg_col in t.columns:
+                    print(f"🧠 [IBIS] Resolviendo agregado '{_agg_func}({_agg_col})' como filtro...")
+                    try:
+                        _agg_result = getattr(t[_agg_col], _agg_func)().to_pyarrow().as_py()
+                        print(f"   -> {_agg_func}({_agg_col}) = {_agg_result} (tipo: {type(_agg_result).__name__})")
+                        if _agg_result is not None:
+                            val = _agg_result
+                    except Exception as _agg_e:
+                        print(f"⚠️ Error resolviendo agregado '{_agg_func}({_agg_col})': {_agg_e}")
+
         is_string_col = 'string' in col_type or 'utf8' in col_type or 'varchar' in col_type
         if isinstance(val, list):
             coerced_values = [IbisEngine._coerce_filter_scalar(col_type, item) for item in val]
