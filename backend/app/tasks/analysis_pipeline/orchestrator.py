@@ -598,6 +598,7 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             _record_stage_latency("file_cache_lookup", started_at=file_cache_started_at, status="completed")
             _record_stage_latency("worker_task_total", started_at=task_started_at, status=cached_status)
             _flush_stage_latency_buffer()
+            publish_task_progress(task_id, {"status": cached_status})
             return cached_status
         _record_stage_latency("file_cache_lookup", started_at=file_cache_started_at, status="miss")
 

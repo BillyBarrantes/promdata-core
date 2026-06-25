@@ -3,9 +3,11 @@
 SSE Endpoint para streaming en tiempo real del progreso de las tareas (Pub/Sub).
 """
 import asyncio
+import json
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from app.core.redis_client import get_pubsub_client
+from app.core.supabase_client import get_supabase_service_client
 from app.core.config import settings
 
 router = APIRouter()
@@ -28,8 +30,8 @@ async def sse_generator(request: Request, task_id: str):
     pubsub.subscribe(channel)
 
     try:
-        # 1800 iteraciones × 0.1s = 180 segundos (= soft_time_limit de Celery)
-        for tick in range(1800):
+        # 600 iteraciones × 0.1s = 60 segundos
+        for tick in range(600):
             if await request.is_disconnected():
                 break
                 
@@ -59,6 +61,21 @@ async def sse_generator(request: Request, task_id: str):
             # la conexión por inactividad.
             if tick % 30 == 0 and tick > 0:
                 yield ": heartbeat\n\n"
+
+            # Fallback: consultar Supabase cada 5s (50 ticks × 0.1s)
+            # como respaldo si el mensaje Pub/Sub del worker no llega
+            # (ej. cache-hit donde publish_task_progress se perdió).
+            if tick % 50 == 0 and tick > 0:
+                try:
+                    sb = get_supabase_service_client()
+                    if sb:
+                        row = sb.table("analysis_tasks").select("status").eq("id", task_id).single().execute()
+                        task_status = row.data.get("status") if row.data else None
+                        if task_status in ("completed", "failed", "timeout"):
+                            yield f"data: {json.dumps({'status': task_status})}\n\n"
+                            break
+                except Exception:
+                    pass
     finally:
         pubsub.unsubscribe(channel)
         pubsub.close()
