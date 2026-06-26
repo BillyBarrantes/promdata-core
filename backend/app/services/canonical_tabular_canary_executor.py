@@ -517,6 +517,16 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
     if not analysis_blocks:
         raise RuntimeError(f"canonical_canary_empty_result:{execution.metadata.get('shadow_query_status')}")
 
+    # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2) — resolved date
+    # Extraer _snapshot_resolved_date del primer result_payload que lo tenga
+    # para usarlo como fallback cuando is_latest_snapshot no está disponible
+    # en candidate_df (pipeline Ibis canónico no siempre propaga la columna).
+    _snapshot_resolved_date = next(
+        (rp["_snapshot_resolved_date"] for rp in execution.execution_results
+         if isinstance(rp, dict) and rp.get("_snapshot_resolved_date")),
+        None
+    )
+
     if final_struct["data"]:
         arrow_data = _try_records_to_arrow_base64(_safe_list(final_struct["data"]))
         if arrow_data and len(arrow_data) <= 4 * 1024 * 1024:
@@ -537,6 +547,26 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
             latest_mask = candidate_df["is_latest_snapshot"] == True
             if bool(latest_mask.any()):
                 snapshot_df = candidate_df[latest_mask]
+        elif _snapshot_resolved_date:
+            date_col = _snapshot_resolved_date["column"]
+            date_val = _snapshot_resolved_date["value"]
+            try:
+                mask = candidate_df[date_col].astype(str).str.contains(date_val)
+                snapshot_df = candidate_df[mask]
+                if len(snapshot_df) == 0:
+                    print(
+                        f"⚠️ [SNAPSHOT-RESOLVED] Formato no-ISO en '{date_col}': "
+                        f"filtro '{date_val}' retornó 0 filas. "
+                        f"Activando fallback completo con orden descendente."
+                    )
+                    snapshot_df = candidate_df
+                snapshot_df = snapshot_df.sort_values(by=date_col, ascending=False)
+                print(
+                    f"📸 [SNAPSHOT-RESOLVED] Filtrado por fecha máxima "
+                    f"'{date_col}' = '{date_val}': {len(snapshot_df)} filas"
+                )
+            except Exception as e:
+                print(f"⚠️ [SNAPSHOT-RESOLVED] Fallback filter falló: {e}")
 
         total_snapshot_rows = len(snapshot_df)
         serialization_df = snapshot_df
@@ -593,6 +623,26 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 latest_mask = snapshot_df["is_latest_snapshot"] == True
                 if bool(latest_mask.any()):
                     snapshot_df = snapshot_df[latest_mask]
+            elif _snapshot_resolved_date:
+                date_col = _snapshot_resolved_date["column"]
+                date_val = _snapshot_resolved_date["value"]
+                try:
+                    mask = snapshot_df[date_col].astype(str).str.contains(date_val)
+                    filtered = snapshot_df[mask]
+                    if len(filtered) == 0:
+                        print(
+                            f"⚠️ [SNAPSHOT-RESOLVED-FALLBACK] Formato no-ISO en '{date_col}': "
+                            f"filtro '{date_val}' retornó 0 filas. "
+                            f"Activando fallback completo con orden descendente."
+                        )
+                        filtered = snapshot_df
+                    snapshot_df = filtered.sort_values(by=date_col, ascending=False)
+                    print(
+                        f"📸 [SNAPSHOT-RESOLVED-FALLBACK] Filtrado por fecha máxima "
+                        f"'{date_col}' = '{date_val}': {len(snapshot_df)} filas"
+                    )
+                except Exception as e:
+                    print(f"⚠️ [SNAPSHOT-RESOLVED-FALLBACK] Fallback filter falló: {e}")
             serialization_df = (
                 snapshot_df.head(_MAX_SNAPSHOT_ROWS)
                 if len(snapshot_df) > _MAX_SNAPSHOT_ROWS
