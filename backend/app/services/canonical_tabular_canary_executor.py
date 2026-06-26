@@ -399,16 +399,19 @@ def _build_chart_option(
             # Standard: equals without prefix, other operators with prefix
             plan_filters[col] = f"{op} {val_str}" if op != "==" else val_str
 
-    # [FIX 2026-06-??] Cross-filter snapshot inheritance
-    # El Ibis engine aplica is_latest_snapshot == True imperativamente
-    # (no via intent.filters) para datasets snapshot. Si no lo reflejamos
-    # en chart_base_filters, el frontend hace cross-filter sobre TODO
-    # el historial en vez de solo la instantánea.
-    if (
-        not plan_filters.get("is_latest_snapshot")
-        and result_payload.get("_snapshot_guard_applied")
-    ):
-        plan_filters["is_latest_snapshot"] = "True"
+    # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2)
+    # El frontend resuelve filtros contra columnas físicas de DuckDB.
+    # is_latest_snapshot es un flag booleano virtual que no siempre
+    # sobrevive la serialización Arrow → el frontend lo descarta.
+    # En su lugar inyectamos la columna de fecha real + valor resuelto
+    # (ej. fecha_de_stock = '2021-07-31') que SÍ es columna física
+    # en snapshot_arrow y el frontend matchea vía L1 sin degradación.
+    resolved_date = result_payload.get("_snapshot_resolved_date")
+    if resolved_date:
+        date_col = resolved_date.get("column")
+        date_val = resolved_date.get("value")
+        if date_col and date_val and date_col not in plan_filters:
+            plan_filters[date_col] = date_val
 
     if plan_filters:
         option["chart_base_filters"] = plan_filters

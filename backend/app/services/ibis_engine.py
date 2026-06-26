@@ -453,13 +453,31 @@ class IbisEngine:
             except Exception as e:
                 print(f"⚠️ [IBIS] Error extrayendo filtered_granular_df: {e}")
 
-            # [FIX 2026-06-??] Cross-filter snapshot inheritance
-            # Si el snapshot guard aplicó is_latest_snapshot == True imperativamente,
-            # propagamos la bandera al canary executor para que chart_base_filters
-            # pueda heredar el filtro y el cross-filter del frontend respete la
-            # instantánea temporal en lugar de devolver todo el historial.
+            # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2)
+            # 1) Propagar bandera de que el snapshot guard se aplicó (legacy)
+            # 2) Resolver la fecha máxima real de la columna temporal (time_axis)
+            #    para que el canary executor inyecte la columna física en lugar
+            #    del flag virtual is_latest_snapshot, que no siempre sobrevive
+            #    la serialización Arrow en DuckDB-WASM.
             if snapshot_guard_applied:
                 rounded_result['_snapshot_guard_applied'] = True
+                time_axis = str(dataset_contract.get("time_axis") or "").strip()
+                if time_axis and time_axis in t.columns:
+                    try:
+                        max_date_val = t[time_axis].max().execute()
+                        if hasattr(max_date_val, 'strftime'):
+                            max_date_str = max_date_val.strftime('%Y-%m-%d')
+                        elif max_date_val is not None:
+                            max_date_str = str(max_date_val)
+                        else:
+                            max_date_str = ""
+                        if max_date_str:
+                            rounded_result['_snapshot_resolved_date'] = {
+                                "column": time_axis,
+                                "value": max_date_str,
+                            }
+                    except Exception as e:
+                        print(f"⚠️ [IBIS] Error resolving max snapshot date: {e}")
 
             return rounded_result
         except Exception as e:
