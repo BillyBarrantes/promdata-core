@@ -419,12 +419,14 @@ class IbisEngine:
         print(f"✅ [DATA SHIELD] Validación de columnas completada. {len(available_columns)} columnas disponibles.")
 
         # 2. Aplicar Filtros Globales (Si existen en la intención)
+        snapshot_guard_applied = False
         if IbisEngine._should_apply_latest_snapshot_filter(intent, t.columns, dataset_contract):
             print("📸 [IBIS SNAPSHOT GUARD] Aplicando filtro automático is_latest_snapshot == True")
             t = t.filter(t['is_latest_snapshot'] == True)
+            snapshot_guard_applied = True
 
         t = IbisEngine._apply_intent_filters(t, intent)
-        
+
         # 3. Enrutador de Intenciones V7 (Schema-Agnostic)
         try:
             if intent.type == "trend":
@@ -439,10 +441,10 @@ class IbisEngine:
                 result = IbisEngine._analyze_predictive(t, intent)
             else:
                 return {"error": f"Intención '{intent.type}' no implementada aún en IbisEngine."}
-            
+
             # 🧹 [FASE 1] Redondeo global — elimina decimales excesivos en TODA la salida
             rounded_result = IbisEngine._round_result(result)
-            
+
             # FASE 5: Añadir la dataframe granular filtrada para Cross-Filtering local
             try:
                 # Nos aseguramos de inyectar exactamente el dataset que generó el gráfico (temporalidad correcta)
@@ -450,6 +452,14 @@ class IbisEngine:
                 rounded_result['filtered_granular_df'] = df_filtered
             except Exception as e:
                 print(f"⚠️ [IBIS] Error extrayendo filtered_granular_df: {e}")
+
+            # [FIX 2026-06-??] Cross-filter snapshot inheritance
+            # Si el snapshot guard aplicó is_latest_snapshot == True imperativamente,
+            # propagamos la bandera al canary executor para que chart_base_filters
+            # pueda heredar el filtro y el cross-filter del frontend respete la
+            # instantánea temporal en lugar de devolver todo el historial.
+            if snapshot_guard_applied:
+                rounded_result['_snapshot_guard_applied'] = True
 
             return rounded_result
         except Exception as e:

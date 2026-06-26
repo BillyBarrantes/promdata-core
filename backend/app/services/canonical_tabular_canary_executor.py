@@ -398,6 +398,18 @@ def _build_chart_option(
                 continue
             # Standard: equals without prefix, other operators with prefix
             plan_filters[col] = f"{op} {val_str}" if op != "==" else val_str
+
+    # [FIX 2026-06-??] Cross-filter snapshot inheritance
+    # El Ibis engine aplica is_latest_snapshot == True imperativamente
+    # (no via intent.filters) para datasets snapshot. Si no lo reflejamos
+    # en chart_base_filters, el frontend hace cross-filter sobre TODO
+    # el historial en vez de solo la instantánea.
+    if (
+        not plan_filters.get("is_latest_snapshot")
+        and result_payload.get("_snapshot_guard_applied")
+    ):
+        plan_filters["is_latest_snapshot"] = "True"
+
     if plan_filters:
         option["chart_base_filters"] = plan_filters
 
