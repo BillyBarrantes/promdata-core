@@ -1196,6 +1196,50 @@ async function resolveFilterCondition(
       rememberResolvedCondition(conditionCacheKey, resolvedCondition);
       return resolvedCondition;
     }
+    // ── [FIX 2026-06-26] TEMPORAL RESCUE (DUAL-GATE) ──────────────────
+    // Cuando la columna existe pero el match directo (string = string)
+    // devolvió 0 filas, puede ser un type mismatch o un format mismatch:
+    //
+    // Gate 1: La columna es de tipo temporal (TIMESTAMP, DATE, TIME)
+    //         → El valor string '2021-07-31' no matchea contra TIMESTAMP.
+    //         → Ejemplo: PyArrow preservó datetime64 → DuckDB lo ve como TIMESTAMP.
+    // Gate 2: La columna es VARCHAR pero el VALOR tiene forma de fecha
+    //         (detectado por buildTemporalValueCandidates, que parsea
+    //          ISO dates, DD/MM/YYYY, YYYY-MM, "Month YYYY", etc.)
+    //         → El formato del string difiere del almacenado (ej. el
+    //           backend envía '2021-07-31' pero el archivo tenía '31/07/2021').
+    //
+    // Sin este dual-gate, el guard de L1 preserva un filtro string literal
+    // que no matchea, y el resolver temporal de L3 NUNCA se ejecuta porque
+    // L1 ya retornó con el guard.
+    //
+    // ¿Por qué es seguro el Gate 2?
+    // buildTemporalValueCandidates() valida estructura estricta (regex):
+    //   - "2021-07-31" → {year:2021, month:7, day:31, kind:'iso_date'}
+    //   - "PAMPAS" → [] (no es fecha → NO se activa)
+    //   - "12345" → podría ser year_only, pero tryResolveTemporalCondition
+    //     verifica con COUNT(*) real → si no hay filas, falla seguro.
+    const colSchema = columns.find(c => String(c.column_name) === dimension);
+    const colDataType = colSchema ? String(colSchema.data_type) : '';
+    const isColTemporal = isTemporalType(colDataType);
+    const isValueDateLike = temporalCandidates.length > 0;
+
+    if (isColTemporal || isValueDateLike) {
+      if (temporalCandidates.length > 0) {
+        const temporalCondition = await tryResolveTemporalCondition(
+          tableName, dimension, temporalCandidates
+        );
+        if (temporalCondition) {
+          console.log(
+            `🦆 [CROSS-FILTER] L1 temporal rescue (${isColTemporal ? 'col=temporal' : 'val=date-like'}): ` +
+            `"${dimension}" ← "${value}" ✅`
+          );
+          rememberResolvedCondition(conditionCacheKey, temporalCondition);
+          return temporalCondition;
+        }
+      }
+    }
+
     // [GUARD] Columna existe pero count=0: preservar filtro exacto para
     // evitar que L2 enlace el valor contra otra columna incorrecta.
     // Sin esto, un filtro "tipo_movimiento='Ingreso'" que no matchee
