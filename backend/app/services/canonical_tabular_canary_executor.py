@@ -333,6 +333,7 @@ def _build_chart_option(
     result_payload: dict[str, Any],
     currency_meta: dict[str, Any],
     schema_profile: dict[str, Any],
+    _snapshot_resolved_date: dict | None = None,
 ) -> dict[str, Any] | None:
     chart_type = _normalize_chart_type(result_payload.get("chart_type"))
     ui_chart_type = normalize_visual_id(result_payload.get("chart_type"))
@@ -406,7 +407,7 @@ def _build_chart_option(
     # En su lugar inyectamos la columna de fecha real + valor resuelto
     # (ej. fecha_de_stock = '2021-07-31') que SÍ es columna física
     # en snapshot_arrow y el frontend matchea vía L1 sin degradación.
-    resolved_date = result_payload.get("_snapshot_resolved_date")
+    resolved_date = _snapshot_resolved_date or result_payload.get("_snapshot_resolved_date")
     if resolved_date:
         date_col = resolved_date.get("column")
         date_val = resolved_date.get("value")
@@ -459,6 +460,32 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
         },
     }
 
+    # [FIX 2026-06] Extraer _snapshot_resolved_date del primer result_payload
+    # + cómputo directo desde candidate_df como fallback con blindaje cronológico.
+    # Se ejecuta ANTES del loop de chart options porque _build_chart_option
+    # necesita este valor para inyectar chart_base_filters.
+    _snapshot_resolved_date = next(
+        (rp["_snapshot_resolved_date"] for rp in execution.execution_results
+         if isinstance(rp, dict) and rp.get("_snapshot_resolved_date")),
+        None
+    )
+    if _snapshot_resolved_date is None and dataset_contract.get("snapshot_guard_allowed"):
+        time_axis = str(dataset_contract.get("time_axis") or "").strip()
+        if time_axis and isinstance(candidate_df, pd.DataFrame) and not candidate_df.empty and time_axis in candidate_df.columns:
+            try:
+                series_dt = pd.to_datetime(candidate_df[time_axis], errors='coerce')
+                if not series_dt.dropna().empty:
+                    max_date = series_dt.max()
+                    date_str = max_date.strftime('%Y-%m-%d')
+                else:
+                    max_date = candidate_df[time_axis].max()
+                    date_str = max_date.strftime('%Y-%m-%d') if hasattr(max_date, 'strftime') else str(max_date)
+                if date_str:
+                    _snapshot_resolved_date = {"column": time_axis, "value": date_str}
+                    print(f"📸 [SNAPSHOT-RESOLVED-DIRECT] Fecha máxima cronológica: '{time_axis}' = '{date_str}'")
+            except Exception as e:
+                print(f"⚠️ [SNAPSHOT-RESOLVED-DIRECT] Error en parsing cronológico: {e}")
+
     analysis_blocks: list[str] = []
     for plan, result_payload in zip(execution.plans, execution.execution_results):
         if not isinstance(result_payload, dict):
@@ -482,6 +509,7 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 result_payload=result_payload,
                 currency_meta=currency_meta,
                 schema_profile=_safe_dict(attrs.get("schema_profile")),
+                _snapshot_resolved_date=_snapshot_resolved_date,
             )
             if option:
                 final_struct["chart_options"].append(option)
@@ -516,16 +544,6 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
 
     if not analysis_blocks:
         raise RuntimeError(f"canonical_canary_empty_result:{execution.metadata.get('shadow_query_status')}")
-
-    # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2) — resolved date
-    # Extraer _snapshot_resolved_date del primer result_payload que lo tenga
-    # para usarlo como fallback cuando is_latest_snapshot no está disponible
-    # en candidate_df (pipeline Ibis canónico no siempre propaga la columna).
-    _snapshot_resolved_date = next(
-        (rp["_snapshot_resolved_date"] for rp in execution.execution_results
-         if isinstance(rp, dict) and rp.get("_snapshot_resolved_date")),
-        None
-    )
 
     if final_struct["data"]:
         arrow_data = _try_records_to_arrow_base64(_safe_list(final_struct["data"]))
