@@ -157,6 +157,8 @@ def _summarize_schema_profile(schema_profile: dict[str, Any]) -> dict[str, Any]:
     role_counts: dict[str, int] = {}
     type_counts: dict[str, int] = {}
     for info in schema_profile.values():
+        if not isinstance(info, dict):
+            continue
         role = str(info.get("role") or "").strip()
         dtype = str(info.get("type") or "").strip()
         if role:

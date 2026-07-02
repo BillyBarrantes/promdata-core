@@ -251,6 +251,9 @@ def _build_candidate_for_table(
     translator_context_summary = DataEngine._build_translator_context_summary(schema_profile, topology_rules)
     reference_date = DataEngine._detect_reference_date(working_df, schema_profile, dataset_contract)
 
+    if reference_date:
+        schema_profile["_dataset_year"] = int(reference_date[:4])
+
     working_df = _attach_dataframe_contract_attrs(
         working_df,
         schema_profile=schema_profile,

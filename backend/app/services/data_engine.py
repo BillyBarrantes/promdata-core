@@ -7,6 +7,8 @@ import re
 import os
 import unicodedata
 
+from app.core.structured_logging import emit_structured_log
+
 class DataEngine:
     """
     Motor de Ingeniería de Datos V3 (Unicorn Edition).
@@ -1202,17 +1204,40 @@ class DataEngine:
     @staticmethod
     def _detect_reference_date(df: pd.DataFrame, schema_profile: dict, semantic_contract: dict) -> str:
         if df is None or df.empty:
-            return str(pd.Timestamp.now().date())
+            result = str(pd.Timestamp.now().date())
+            emit_structured_log("reference_date_detected", reference_date=result, method="system_fallback")
+            return result
 
-        if semantic_contract.get('snapshot_guard_allowed'):
-            date_cols_for_ref = [c for c, info in schema_profile.items() if info.get('role') == 'date' and c in df.columns]
-            if date_cols_for_ref:
-                ref_col = date_cols_for_ref[0]
-                try:
-                    return str(pd.to_datetime(df[ref_col], errors='coerce').max().date())
-                except Exception:
-                    return str(pd.Timestamp.now().date())
-        return str(pd.Timestamp.now().date())
+        # 1. Intentar columnas con role='date' en schema_profile (más confiable)
+        date_cols = [
+            c for c, info in schema_profile.items()
+            if info.get('role') == 'date' and c in df.columns
+        ]
+        for ref_col in date_cols:
+            try:
+                result = str(pd.to_datetime(df[ref_col], errors='coerce').max().date())
+                emit_structured_log("reference_date_detected", reference_date=result, method="role_date")
+                return result
+            except Exception:
+                continue
+
+        # 2. Fallback: cualquier columna con min/max ISO en schema_profile
+        for col, info in schema_profile.items():
+            if not isinstance(info, dict) or col not in df.columns:
+                continue
+            for key in ('max', 'min'):
+                raw = info.get(key)
+                if raw and re.match(r'\d{4}-\d{2}-\d{2}', str(raw)):
+                    try:
+                        result = str(pd.to_datetime(df[col], errors='coerce').max().date())
+                        emit_structured_log("reference_date_detected", reference_date=result, method="fallback_iso")
+                        return result
+                    except Exception:
+                        continue
+
+        result = str(pd.Timestamp.now().date())
+        emit_structured_log("reference_date_detected", reference_date=result, method="system_fallback")
+        return result
 
     @staticmethod
     def _contract_path_from_parquet_path(parquet_path: str) -> str:

@@ -1,8 +1,12 @@
 import ibis
 import pandas as pd
 import datetime
+import re
 from app.services.data_engine import DataEngine
 from app.services.snapshot_guard import should_apply_latest_snapshot_filter
+from app.services.semantic_translator.temporal_resolver import (
+    normalize_intent_temporal_filters,
+)
 from app.core.semantic_grammar import (
     AnalysisPlan, DescriptiveIntent, TimeTrendIntent, DistributionIntent, 
     TimeGrain, DiagnosticIntent, PredictiveIntent, DataFilter
@@ -229,6 +233,62 @@ class IbisEngine:
         return value
 
     @staticmethod
+    def _sanitize_intent_projection(intent, available_columns: set, dataset_contract: dict | None = None) -> None:
+        """
+        [V1] Sanitización Universal de Proyecciones.
+
+        Portal centralizado que limpia el intent ANTES de que llegue a
+        cualquiera de los 7 métodos _analyze_*.  Garantiza que:
+        1. group_by nunca contenga la dimensión primaria (evita
+           'Duplicate column name' en DuckDB/Ibis).
+        2. Filtros 'between' (no soportados por FilterOperator) se
+           expandan a pares >= / <= que _build_filter_expression
+           procesa nativamente.
+
+        Es idempotente y seguro: si no hay colisión ni between,
+        el intent no se modifica.
+        """
+        # ── 1. Escudo de Duplicados (group_by vs dimension) ──────────
+        dim = getattr(intent, 'dimension', None)
+        gb = list(getattr(intent, 'group_by', None) or [])
+
+        if dim and gb and dim in gb:
+            deduped = [c for c in gb if c != dim]
+            if len(deduped) < len(gb):
+                intent.group_by = deduped
+                print(
+                    f"🧹 [IBIS SANITIZE] group_by deduplicado: "
+                    f"'{dim}' removido → {deduped}"
+                )
+
+        # ── 2. Expansión de filtros 'between' ────────────────────────
+        raw_filters = list(getattr(intent, 'filters', None) or [])
+        sanitized_filters: list = []
+        mutated = False
+        for f in raw_filters:
+            op = str(getattr(f, 'operator', '') or '').strip().lower()
+            if op == 'between' and isinstance(getattr(f, 'value', None), str):
+                parts = f.value.split(' and ')
+                if len(parts) == 2:
+                    lo, hi = parts[0].strip(), parts[1].strip()
+                    sanitized_filters.append(
+                        DataFilter(column=f.column, operator='>=', value=lo)
+                    )
+                    sanitized_filters.append(
+                        DataFilter(column=f.column, operator='<=', value=hi)
+                    )
+                    print(
+                        f"🧹 [IBIS SANITIZE] Filtro between expandido: "
+                        f"'{f.column}' → ['>= {lo}', '<= {hi}']"
+                    )
+                    mutated = True
+                    continue
+            sanitized_filters.append(f)
+
+        if mutated and hasattr(intent, 'filters'):
+            intent.filters = sanitized_filters
+
+    @staticmethod
     def _build_filter_expression(t, f: DataFilter):
         col = t[f.column]
         val = f.value
@@ -417,6 +477,46 @@ class IbisEngine:
                 setattr(intent, optional_metric_field, None)
         
         print(f"✅ [DATA SHIELD] Validación de columnas completada. {len(available_columns)} columnas disponibles.")
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🧹 IBIS SANITIZE — Sanitización Universal de Proyecciones
+        # Punto único de intercepción que blinda los 7 métodos _analyze_*
+        # contra colisiones de duplicidad y filtros no soportados.
+        # ═══════════════════════════════════════════════════════════════
+        IbisEngine._sanitize_intent_projection(intent, available_columns, dataset_contract)
+
+
+        # ═══════════════════════════════════════════════════════════════
+        # 🕐 TEMPORAL FORTRESS — Universal temporal filter normalization
+        # Intercepta filtros de TODOS los planes (SIMPLE + COMPLEJO) y
+        # corrige años ISO alucinados por el LLM antes de aplicar filtros.
+        # ═══════════════════════════════════════════════════════════════
+        if dataset_contract:
+            temporal_schema: dict = {}
+            evidence = dataset_contract.get('evidence', {})
+            if isinstance(evidence, dict):
+                max_date = str(evidence.get('max_date', '')).strip()
+                if max_date:
+                    year_match = re.match(r'(\d{4})', max_date)
+                    if year_match:
+                        temporal_schema['_dataset_year'] = int(year_match.group(1))
+            for date_col in dataset_contract.get('date_columns', []) or []:
+                if date_col not in temporal_schema:
+                    temporal_schema[date_col] = {'type': 'temporal', 'role': 'date'}
+            time_axis_col = str(dataset_contract.get('time_axis', '') or '').strip()
+            if time_axis_col and time_axis_col not in temporal_schema:
+                temporal_schema[time_axis_col] = {'type': 'temporal', 'role': 'date'}
+            if temporal_schema:
+                corrected = normalize_intent_temporal_filters(
+                    intent, temporal_schema
+                )
+                if corrected is not intent:
+                    intent = corrected
+                    print(
+                        "🕐 [TEMPORAL FORTRESS] Filtros temporales del intent "
+                        "normalizados (corrección de año ISO)"
+                    )
+
 
         # 2. Aplicar Filtros Globales (Si existen en la intención)
         snapshot_guard_applied = False
@@ -1050,6 +1150,12 @@ class IbisEngine:
                     intent.limit = min(intent.limit, 15)
                 elif unique_count > 40:
                     intent.limit = min(intent.limit, 20)
+                elif unique_count <= 30 and not getattr(intent, 'ranking_metric', None):
+                    # [FIX 2026-07-01] Regla de Densidad Estándar:
+                    # mostrar TODOS los valores (hasta 30) cuando no hay
+                    # ranking_metric explícito (si lo hay, usuario pidió
+                    # Top N → mantener su limit).
+                    intent.limit = unique_count
             except Exception as card_e:
                 print(f"⚠️ [DISTRIBUTION] Error detectando cardinalidad: {card_e}")
 

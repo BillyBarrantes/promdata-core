@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from app.core.structured_logging import emit_structured_log
@@ -154,6 +155,28 @@ def build_canonical_tabular_production_execution(
                             None,
                         )
                         if gemini_match is None:
+                            # [V5] TOKEN BOUNDARY GUARD: Solo inyectar si el valor
+                            # aparece como palabra completa en el prompt Y tiene ≥4 chars.
+                            # Previene falsos positivos como 'ENT' matcheando en 'vENcimiento'.
+                            _lf_val_str = str(lf.value).strip()
+                            if len(_lf_val_str) < 4:
+                                print(
+                                    f"⚠️ [LITERAL FILTER → BLOCKED] "
+                                    f"Token '{_lf_val_str}' demasiado corto (<4 chars). "
+                                    f"Posible falso positivo."
+                                )
+                                continue
+                            if not re.search(
+                                rf'\b{re.escape(_lf_val_str)}\b',
+                                str(actual_prompt),
+                                re.IGNORECASE,
+                            ):
+                                print(
+                                    f"⚠️ [LITERAL FILTER → BLOCKED] "
+                                    f"'{_lf_val_str}' no es token completo en el prompt. "
+                                    f"Posible substring match."
+                                )
+                                continue
                             # Columna no filtrada por Gemini → inyectar filtro literal
                             intent_filters.append(lf)
                             print(

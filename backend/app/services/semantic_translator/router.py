@@ -89,6 +89,18 @@ def route_prompt_with_semantic_router(
     Si el usuario pide "graficar X pero ordenar por Y", usa plot_metric=X y ranking_metric=Y.
     Si el usuario excluye valores, usa negative_filters con operator="not_in" o "!=".
 
+    IMPORTANTE — FORMATO DE FECHAS EN FILTROS:
+    Los valores de filtros en columnas de fecha/timestamp DEBEN ser fechas ISO
+    (YYYY-MM-DD) o expresiones numéricas. NUNCA uses nombres de meses ni palabras
+    sueltas como valor de filtro temporal.
+    Correcto: "value": "2021-06-01"  |  Incorrecto: "value": "junio"
+    Si el usuario dice "junio y julio", traduce a: operator ">=" value "YYYY-06-01"
+    y un segundo filtro operator "<=" value "YYYY-07-31".
+    INSTRUCCIÓN CRÍTICA — AÑO EN FECHAS: El marcador YYYY debe reemplazarse
+    con FECHA_REFERENCIA_DATASET si existe en la topología del análisis,
+    o inferirse del rango de fechas real del dataset. Si no hay información
+    del año del dataset, usa el año de los datos que ves en el contexto.
+
     COLUMNAS: {list(columns or [])}
     SCHEMA_FINGERPRINT: {schema_fp}
     """

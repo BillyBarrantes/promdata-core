@@ -156,8 +156,8 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
   for exact metric match. Do not remove. It is the safety net when the
   primary allowed-roles match fails.
 
-### 4.3 AI Response Cache v2
-- `app/services/ai_response_cache.py` uses `_CACHE_KEY_SCHEMA_VERSION = "v2"`.
+### 4.3 AI Response Cache v3
+- `app/services/ai_response_cache.py` uses `_CACHE_KEY_SCHEMA_VERSION = "v3"`.
 - **Two prompts with the same schema but different intent MUST produce
   different cache keys.** See the long docstring at the top of that file
   for the canonical governance rules.
@@ -244,6 +244,24 @@ cloudbuild.worker.yaml    # Optional: rebuilds worker image (rarely used)
   task results. The frontend polls task status in the first few
   seconds after submit, so 24h is more than enough for retries and
   late debugging.
+
+### 4.8 Temporal Fortress (2026-07-01)
+- `app/services/snapshot_guard.py` — Contains the **trend-conditional snapshot guard**.
+  Trend intents only skip the guard when their time dimension matches the
+  contract's `time_axis`. **DO NOT simplify to "trend always skips guard".**
+- `app/services/semantic_translator/temporal_resolver.py` — Contains the
+  **_dataset_year cascade** (4-level fallback). Step 4 uses
+  `schema_profile["_dataset_year"]` injected by
+  `canonical_analytical_contract_adapter.py:255`. **DO NOT remove step 4.**
+- `app/services/semantic_translator/temporal_resolver.py` — Also contains
+  **`normalize_intent_temporal_filters()`**, the universal interception point
+  that applies temporal correction to filters from ALL routes (SIMPLE and
+  COMPLEJO). Called by `ibis_engine.execute_plan()` before `_apply_intent_filters()`.
+- `app/services/semantic_translator/validator.py:440-447` — Contains the
+  **type="temporal" structural detection**. **DO NOT remove
+  `col_meta_type == "temporal"` from `is_temporal_col`.**
+- All four are protected by `test_temporal_fortress.py` (9 regression tests).
+  If that test goes red, the temporal engine is broken.
 
 ---
 

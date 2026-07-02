@@ -59,7 +59,7 @@ from app.core.structured_logging import emit_structured_log
 
 
 _CACHE_PREFIX = "promdata:ai_cache"
-_CACHE_KEY_SCHEMA_VERSION = "v2"
+_CACHE_KEY_SCHEMA_VERSION = "v3"
 _MEMORY_CACHE: dict[str, tuple[float, str]] = {}
 _MEMORY_LOCK = threading.Lock()
 

@@ -161,6 +161,8 @@ def detect_direction_columns(
     detections: list[dict[str, Any]] = []
 
     for column_name, metadata in schema_profile.items():
+        if not isinstance(metadata, dict):
+            continue
         # Skip non-categorical columns early
         col_type = str(getattr(metadata, "type", metadata.get("type", ""))).lower()
         role = str(getattr(metadata, "role", metadata.get("role", ""))).lower()

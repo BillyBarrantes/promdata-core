@@ -1532,6 +1532,9 @@ def _build_topology_context(candidate_df: pd.DataFrame) -> str:
     translator_context = str(attrs.get("translator_context_summary") or "").strip()
     if translator_context:
         reference_date = attrs.get("reference_date")
+        emit_structured_log("topology_context_reference_date",
+            has_reference_date=bool(reference_date),
+            reference_date=reference_date or None)
         if reference_date:
             translator_context += (
                 f"\nFECHA_REFERENCIA_DATASET: {reference_date}"

@@ -20,6 +20,7 @@ from app.core.structured_logging import emit_structured_log
 from app.services.ai_response_cache import build_cache_key, get_cached_json, set_cached_json
 from app.services.direction_detector import should_split_by_flow_direction
 from app.services.metric_semantics import infer_metric_unit_from_column_name, normalize_semantic_text
+from app.services.semantic_translator.temporal_resolver import resolve_temporal_filter_value
 from app.services.semantic_translator.core import (
     humanize_column_alias,
     normalize_surface_text,
@@ -431,7 +432,54 @@ def normalize_router_filters(
             value = clean_values
 
         operator = filter_row.get("operator") or "=="
-        role = schema_profile.get(resolved_column, {}).get("role")
+
+        # ═══════════════════════════════════════════════════════════════
+        # ADR-TEMPORAL-003: type="temporal" Structural Detection
+        # Date: 2026-07-01
+        # Status: ACCEPTED — DO NOT MODIFY without test_temporal_fortress.py GREEN
+        #
+        # DECISION: is_temporal_col debe verificar col_meta.get("type") == "temporal"
+        # ademas de role=="time" y dtype patterns.
+        #
+        # RAZON: El canonical_schema_profiler asigna type="temporal" + role="date"
+        # a columnas datetime. Sin el check de type, columnas como fecha_de_stock
+        # (role="date", NO "time") no activan el temporal resolver, y los anos
+        # ISO alucinados por el LLM pasan sin correccion.
+        #
+        # RIESGO DE ALTERAR: Si se elimina col_meta_type == "temporal", la ruta
+        # SIMPLE retorna DataFrames vacios para cualquier dataset donde el
+        # profiler asigna role="date" en vez de role="time". Regresion silenciosa.
+        #
+        # VALIDACION: test_temporal_fortress.py (T1, T2, T8)
+        # ═══════════════════════════════════════════════════════════════
+        # ── [V1] Temporal Resolver: resolve month names / between to ISO ──
+        col_meta = schema_profile.get(resolved_column, {})
+        col_role = col_meta.get("role") if isinstance(col_meta, dict) else None
+        col_dtype = str(col_meta.get("dtype", "")).lower() if isinstance(col_meta, dict) else ""
+        col_meta_type = str(col_meta.get("type", "")).lower() if isinstance(col_meta, dict) else ""
+        is_temporal_col = (
+            col_role == "time"
+            or col_meta_type == "temporal"
+            or "date" in col_dtype
+            or "timestamp" in col_dtype
+            or "datetime" in col_dtype
+        )
+        if is_temporal_col:
+            resolved = resolve_temporal_filter_value(
+                resolved_column, operator, value, schema_profile=schema_profile
+            )
+            if resolved:
+                # El resolver produjo filtros ISO — agregar todos y saltar el filtro original
+                for rf in resolved:
+                    try:
+                        rf_validated = DataFilter.model_validate(rf)
+                        normalized_filters.append(rf_validated.model_dump(mode="json"))
+                    except Exception:
+                        pass
+                continue
+        # ── Fin Temporal Resolver ──
+
+        role = col_role
         if operator in ("==", "=") and role == "dimension":
             operator = "ilike"
         try:
