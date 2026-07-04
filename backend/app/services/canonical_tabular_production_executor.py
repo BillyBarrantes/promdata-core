@@ -240,7 +240,11 @@ def build_canonical_tabular_production_execution(
                     index=index,
                     error=(
                         "Production Metric Guard bloqueó el plan: las métricas "
-                        f"{blocked_metrics} no son agregables en el contrato canónico."
+                        f"{blocked_metrics} no existen como columnas en el dataset. "
+                        f"Columnas disponibles: "
+                        f"{sorted(list(candidate_df.columns))}. "
+                        "Usa solo columnas existentes en el plan — "
+                        "no se permiten métricas derivadas."
                     ),
                     blocked_metrics=blocked_metrics,
                 )

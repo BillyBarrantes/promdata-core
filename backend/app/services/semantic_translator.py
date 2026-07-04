@@ -2872,10 +2872,27 @@ class SemanticTranslator:
         5. 🛡️ PROTOCOLO ANTI-ALUCINACIÓN:
            - Si el usuario pide un análisis pero NO ENCUENTRAS una columna que corresponda al concepto
              (ni por nombre legible ni por glosario), NO inventes un análisis genérico.
-           - En su lugar, llena el campo "glossary_hint" con un mensaje claro:
-             Ejemplo: "No encontré una columna relacionada con 'fechas de vencimiento'. 
-             Sugiero agregar al Glosario qué columna contiene esta información."
-                       - NUNCA hagas un análisis diferente al que pidió el usuario. Si no puedes hacerlo, usa glossary_hint.
+            - En su lugar, llena el campo "glossary_hint" con un mensaje claro:
+              Ejemplo: "No encontré una columna relacionada con 'fechas de vencimiento'. 
+              Sugiero agregar al Glosario qué columna contiene esta información."
+                        - NUNCA hagas un análisis diferente al que pidió el usuario. Si no puedes hacerlo, usa glossary_hint.
+
+         5.1 🚫 PROHIBICIÓN DE MÉTRICAS DERIVADAS:
+              - NUNCA inventes nombres de métricas que no existan en COLUMNAS DISPONIBLES.
+              - Si el usuario pide "tasa de X", "conteo de Y", "porcentaje de Z":
+                * Usa una métrica NUMÉRICA existente (ej: id_empleado, salario_mensual, nivel_desempeno)
+                * Aplica filtros sobre la dimensión relevante
+                * NO crees métricas como "tasa_rotacion", "conteo_inactivos", "porcentaje_bajas", "tasa_bajas"
+              - Ejemplo CORRECTO para "tasa de empleados inactivos por departamento":
+                * metric: "id_empleado" (métrica numérica existente como proxy de conteo)
+                * filters: [{{"column": "estado", "operator": "==", "value": "Inactivo"}}]
+                * aggregation: "count"
+                * dimension: "departamento"
+              - Ejemplo INCORRECTO (NUNCA hagas esto):
+                * metric: "tasa_rotacion" (NO existe en el dataset)
+              - REGLA DE ORO: toda métrica que uses DEBE aparecer textualmente en COLUMNAS DISPONIBLES.
+                Si necesitas contar o agregar, usa una columna existente como proxy con el filtro adecuado.
+              - Si no puedes calcular lo que pide el usuario con columnas existentes + filtros, usa glossary_hint.
 
          6. 📊 TRIPLE VISTA (Dashboard Automático) — [FASE 3C]:
             - Para análisis generales, DEBES generar EXACTAMENTE 3 planes complementarios:
