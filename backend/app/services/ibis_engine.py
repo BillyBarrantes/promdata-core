@@ -18,6 +18,33 @@ class IbisEngine:
     Lee archivos Parquet (Fase 1.1) y ejecuta planes semánticos (Fase 1.2).
     """
 
+    # ═══════════════════════════════════════════════════════════════════
+    # IBIS_FUNC_MAP — Catálogo de funciones de agregación soportadas
+    # ═══════════════════════════════════════════════════════════════════
+    # Mapea funciones del lenguaje natural (generadas por el traductor
+    # semántico) a métodos reales del motor Ibis.
+    #
+    # Soporte: MAX, MIN, SUM, AVG/MEAN, MEDIAN, COUNT, COUNT_DISTINCT,
+    #          STDDEV/STD, VARIANCE/VAR
+    #
+    # Usado en _build_filter_expression para resolver filtros que
+    # comparan contra valores agregados (ej. salario < MEDIAN(salario)).
+    # ═══════════════════════════════════════════════════════════════════
+    IBIS_FUNC_MAP: dict[str, str] = {
+        'max': 'max',
+        'min': 'min',
+        'sum': 'sum',
+        'avg': 'mean',
+        'mean': 'mean',
+        'median': 'median',
+        'count': 'count',
+        'count_distinct': 'nunique',
+        'stddev': 'std',
+        'std': 'std',
+        'variance': 'var',
+        'var': 'var',
+    }
+
     @staticmethod
     def _round_result(obj, decimals=2):
         """
@@ -309,18 +336,33 @@ class IbisEngine:
 
         import re as _re
         if isinstance(val, str):
-            _agg_match = _re.match(r'^(max|min|avg|sum)\((\w+)\)$', val.strip())
+            # Regex case-insensitive con soporte de espacios y catálogo completo
+            _agg_match = _re.match(
+                r'^(max|min|avg|mean|sum|median|count|count_distinct|stddev|std|variance|var)\(\s*(\w+)\s*\)$',
+                val.strip(),
+                _re.IGNORECASE
+            )
             if _agg_match:
-                _agg_func, _agg_col = _agg_match.group(1), _agg_match.group(2)
-                if _agg_col in t.columns:
-                    print(f"🧠 [IBIS] Resolviendo agregado '{_agg_func}({_agg_col})' como filtro...")
-                    try:
-                        _agg_result = getattr(t[_agg_col], _agg_func)().to_pyarrow().as_py()
-                        print(f"   -> {_agg_func}({_agg_col}) = {_agg_result} (tipo: {type(_agg_result).__name__})")
-                        if _agg_result is not None:
-                            val = _agg_result
-                    except Exception as _agg_e:
-                        print(f"⚠️ Error resolviendo agregado '{_agg_func}({_agg_col})': {_agg_e}")
+                _agg_func_raw, _agg_col = _agg_match.group(1), _agg_match.group(2)
+                _agg_func_lower = _agg_func_raw.lower()
+
+                # Mapear a método Ibis usando el catálogo de clase
+                _ibis_method = IbisEngine.IBIS_FUNC_MAP.get(_agg_func_lower)
+
+                if _ibis_method and _agg_col in t.columns:
+                    print(f"🧠 [IBIS] Resolviendo agregado '{_agg_func_raw}({_agg_col})' como filtro...")
+
+                    # Validar que el método exista en la columna
+                    if not hasattr(t[_agg_col], _ibis_method):
+                        print(f"⚠️ [IBIS] Función '{_ibis_method}' no soportada para columna '{_agg_col}'")
+                    else:
+                        try:
+                            _agg_result = getattr(t[_agg_col], _ibis_method)().to_pyarrow().as_py()
+                            print(f"   -> {_agg_func_raw}({_agg_col}) = {_agg_result} (tipo: {type(_agg_result).__name__})")
+                            if _agg_result is not None:
+                                val = _agg_result
+                        except Exception as _agg_e:
+                            print(f"⚠️ Error resolviendo agregado '{_agg_func_raw}({_agg_col})': {_agg_e}")
 
         is_string_col = 'string' in col_type or 'utf8' in col_type or 'varchar' in col_type
         if isinstance(val, list):
