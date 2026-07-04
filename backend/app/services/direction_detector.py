@@ -183,40 +183,42 @@ def detect_direction_columns(
             unique_vals = metadata.get("unique_values", metadata.get("values", []))
             values = {_normalize_value(v) for v in unique_vals if _normalize_value(v)}
 
-        if len(values) < _MIN_DIRECTION_CARDINALITY:
-            # [FALLBACK] Schema has cardinality but no unique_values (production path).
-            # Use column name semantics as a signal for direction detection.
-            is_direction = _column_name_signals_direction(column_name, cardinality)
-            if not is_direction:
-                continue
-            # Speculative detection: column name suggests direction, cardinality is 2-3.
-            # Confidence 0.92 — above the 0.90 threshold but below a perfect value match.
-            detections.append({
-                "column_name": column_name,
-                "detected_pair": set(),  # unknown pair (speculative)
-                "confidence": 0.92,
-                "all_values": set(),
-                "rationale": f"Column '{column_name}' has cardinality {cardinality} and direction-signaling name",
-            })
+        if len(values) >= _MIN_DIRECTION_CARDINALITY:
+            # [FIX 2026-07-04] Tenemos valores reales → validar par antónimo estricto.
+            # Si los valores NO forman un par antónimo válido (ej: "Activo"/"Inactivo"),
+            # NO usar detección por nombre — evitar falsos positivos del direction_guard.
+            is_direction, confidence = _is_antonym_pair(values)
+            if is_direction and confidence >= confidence_threshold:
+                detected_pair: set[str] = set()
+                for pair in _ANTONYM_PAIRS:
+                    if pair.issubset(values):
+                        detected_pair = set(pair)
+                        break
+                detections.append({
+                    "column_name": column_name,
+                    "detected_pair": detected_pair,
+                    "confidence": round(confidence, 2),
+                    "all_values": values,
+                    "rationale": f"Detected antonym pair {detected_pair} in column '{column_name}' with {len(values)} unique values",
+                })
+            # IMPORTANTE: Si tenemos valores pero no forman par antónimo,
+            # NO hacer detección especulativa por nombre.
             continue
 
-        is_direction, confidence = _is_antonym_pair(values)
-
-        if is_direction and confidence >= confidence_threshold:
-            # Find which pair matched
-            detected_pair: set[str] = set()
-            for pair in _ANTONYM_PAIRS:
-                if pair.issubset(values):
-                    detected_pair = set(pair)
-                    break
-
-            detections.append({
-                "column_name": column_name,
-                "detected_pair": detected_pair,
-                "confidence": round(confidence, 2),
-                "all_values": values,
-                "rationale": f"Detected antonym pair {detected_pair} in column '{column_name}' with {len(values)} unique values",
-            })
+        # [FALLBACK] No tenemos valores únicos (producción sin sample_data).
+        # Solo activar detección por nombre cuando cardinalidad es exactamente 2
+        # (par binario estricto). Cardinalidad 3+ es demasiado ambigua para
+        # detección especulativa sin valores reales.
+        if cardinality == 2:
+            is_direction = _column_name_signals_direction(column_name, cardinality)
+            if is_direction:
+                detections.append({
+                    "column_name": column_name,
+                    "detected_pair": set(),
+                    "confidence": 0.90,
+                    "all_values": set(),
+                    "rationale": f"Column '{column_name}' has cardinality 2 and direction-signaling name",
+                })
 
     return detections
 

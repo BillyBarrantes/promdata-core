@@ -2969,6 +2969,17 @@ class SemanticTranslator:
               análisis descriptivos/distributivos como "último corte" salvo que el usuario pida historia, comparación o tendencia.
             - La presencia de columnas de fecha NO implica snapshot. El contrato manda.
 
+        13. 📊 MULTI-AGREGACIÓN (Máximo + Mínimo por categoría):
+             - Si el usuario pide "máximo Y mínimo", "mínimo Y máximo", "mayor Y menor",
+               o dos agregaciones distintas sobre la MISMA métrica y dimensión,
+               genera DOS planes independientes, uno por cada agregación solicitada:
+               * Plan 1: aggregation="max", metrics=["columna_métrica"]
+               * Plan 2: aggregation="min", metrics=["columna_métrica"]
+             - CADA plan debe conservar el mismo `group_by` o `dimension` que pidió el usuario.
+             - PROHIBIDO colapsar múltiples agregaciones en un solo plan con aggregation="sum".
+               Si el usuario pide max/min, NO uses sum.
+             - Si el usuario pide más de dos agregaciones, genera un plan por cada una.
+
         --- 🧠 MEMORIA Y REGLAS DE NEGOCIO --- [FASE 3F]
         - Si `DATASET_CONTRACT.mode=snapshot`, usa el último corte como referencia natural solo cuando el análisis sea de estado actual.
         - Si `DATASET_CONTRACT.mode=flow`, trata las fechas como una serie transaccional completa y NO inventes un filtro al último corte.
