@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import re
 from typing import Any
 
+import pandas as pd
+
 from app.core.structured_logging import emit_structured_log
 from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe
 from app.services.canonical_dark_runtime_orchestrator import (
@@ -30,6 +32,280 @@ from app.services.analysis_memory_context import (
     unwrap_prompt_payload,
 )
 from app.services.semantic_translator import SemanticTranslator
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# [V4] METRIC HALLUCINATION GUARD — Auto-corrección de métricas alucinadas
+# ═══════════════════════════════════════════════════════════════════════════
+# Gemini puede inventar métricas que no existen en el dataset (ej:
+# "tasa_rotacion", "conteo_inactivos"). Este middleware detecta esas
+# alucinaciones y las reemplaza con métricas válidas, ajustando la
+# agregación a COUNT y preservando las dimensiones del plan original.
+#
+# Para tasas/porcentajes: combina dimensiones (no aplica filtro exclusivo).
+# Para conteos simples: inyecta el filtro correspondiente.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_RATE_KEYWORDS = (
+    "tasa", "porcentaje", "proporción", "ratio", "%",
+    "percentage", "rate", "proportion",
+)
+
+
+def _detect_rate_request(prompt: str | None) -> bool:
+    """Detecta si el prompt solicita una tasa, porcentaje o proporción."""
+    if not prompt:
+        return False
+    prompt_lower = prompt.lower()
+    return any(keyword in prompt_lower for keyword in _RATE_KEYWORDS)
+
+
+def _extract_categorical_dimension(
+    prompt: str | None,
+    candidate_df: pd.DataFrame,
+) -> str | None:
+    """Busca columnas categóricas (cardinalidad 2-20) relevantes en el prompt."""
+    if candidate_df is None or candidate_df.empty:
+        return None
+    categorical_columns = [
+        str(col) for col in candidate_df.columns
+        if candidate_df[col].nunique() <= 20
+        and candidate_df[col].dtype == "object"
+    ]
+    if not categorical_columns:
+        return None
+    if not prompt:
+        return categorical_columns[0]
+    prompt_lower = prompt.lower()
+    for col in categorical_columns:
+        if col.lower() in prompt_lower:
+            return col
+    return categorical_columns[0]
+
+
+def _extract_filter_value_from_prompt(
+    prompt: str | None,
+    categorical_dimension: str,
+    candidate_df: pd.DataFrame,
+) -> str | None:
+    """Extrae el valor del filtro del prompt para una columna categórica."""
+    if not prompt or not categorical_dimension or categorical_dimension not in candidate_df.columns:
+        return None
+    unique_values = candidate_df[categorical_dimension].dropna().unique()
+    prompt_lower = prompt.lower()
+    for value in unique_values:
+        if str(value).lower() in prompt_lower:
+            return str(value)
+    return None
+
+
+def _find_count_metric(
+    candidate_df: pd.DataFrame,
+    schema_profile: dict | None = None,
+) -> str:
+    """Encuentra la mejor métrica para operaciones de conteo."""
+    if candidate_df is None or candidate_df.empty:
+        return "id"
+    schema_profile = schema_profile or {}
+    # Prioridad 1: columna identificador
+    for col in candidate_df.columns:
+        col_str = str(col).lower()
+        if col_str.startswith("id_") or col_str == "id":
+            return str(col)
+    # Prioridad 2: columna numérica con role="metric"
+    for col, info in schema_profile.items():
+        if isinstance(info, dict) and info.get("role") == "metric" and col in candidate_df.columns:
+            return str(col)
+    # Prioridad 3: primera columna numérica
+    for col in candidate_df.columns:
+        try:
+            if pd.api.types.is_numeric_dtype(candidate_df[col]):
+                return str(col)
+        except Exception:
+            pass
+    # Fallback: primera columna
+    return str(candidate_df.columns[0])
+
+
+def _apply_dimension_combination(
+    plan: Any,
+    categorical_dimension: str,
+) -> None:
+    """Combina la dimensión categórica con las existentes del plan sin sobrescribir."""
+    intent = plan.main_intent
+    intent_type = getattr(intent, "type", None)
+
+    # Caso 1: Intent con group_by (DescriptiveIntent, DiagnosticIntent)
+    if hasattr(intent, "group_by") and intent_type in ("descriptive", "diagnostic"):
+        if intent.group_by is None:
+            intent.group_by = [categorical_dimension]
+        elif categorical_dimension not in intent.group_by:
+            intent.group_by = list(intent.group_by) + [categorical_dimension]
+        return
+
+    # Caso 2: DistributionIntent (dimension + group_by)
+    if intent_type == "distribution":
+        if hasattr(intent, "group_by"):
+            if intent.group_by is None:
+                intent.group_by = [categorical_dimension]
+            elif categorical_dimension not in intent.group_by:
+                intent.group_by = list(intent.group_by) + [categorical_dimension]
+        return
+
+    # Caso 3: TimeTrendIntent (split_dimension para multi-series)
+    if intent_type == "trend":
+        if hasattr(intent, "split_dimension"):
+            intent.split_dimension = categorical_dimension
+        return
+
+    # Caso 4: Fallback — usar group_by si existe
+    if hasattr(intent, "group_by"):
+        if intent.group_by is None:
+            intent.group_by = [categorical_dimension]
+        elif categorical_dimension not in intent.group_by:
+            intent.group_by = list(intent.group_by) + [categorical_dimension]
+
+
+def _replace_metric_in_plan(
+    plan: Any,
+    new_metric: str,
+    new_aggregation: str,
+) -> None:
+    """Reemplaza la métrica alucinada por una válida en el plan."""
+    intent = plan.main_intent
+    intent_type = getattr(intent, "type", None)
+
+    if intent_type == "descriptive":
+        if hasattr(intent, "metrics") and intent.metrics:
+            intent.metrics = [new_metric]
+        if hasattr(intent, "aggregation"):
+            intent.aggregation = new_aggregation
+
+    elif intent_type == "trend":
+        if hasattr(intent, "value_column"):
+            intent.value_column = new_metric
+
+    elif intent_type == "distribution":
+        if hasattr(intent, "metric"):
+            intent.metric = new_metric
+
+    elif intent_type == "diagnostic":
+        if hasattr(intent, "metric"):
+            intent.metric = new_metric
+        if hasattr(intent, "metrics") and intent.metrics:
+            intent.metrics = [new_metric]
+        if hasattr(intent, "aggregation"):
+            intent.aggregation = new_aggregation
+
+    elif intent_type == "predictive":
+        if hasattr(intent, "value_column"):
+            intent.value_column = new_metric
+
+
+def _apply_filter_correction(
+    plan: Any,
+    count_metric: str,
+    blocked_metrics: list,
+    prompt: str | None,
+    candidate_df: pd.DataFrame,
+) -> None:
+    """Aplica corrección con filtro para conteos simples (no tasas)."""
+    intent = plan.main_intent
+
+    # Reemplazar métrica
+    _replace_metric_in_plan(plan, count_metric, "count")
+
+    # Extraer dimensión categórica y valor del filtro
+    categorical_dimension = _extract_categorical_dimension(prompt, candidate_df)
+
+    if categorical_dimension:
+        filter_value = _extract_filter_value_from_prompt(
+            prompt, categorical_dimension, candidate_df
+        )
+        if filter_value and hasattr(intent, "filters"):
+            if intent.filters is None:
+                intent.filters = []
+            from app.core.semantic_grammar import DataFilter, FilterOperator
+            intent.filters = list(intent.filters) + [
+                DataFilter(
+                    column=categorical_dimension,
+                    operator=FilterOperator.EQUALS,
+                    value=filter_value,
+                )
+            ]
+            emit_structured_log(
+                "metric_correction_filter_injected",
+                categorical_dimension=str(categorical_dimension),
+                filter_value=str(filter_value),
+                intent_type=getattr(intent, "type", None),
+            )
+
+    emit_structured_log(
+        "metric_correction_filter_applied",
+        blocked_metrics=[str(m) for m in blocked_metrics],
+        count_metric=str(count_metric),
+        intent_type=getattr(intent, "type", None),
+    )
+
+
+def _apply_metric_correction(
+    plan: Any,
+    count_metric: str,
+    blocked_metrics: list,
+    prompt: str | None,
+    candidate_df: pd.DataFrame,
+) -> None:
+    """Aplica la corrección de métricas según el tipo de solicitud."""
+    is_rate_request = _detect_rate_request(prompt)
+
+    if is_rate_request:
+        categorical_dimension = _extract_categorical_dimension(prompt, candidate_df)
+        if categorical_dimension:
+            _apply_dimension_combination(plan, categorical_dimension)
+            _replace_metric_in_plan(plan, count_metric, "count")
+            emit_structured_log(
+                "metric_correction_rate_applied",
+                blocked_metrics=[str(m) for m in blocked_metrics],
+                count_metric=str(count_metric),
+                categorical_dimension=str(categorical_dimension),
+                intent_type=getattr(plan.main_intent, "type", None),
+            )
+        else:
+            _apply_filter_correction(plan, count_metric, blocked_metrics, prompt, candidate_df)
+    else:
+        _apply_filter_correction(plan, count_metric, blocked_metrics, prompt, candidate_df)
+
+
+def _auto_correct_hallucinated_metrics(
+    plans: list[Any] | None,
+    candidate_df: pd.DataFrame | None,
+    prompt: str | None = None,
+) -> list[Any]:
+    """Auto-corrige métricas alucinadas en los planes generados por Gemini."""
+    if not plans or candidate_df is None:
+        return plans if plans else []
+
+    schema_profile = dict(
+        (getattr(candidate_df, "attrs", {}) or {}).get("schema_profile", {}) or {}
+    )
+    count_metric = _find_count_metric(candidate_df, schema_profile)
+
+    corrected_plans: list[Any] = []
+    for plan in plans:
+        try:
+            blocked_metrics = _blocked_plan_metrics(plan, candidate_df)
+            if blocked_metrics:
+                _apply_metric_correction(
+                    plan, count_metric, blocked_metrics, prompt, candidate_df
+                )
+        except Exception as _metric_guard_err:
+            print(
+                f"⚠️ [METRIC GUARD] Error no-fatal en auto-corrección: "
+                f"{_metric_guard_err}"
+            )
+        corrected_plans.append(plan)
+
+    return corrected_plans
 
 
 @dataclass
@@ -218,6 +494,15 @@ def build_canonical_tabular_production_execution(
         except Exception as _lf_err:
             # El indexer nunca debe bloquear la ejecución — es best-effort
             print(f"⚠️ [LITERAL FILTER] Error no-fatal en indexer canónico: {_lf_err}")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [V4] METRIC HALLUCINATION GUARD — Auto-corrección de métricas alucinadas
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gemini puede inventar métricas que no existen en el dataset (ej:
+    # "tasa_rotacion", "conteo_inactivos"). Este interceptor detecta esas
+    # alucinaciones y las corrige ANTES de que el Metric Guard bloquee el plan.
+    # ═══════════════════════════════════════════════════════════════════════════
+    plans = _auto_correct_hallucinated_metrics(plans, candidate_df, actual_prompt)
 
     bounded_plans = list(plans[: max(int(max_plans or 0), 1)])
     plan_summaries = [_summarize_plan(plan, index + 1) for index, plan in enumerate(bounded_plans)]
