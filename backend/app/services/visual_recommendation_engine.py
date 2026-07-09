@@ -407,6 +407,22 @@ def _build_allowed_replacements(plan: Any, ibis_output: dict[str, Any]) -> list[
     return allowed
 
 
+def _has_negative_values(ibis_output: dict[str, Any]) -> bool:
+    """Check if any data point contains negative numeric values.
+    Pie charts cannot render negative values mathematically, so this
+    blocks Donut recommendations for comparison/variation data."""
+    data = ibis_output.get("data")
+    if not isinstance(data, list):
+        return False
+    for row in data[:50]:
+        if not isinstance(row, dict):
+            continue
+        for val in row.values():
+            if isinstance(val, (int, float)) and val < 0:
+                return True
+    return False
+
+
 def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tuple[bool, str | None]:
     intent_type = _intent_type(plan)
     has_temporal = _has_temporal_axis(plan)
@@ -424,8 +440,19 @@ def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tup
         return False, "Donut no es recomendable para series temporales."
     if visual == "pie_chart" and rows > 6:
         return False, "Donut pierde claridad cuando hay mas de 6 categorias."
+    if visual == "pie_chart" and _has_negative_values(ibis_output):
+        return False, "Donut no puede representar deltas o variaciones negativas."
     if visual == "treemap" and has_temporal:
         return False, "Treemap no es recomendable para evolucion temporal."
+    if visual == "treemap" and _has_negative_values(ibis_output):
+        return False, "Treemap no puede representar variaciones negativas; requiere areas positivas."
+    # ── ADR-VISUAL-003 ──────────────────────────────────────────────────
+    # Treemap areas MUST be positive (proportional representation).
+    # Variation/delta data with negative values produces invisible or
+    # mathematically incorrect areas. Redirect to grouped bar chart.
+    # ────────────────────────────────────────────────────────────────────
+    if visual == "treemap" and _has_negative_values(ibis_output):
+        return False, "Treemap no puede representar variaciones negativas; requiere areas positivas."
     if visual == "gauge_chart" and not is_percentage:
         return False, "Gauge requiere una sola metrica acotada o porcentual."
     if visual == "gauge_chart" and rows > 1:
@@ -449,6 +476,22 @@ def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tup
     return True, None
 
 
+def _has_dual_numeric_metrics(plan: Any, ibis_output: dict[str, Any]) -> bool:
+    """Detecta si hay 2 metricas numericas dispares para recomendar Combo Chart.
+    Ej: km_recorridos vs gasto_combustible_s -> barras + linea (dual axis)."""
+    data = ibis_output.get("data")
+    if not isinstance(data, list) or len(data) == 0:
+        return False
+    row = data[0]
+    if not isinstance(row, dict):
+        return False
+    numeric_keys = [k for k, v in row.items()
+                    if isinstance(v, (int, float))
+                    and k not in ('name', 'extra_info', 'value')
+                    and not k.startswith('_')]
+    return len(numeric_keys) >= 2
+
+
 def _recommend_visual(plan: Any, ibis_output: dict[str, Any]) -> tuple[str, str]:
     intent_type = _intent_type(plan)
     has_temporal = _has_temporal_axis(plan)
@@ -467,8 +510,10 @@ def _recommend_visual(plan: Any, ibis_output: dict[str, Any]) -> tuple[str, str]
         return "area_chart", "La proyeccion temporal gana legibilidad con Area para resaltar continuidad y volumen."
     if has_temporal:
         return "line_chart", "La evolucion temporal se entiende mejor con Line."
-    if intent_type == "diagnostic" and scatter_ready:
+    if intent_type == "diagnostic" and scatter_ready and not _has_dual_numeric_metrics(plan, ibis_output):
         return "scatter_plot", "La intencion diagnostica prioriza relacion y dispersion entre variables."
+    if intent_type == "diagnostic" and _has_dual_numeric_metrics(plan, ibis_output):
+        return "combo_chart", "Dos metricas dispares se visualizan mejor con Combo (Barras + Linea)."
     if intent_type == "diagnostic" and bubble_metric:
         return "bubble_chart", "La lectura diagnostica expone una tercera magnitud util para Bubble."
     if intent_type == "diagnostic" and histogram_ready:
@@ -477,9 +522,9 @@ def _recommend_visual(plan: Any, ibis_output: dict[str, Any]) -> tuple[str, str]
         return "bar_chart", "La salida diagnostica disponible no expone dos metricas numericas por punto; Bar preserva una lectura valida."
     if is_percentage and rows == 1:
         return "gauge_chart", "Una sola metrica porcentual se comunica mejor con Gauge."
-    if rows <= 6:
-        return "pie_chart", "Hay pocas categorias y la composicion se lee bien con Donut."
-    if rows <= 20:
+    if rows <= 6 and not _has_negative_values(ibis_output):
+        return "pie_chart", "Hay pocas categorías y la composición se lee bien con Donut."
+    if rows <= 20 and not _has_negative_values(ibis_output):
         return "treemap", "La densidad categorica media favorece Treemap frente a Donut."
     return "bar_chart", "La comparacion estructural gana claridad con barras."
 

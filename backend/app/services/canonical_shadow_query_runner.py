@@ -1605,14 +1605,30 @@ def _get_ibis_engine_cls():
     return IbisEngine
 
 
-def _persist_shadow_candidate(candidate_df: pd.DataFrame, *, file_id: str, candidate_id: str) -> tuple[str | None, str | None]:
+def _persist_shadow_candidate(
+    candidate_df: pd.DataFrame,
+    *,
+    file_id: str,
+    candidate_id: str,
+    related_frames: dict[str, pd.DataFrame] | None = None,
+) -> tuple[str | None, str | None, dict[str, str]]:
     working_df = _ensure_shadow_snapshot_guard_column(candidate_df)
     working_df.attrs["cleaning_notes"] = "shadow_query_runtime_candidate"
     shadow_file_id = _shadow_file_id(file_id, candidate_id)
     parquet_path = DataEngine.commit_to_parquet(working_df, shadow_file_id)
+
+    # [FASE 4 MULTI-HOJA] Persistir frames relacionados
+    related_paths: dict[str, str] = {}
+    if related_frames and parquet_path:
+        for frame_id, frame_df in related_frames.items():
+            related_shadow_id = _shadow_file_id(file_id, frame_id)
+            related_path = DataEngine.commit_to_parquet(frame_df, related_shadow_id)
+            if related_path:
+                related_paths[frame_id] = related_path
+
     if not parquet_path:
-        return shadow_file_id, None
-    return shadow_file_id, parquet_path
+        return shadow_file_id, None, related_paths
+    return shadow_file_id, parquet_path, related_paths
 
 
 def _plan_visual_protocol(plan: AnalysisPlan) -> str | None:
@@ -1870,7 +1886,7 @@ def build_canonical_shadow_query_execution(
     bounded_plans = list(plans[: max(int(max_plans or 0), 1)])
     plan_summaries = [_summarize_plan(plan, index + 1) for index, plan in enumerate(bounded_plans)]
 
-    shadow_file_id, parquet_path = _persist_shadow_candidate(
+    shadow_file_id, parquet_path, _related_paths = _persist_shadow_candidate(
         candidate_df,
         file_id=file_id,
         candidate_id=selected_candidate_id,

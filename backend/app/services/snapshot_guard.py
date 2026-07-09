@@ -91,6 +91,18 @@ def should_apply_latest_snapshot_filter(intent, table_columns: list[str], datase
             str(getattr(intent, 'date_column', '') or '')
             or str(getattr(intent, 'dimension', '') or '')
         ).strip().lower()
+
+        # [FIX 2026-07-04] Verificar contra date_columns del contrato.
+        # Si el trend usa CUALQUIER columna temporal del dataset (no solo time_axis),
+        # es una evolución histórica legítima. Omitir el guard.
+        date_columns = [col.lower() for col in dataset_contract.get('date_columns', []) or []]
+        if trend_dim and trend_dim in date_columns:
+            print(
+                "🧠 [IBIS SNAPSHOT GUARD] Omitido para trend sobre columna temporal "
+                f"del contrato: {trend_dim}"
+            )
+            return False
+
         if trend_dim and trend_dim == time_axis_lower:
             print(
                 "🧠 [IBIS SNAPSHOT GUARD] Omitido para trend sobre time_axis="

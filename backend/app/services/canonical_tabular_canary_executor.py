@@ -14,6 +14,7 @@ from app.services.canonical_shadow_query_runner import (
 )
 from app.services.chart_factory import ChartFactory
 from app.services.dashboard_narrative import generate_dashboard_executive_summary
+from app.services.smart_table_builder import should_use_smart_table, echarts_to_smart_table, build_smart_table_from_records
 from app.services.visual_recommendation_engine import build_visual_governance, normalize_visual_id
 
 
@@ -50,6 +51,9 @@ def _normalize_chart_type(value: Any) -> str:
         "scatter_plot": "scatter",
         "funnel_chart": "funnel",
         "kpi_card": "gauge",
+        "combo_chart": "combo",
+        "dual_axis_chart": "combo",
+        "smart_table": "smart_table",
     }
     return mapping.get(normalized, normalized or "bar")
 
@@ -96,6 +100,13 @@ def _analysis_line_from_hard_facts(title: str, hard_facts: dict[str, Any]) -> st
 def _safe_metric_unit(plan: Any) -> str | None:
     metric_unit = getattr(getattr(plan, "main_intent", None), "metric_unit", None)
     return getattr(metric_unit, "value", metric_unit) if metric_unit is not None else None
+
+
+def _get_plan_visual_protocol(plan: Any) -> str | None:
+    vp = getattr(getattr(plan, "main_intent", None), "visual_protocol", None)
+    if hasattr(vp, "value"):
+        return str(vp.value)
+    return str(vp) if vp else None
 
 
 def _try_records_to_arrow_base64(rows: list[dict[str, Any]]) -> str | None:
@@ -182,6 +193,9 @@ def _build_aggregated_data_summary(data: list[Any], *, max_items: int = 12) -> s
 def _build_widget_facts(title: str, result_payload: dict[str, Any]) -> list[str]:
     facts: list[str] = []
     hard_facts = _safe_dict(result_payload.get("hard_facts"))
+    
+    # Defensive initialization - extract chart_data early to avoid UnboundLocalError
+    chart_data = _safe_list(result_payload.get("data"))
 
     if hard_facts.get("top_1_name") is not None and hard_facts.get("top_1_val") is not None:
         share_text = f" ({hard_facts.get('top_1_share')}% del total)" if hard_facts.get("top_1_share") is not None else ""
@@ -215,31 +229,61 @@ def _build_widget_facts(title: str, result_payload: dict[str, Any]) -> list[str]
             f"sobre {hard_facts.get('total_points', '?')} puntos totales (histórico+forecast)."
         )
 
+    # ── Comparison Metadata Feeding ──────────────────────────────────
+    try:
+        comparison = hard_facts.get("comparison")
+        if comparison and isinstance(comparison, dict):
+            _year_from = comparison.get("year_from", "")
+            _year_to = comparison.get("year_to", "")
+            _total_var = comparison.get("total_variation", 0)
+            _positive = comparison.get("positive_changes", 0)
+            _negative = comparison.get("negative_changes", 0)
+            _entities = comparison.get("total_entities", len(chart_data) if chart_data else 0)
+            _period_text = f"{_year_from} vs {_year_to}" if _year_from and _year_to else (_year_to or "períodos")
+            facts.append(
+                f"{title}: comparación {_period_text}, variación neta {_total_var}, "
+                f"{_positive} aumentos y {_negative} disminuciones en {_entities} entidades."
+            )
+    except Exception as e:
+        print(f"⚠️ [CANARY SPY] Error procesando metadatos de comparación: {e}")
+        import traceback
+        traceback.print_exc()
+
     # ── Post-Aggregation Fact Feeding ──────────────────────────────────
     # Inject the compact aggregated data[] that DuckDB already computed
     # so Gemini can narrate the FULL temporal/dimensional scope, not just
     # the truncated snapshot.  Cost: ~200 chars, 0 bytes extra memory.
-    chart_data = _safe_list(result_payload.get("data"))
-    data_summary = _build_aggregated_data_summary(chart_data)
-    if data_summary:
-        facts.append(f"{title}: {data_summary}")
+    try:
+        data_summary = _build_aggregated_data_summary(chart_data)
+        if data_summary:
+            facts.append(f"{title}: {data_summary}")
+    except Exception as e:
+        print(f"⚠️ [CANARY SPY] Error construyendo data_summary: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Predictive widgets need more facts (history + forecast)
     max_facts = 5 if hard_facts.get("forecast_points") is not None else 4
     if facts:
         return facts[:max_facts]
 
-    for row in chart_data[:3]:
-        if not isinstance(row, dict):
-            continue
-        if row.get("name") is not None and row.get("value") is not None:
-            facts.append(f"{title}: {row.get('name')} = {row.get('value')}.")
-        elif row.get("date") is not None and row.get("value") is not None:
-            facts.append(f"{title}: {row.get('date')} = {row.get('value')} ({row.get('type', 'data')}).")
-        elif row:
-            preview = ", ".join(f"{key}: {value}" for key, value in list(row.items())[:3])
-            if preview:
-                facts.append(f"{title}: {preview}.")
+    try:
+        for row in chart_data[:3]:
+            if not isinstance(row, dict):
+                continue
+            if row.get("name") is not None and row.get("value") is not None:
+                facts.append(f"{title}: {row.get('name')} = {row.get('value')}.")
+            elif row.get("date") is not None and row.get("value") is not None:
+                facts.append(f"{title}: {row.get('date')} = {row.get('value')} ({row.get('type', 'data')}).")
+            elif row:
+                preview = ", ".join(f"{key}: {value}" for key, value in list(row.items())[:3])
+                if preview:
+                    facts.append(f"{title}: {preview}.")
+    except Exception as e:
+        print(f"⚠️ [CANARY SPY] Error procesando chart_data fallback: {e}")
+        import traceback
+        traceback.print_exc()
+    
     return facts[:max_facts]
 
 
@@ -249,13 +293,27 @@ def _build_summary_widgets(
     chart_options: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     widgets: list[dict[str, Any]] = []
+    _chart_idx = 0
     for index, (plan, result_payload) in enumerate(zip(execution.plans, execution.execution_results), start=1):
         if not isinstance(result_payload, dict) or result_payload.get("error"):
             continue
 
         title = _normalize_text(result_payload.get("title")) or plan.title or f"Widget {index}"
         result_type = _normalize_text(result_payload.get("type")).lower()
-        visual_type = normalize_visual_id(result_payload.get("chart_type"))
+
+        # Use the APPLIED visual type from chart_options (post-ChartFactory conversion),
+        # not the ORIGINAL from result_payload. Uses dedicated counter to handle
+        # index mismatch when _build_chart_option returns None for some results.
+        visual_type = _normalize_text(result_payload.get("chart_type"))
+        if _chart_idx < len(chart_options):
+            chart_opt = chart_options[_chart_idx]
+            if isinstance(chart_opt, dict):
+                vsp = chart_opt.get("visual_source_payload")
+                if isinstance(vsp, dict) and vsp.get("chart_type"):
+                    visual_type = _normalize_text(vsp.get("chart_type"))
+        _chart_idx += 1
+        visual_type = normalize_visual_id(visual_type)
+
         if result_type == "kpi":
             visual_type = "gauge_chart"
 
@@ -335,8 +393,90 @@ def _build_chart_option(
     schema_profile: dict[str, Any],
     _snapshot_resolved_date: dict | None = None,
 ) -> dict[str, Any] | None:
-    chart_type = _normalize_chart_type(result_payload.get("chart_type"))
-    ui_chart_type = normalize_visual_id(result_payload.get("chart_type"))
+    original_ui_chart_type = normalize_visual_id(result_payload.get("chart_type"))
+
+    # ── V6.6 FIX: Evaluar Gobernanza ANTES de generar el gráfico ──
+    visual_governance = build_visual_governance(
+        plan,
+        result_payload,
+        original_ui_chart_type,
+        requested_visual_locked=False,
+    )
+    ui_chart_type = visual_governance.get("applied_visual") or original_ui_chart_type
+    chart_type = _normalize_chart_type(ui_chart_type)
+
+    # ── ADR-VISUAL-007 (Governance Auto-Heal Gate) ────────────────────
+    # When the Ibis engine's output chart_type ('_eng_ct') diverges from
+    # the LLM's original visual protocol ('_llm_vp'), and governance
+    # recommends a structurally superior visual ('_rec_visual') versus
+    # what was applied ('_app_visual'), override the applied type.
+    # Governance recommendations come from structural data properties
+    # (cardinality, metric count, temporal axis) and are domain-agnostic.
+    # ──────────────────────────────────────────────────────────────────
+    _rec_visual = visual_governance.get("recommended_visual")
+    _app_visual = visual_governance.get("applied_visual")
+    _llm_vp = _get_plan_visual_protocol(plan)
+    _eng_ct = result_payload.get("chart_type")
+    if (_rec_visual and _app_visual and _rec_visual != _app_visual
+        and _llm_vp and _eng_ct
+        and normalize_visual_id(_llm_vp) != normalize_visual_id(_eng_ct)):
+        gov_override_type = _normalize_chart_type(_rec_visual)
+        if gov_override_type and gov_override_type != chart_type:
+            print(f"🔄 [GOVERNANCE OVERRIDE] Engine fallback: {_llm_vp} → {_eng_ct}, Gov recommends: {_rec_visual} → applying")
+            ui_chart_type = _rec_visual
+            chart_type = gov_override_type
+
+    # ── ADR-VISUAL-004 (Post-Guard) ────────────────────────────────────
+    # The planner assigns visual_protocol BEFORE data is computed.
+    # Treemap can slip through when the data contains comparison deltas
+    # (negative values). Redirect to bar_chart (grouped) at the last gate.
+    # ───────────────────────────────────────────────────────────────────
+    if chart_type == "treemap":
+        _data_list = result_payload.get("data")
+        if isinstance(_data_list, list) and _data_list:
+            _first = _data_list[0] if isinstance(_data_list[0], dict) else {}
+            _has_comparison_keys = any(
+                k for k in _first
+                if k not in ("name", "extra_info") and not str(k).startswith("_")
+                and isinstance(_first.get(k), (int, float)) and _first[k] < 0
+            )
+            if _has_comparison_keys:
+                chart_type = "bar"
+                print(f"🔄 [POST-GUARD] Treemap → Bar Chart (datos con variaciones negativas detectadas)")
+
+    # ── ADR-VISUAL-006 (Smart Table Contractual) ────────────────────
+    # When visual_recommendation_engine selects "smart_table" as the
+    # recommended visual, chart_type arrives as "smart_table".
+    # ChartFactory has no handler for this → would fall to bar_chart.
+    # Intercept here: build smart_table payload directly from records.
+    # ──────────────────────────────────────────────────────────
+    if chart_type == "smart_table":
+        _raw_data = result_payload.get("data")
+        if isinstance(_raw_data, list) and _raw_data and isinstance(_raw_data[0], dict):
+            _safe_mu = _safe_metric_unit(plan)
+            smart_payload = build_smart_table_from_records(
+                records=_raw_data,
+                title=title,
+                is_percentage=_safe_mu == "percentage",
+            )
+            if smart_payload:
+                smart_payload["visual_source_payload"] = {
+                    "title": title,
+                    "chart_type": "smart_table",
+                    "requested_chart_type": visual_governance.get("requested_visual") or ui_chart_type,
+                    "rows": _raw_data,
+                    "barmode": result_payload.get("barmode"),
+                    "metric_unit": _safe_mu,
+                    "is_percentage": _safe_mu == "percentage",
+                }
+                smart_payload["visual_governance"] = visual_governance
+                _st_query_contract = build_plan_query_contract(plan, schema_profile)
+                if _st_query_contract:
+                    smart_payload["query_contract"] = _st_query_contract
+                print(f"📊 [SMART TABLE] Contractual: {len(_raw_data)} records → smart_table directa")
+                return smart_payload
+        # Si records vacíos o malformados, fall through a ChartFactory
+
     option = ChartFactory.create_chart(
         chart_type,
         title,
@@ -348,22 +488,36 @@ def _build_chart_option(
     )
     if not isinstance(option, dict) or option.get("error"):
         return None
-    visual_governance = build_visual_governance(
-        plan,
-        result_payload,
-        ui_chart_type,
-        requested_visual_locked=False,
-    )
+
     safe_metric_unit = _safe_metric_unit(plan)
+    # Smart Table detection: if chart has >20 categories, convert to Smart Table
+    _applied_type = ui_chart_type
+    if should_use_smart_table(option):
+        smart_table_payload = echarts_to_smart_table(option, title, is_percentage=safe_metric_unit == "percentage")
+        if smart_table_payload and smart_table_payload.get("type") == "smart_table":
+            option = smart_table_payload
+            _applied_type = "smart_table"
+            print(f"🔄 [SMART TABLE] Chart converted to Smart Table ({len(_safe_list(result_payload.get('data')))} rows)")
+    else:
+        # Detect stacked bar: multiple series with stack property or barmode
+        series_list = option.get("series", [])
+        if isinstance(series_list, list) and len(series_list) > 1:
+            has_stack = any(isinstance(s, dict) and s.get("stack") for s in series_list)
+            if has_stack or result_payload.get("barmode") == "stacked":
+                _applied_type = "stacked_bar_chart"
+
+    print(f"🔍 [VISUAL TYPE] Original: {original_ui_chart_type}, Applied: {_applied_type}")
+
     option["visual_source_payload"] = {
         "title": title,
-        "chart_type": ui_chart_type,
+        "chart_type": _applied_type,
         "requested_chart_type": visual_governance.get("requested_visual") or ui_chart_type,
         "rows": _safe_list(result_payload.get("data")),
         "x_label": result_payload.get("x_axis"),
         "y_label": result_payload.get("y_axis"),
         "barmode": result_payload.get("barmode"),
         "metric_unit": safe_metric_unit,
+        "is_percentage": safe_metric_unit == "percentage",
     }
     option["visual_governance"] = visual_governance
     query_contract = build_plan_query_contract(plan, schema_profile)

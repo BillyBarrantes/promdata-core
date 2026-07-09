@@ -262,5 +262,10 @@ def materialize_bundle(
             "relation_count": len(relations),
             "related_frame_count": len(related_materialized),
             "derived_view_count": len(derived_views),
+            # [FASE 1 MULTI-HOJA] Relaciones serializadas para consumo cross-sheet
+            "frame_relations": [
+                r.model_dump() if hasattr(r, "model_dump") else dict(r)
+                for r in relations
+            ],
         },
     )

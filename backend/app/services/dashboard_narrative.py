@@ -257,6 +257,17 @@ def generate_dashboard_executive_summary(
     - Si las NOTAS SOBRE LOS DATOS indican flujos opuestos (ej: Ingreso vs Egreso), NUNCA sumes ambos valores en la narrativa. Reporta cada flujo por separado o menciona ambos explicitamente.
     - No inventes porcentajes, totales o tendencias que no esten explicitamente visibles.
     - Maximos: 3 hallazgos, 2 riesgos, 3 acciones, 2 caveats.
+    - COMPARACION ENTRE PERIODOS: Si algun widget contiene metadatos de comparacion
+      (comparison.year_from, comparison.year_to, comparison.total_variation):
+      1) Menciona EXPLICITAMENTE los dos periodos comparados en el overview
+         (ej: "El analisis compara los datos de 2024 contra 2025").
+      2) Si hay comparison.total_variation, reporta la variacion total neta numerica.
+      3) Si hay comparison.positive_changes y comparison.negative_changes,
+         menciona cuantas entidades aumentaron y cuantas disminuyeron.
+      4) NO uses lenguaje generico; cada hallazgo debe describir el comportamiento
+         especifico de los datos entre los periodos comparados.
+      5) Si hay comparison.base_total y comparison.compared_total,
+         menciona los valores absolutos de cada periodo para dar contexto.
     """
 
     payload: dict[str, Any] | None = None

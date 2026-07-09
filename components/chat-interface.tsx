@@ -297,7 +297,7 @@ const POLLING_IMMEDIATE_DELAY_MS = 0;
 const POLLING_FAST_INTERVAL_MS = 1000;
 const POLLING_ERROR_RETRY_MS = 1500;
 const POLLING_REQUEST_TIMEOUT_MS = 5000;
-const MAX_POLL_RETRIES = 30;
+const MAX_POLL_RETRIES = 90;
 
 const parseTaskResultPayload = (value: any): any => {
   if (typeof value !== "string") return value;

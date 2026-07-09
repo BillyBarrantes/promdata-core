@@ -155,6 +155,16 @@ def sanitize_translator_payload_item(
             if isinstance(f, dict) and f.get('column') in available_columns
         ]
 
+    if 'join_keys' in item and isinstance(item['join_keys'], list):
+        item['join_keys'] = [k for k in item['join_keys'] if k in available_columns]
+
+    if 'pre_aggregation' in item and isinstance(item['pre_aggregation'], dict):
+        agg = item['pre_aggregation']
+        if 'group_by' in agg and isinstance(agg['group_by'], list):
+            agg['group_by'] = [c for c in agg['group_by'] if c in available_columns]
+        if 'metrics' in agg and isinstance(agg['metrics'], list):
+            agg['metrics'] = [c for c in agg['metrics'] if c in available_columns]
+
     return item
 
 

@@ -81,12 +81,27 @@ def _build_join_relation(
 ) -> CanonicalFrameRelation | None:
     if not shared_keys:
         return None
-    scored_keys: list[tuple[str, float, bool]] = []
+    scored_keys: list[tuple[str, float, bool, int]] = []
     for key in shared_keys:
         overlap = _value_overlap_ratio(left, right, shared_key=key)
-        scored_keys.append((key, overlap, _is_identifier_like(key)))
-    scored_keys.sort(key=lambda item: (item[1], item[2]), reverse=True)
-    best_key, best_overlap, identifier_like = scored_keys[0]
+        left_idx = _header_index(left).get(key)
+        right_idx = _header_index(right).get(key)
+        total_unique = 0
+        if left_idx is not None and right_idx is not None:
+            left_vals = {
+                row[left_idx]
+                for row in _sample_rows(left)
+                if left_idx < len(row) and str(row[left_idx] or "").strip()
+            }
+            right_vals = {
+                row[right_idx]
+                for row in _sample_rows(right)
+                if right_idx < len(row) and str(row[right_idx] or "").strip()
+            }
+            total_unique = len(left_vals | right_vals)
+        scored_keys.append((key, overlap, _is_identifier_like(key), total_unique))
+    scored_keys.sort(key=lambda item: (item[1], item[2], item[3]), reverse=True)
+    best_key, best_overlap, identifier_like, _ = scored_keys[0]
     if best_overlap <= 0:
         return None
 

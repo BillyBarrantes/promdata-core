@@ -44,7 +44,7 @@ def test_production_executor_uses_semantic_translator_without_shadow_visual_bund
 
     monkeypatch.setattr(production_executor, "get_selected_candidate_dataframe", lambda *_: candidate_df)
     monkeypatch.setattr(production_executor.SemanticTranslator, "translate", _fake_translate)
-    monkeypatch.setattr(production_executor, "_persist_shadow_candidate", lambda *_args, **_kwargs: ("production_file", "/tmp/production.parquet"))
+    monkeypatch.setattr(production_executor, "_persist_shadow_candidate", lambda *_args, **_kwargs: ("production_file", "/tmp/production.parquet", {}))
     monkeypatch.setattr(production_executor, "_blocked_plan_metrics", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(
         production_executor,

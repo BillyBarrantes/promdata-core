@@ -158,7 +158,7 @@ const isQuantityLike = (value: unknown): boolean => {
 
 const isPercentLike = (value: unknown): boolean => {
   const normalized = String(value || "").toLowerCase();
-  return normalized.includes("%") || normalized.includes("variaci") || normalized.includes("porcent");
+  return normalized.includes("%") || normalized.includes("porcent");
 };
 
 const parseDisplayNumber = (value: string): number | null => {

@@ -2664,6 +2664,7 @@ class SemanticTranslator:
         format_instruction: str = "",
         schema_profile: dict | None = None,
         dataset_contract: dict[str, Any] | None = None,
+        related_frames_context: str = "",
     ) -> Optional[List[AnalysisPlan]]:
         router_decision = SemanticTranslator._route_prompt_with_semantic_router(
             prompt,
@@ -2785,7 +2786,7 @@ class SemanticTranslator:
         - CONTEXTO GLOSARIO: {glossary_context}
         - TOPOLOGÍA (Tipos de Datos): {topology_context}
         - SEMANTIC_ROUTER_DECISION (CONTRATO DE ALTA PRIORIDAD): {router_context_json}
-
+        {related_frames_context if related_frames_context else ''}
         --- 🔒 CONTRATO DEL ROUTER SEMÁNTICO ---
         - Debes respetar `detected_intent`, `reason_codes` y `semantic_contract` como señales superiores al texto suelto.
         - Si `reason_codes` contiene `multi_series`, `per_item` o `top_n_filter` con intención trend,

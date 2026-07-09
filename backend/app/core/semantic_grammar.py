@@ -258,6 +258,33 @@ class PredictiveIntent(BaseIntent):
     grain: TimeGrain = Field(default=TimeGrain.MONTH, description="Granularidad temporal")
     horizon: int = Field(default=6, description="Períodos a proyectar hacia el futuro")
 
+# --- 2.5 PRE-AGREGACIÓN MULTI-HOJA (Lazy Consolidation before JOIN) ---
+
+class PreAggregationSpec(BaseModel):
+    """Especificación de pre-agregación para datasets transaccionales.
+
+    Cuando el dataset tiene múltiples filas por entidad por período
+    (ej: registros diarios de 120 vehículos × 365 días = 43,800 filas),
+    un JOIN directo por ID produce explosión cartesiana. Esta especificación
+    instruye al motor a consolidar las métricas ANTES del cruce.
+
+    Ejemplo: "cruza 2022 con 2025 y calcula variación de Km por vehículo"
+    → group_by: ["placa_unidad"], metrics: ["km_recorridos"], aggregation: "sum"
+    """
+    group_by: list[str] = Field(
+        ...,
+        description="Columnas por las cuales agrupar antes del JOIN. "
+                    "Ej: ['placa_unidad'] para consolidar 365 filas diarias en 1 por vehículo."
+    )
+    metrics: list[str] = Field(
+        ...,
+        description="Columnas métricas a agregar. Ej: ['km_recorridos', 'galones_consumidos']."
+    )
+    aggregation: Literal["sum", "avg", "min", "max", "count"] = Field(
+        default="sum",
+        description="Función de agregación. 'sum' para totales anuales, 'avg' para promedios."
+    )
+
 # --- 3. CONTENEDOR MAESTRO (El JSON final que devolverá la IA) ---
 
 class AnalysisPlan(BaseModel):
@@ -281,6 +308,38 @@ class AnalysisPlan(BaseModel):
     metric_polarity: Optional[MetricPolarity] = Field(
         default=MetricPolarity.NEUTRAL,
         description="Polaridad de la métrica según contexto del negocio. 'favorable'=se quiere maximizar (ventas, ingresos). 'unfavorable'=se quiere minimizar (vencimientos, merma, errores). 'neutral'=informativo."
+    )
+
+    # [FASE 2 MULTI-HOJA] Soporte para análisis cross-sheet.
+    # primary_frame_id identifica la hoja principal del plan.
+    # related_frame_ids lista las hojas relacionadas disponibles para JOINs.
+    primary_frame_id: str = Field(
+        default="primary",
+        description="Frame principal del plan (hoja primaria). Para análisis multi-hoja."
+    )
+    related_frame_ids: list[str] = Field(
+        default_factory=list,
+        description="Frames relacionados disponibles para análisis cross-sheet."
+    )
+
+    # [FASE 3C MULTI-HOJA] Llaves de JOIN gobernadas por contrato.
+    # Capa 1: El LLM las devuelve si el prompt menciona explícitamente la llave.
+    # Capa 2: El orchestrator las hereda vía value overlap ratio si el LLM las omite.
+    # Capa 3: ibis_engine usa estas llaves antes de cualquier heurístico.
+    join_keys: list[str] = Field(
+        default_factory=list,
+        description="Columnas llave para JOIN cross-sheet. Ej: ['placa_unidad']. Si está vacío, el engine usa heurísticas internas."
+    )
+
+    # [FASE 3D MULTI-HOJA] Pre-agregación para datasets transaccionales.
+    # Capa 1: El LLM la emite si detecta el patrón "variación + transaccional".
+    # Capa 2: El production_executor la calcula por cardinalidad como fallback.
+    # Capa 3: ibis_engine consolida ambas tablas ANTES del JOIN.
+    pre_aggregation: Optional[PreAggregationSpec] = Field(
+        default=None,
+        description="Consolidación previa al JOIN para datasets transaccionales. "
+                    "Si no es None, el engine agrupa según group_by y agrega las metrics "
+                    "ANTES de ejecutar el JOIN, evitando explosiones cartesianas."
     )
 
     # 🛡️ [V8] Anti-Hallucination: If the AI can't map a concept to a column,

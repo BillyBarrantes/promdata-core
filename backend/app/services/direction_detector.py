@@ -113,12 +113,14 @@ def _is_antonym_pair(values: set[str]) -> tuple[bool, float]:
 
 # Domain-agnostic tokens that signal a column represents type/direction/class.
 # When combined with low cardinality (2-3), these strongly indicate a direction column.
+# [FIX 2026-07-04] Removed "estado", "estatus", "status" — these are generic categorical
+# markers, NOT directional flows. Columns named "estado" with values "Activo"/"Inactivo"
+# are NOT business direction columns and should not trigger the direction guard.
 _DIRECTION_SIGNAL_TOKENS: set[str] = {
-    "tipo", "type", "clase", "class", "category", "categoria",
+    "tipo", "type", "clase", "class",
     "direccion", "direction", "sentido", "sense", "movimiento",
     "movement", "flujo", "flow", "modalidad", "mode", "naturaleza",
-    "nature", "kind", "status", "estado", "estatus", "grupo", "group",
-    "segmento", "segment", "canal", "channel", "via", "method",
+    "nature", "kind", "canal", "channel", "via", "method",
 }
 
 

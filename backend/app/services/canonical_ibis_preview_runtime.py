@@ -124,6 +124,14 @@ def build_canonical_ibis_preview_runtime(
             dataframe=_view_to_dataframe(view),
         )
 
+    # [FASE 1 MULTI-HOJA] Extraer relaciones detectadas entre frames
+    bundle_metadata = getattr(materialized_bundle, "metadata", None) or {}
+    materialized_relations = bundle_metadata.get("frame_relations") or []
+    frame_relations = [
+        r.model_dump() if hasattr(r, "model_dump") else dict(r)
+        for r in materialized_relations
+    ] if materialized_relations else []
+
     return CanonicalIbisPreviewRuntime(
         connection=connection,
         tables=tables,
@@ -134,6 +142,7 @@ def build_canonical_ibis_preview_runtime(
             "table_count": len(tables),
             "dataframe_count": len(dataframes),
             "preview_backend": "ibis_duckdb" if connection is not None else "pandas_fallback",
+            "frame_relations": frame_relations,
         },
     )
 

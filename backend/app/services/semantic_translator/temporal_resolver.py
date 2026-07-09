@@ -143,6 +143,36 @@ def _infer_dataset_year(
     return None
 
 
+def _infer_dataset_year_range(
+    schema_profile: dict[str, Any] | None,
+) -> tuple[int | None, int | None]:
+    """
+    Extrae (min_year, max_year) del dataset desde columnas temporales.
+
+    Usa los campos min/max de columnas con role="time" o role="date"
+    para determinar el rango real del dataset. Si no hay columnas
+    temporales, retorna (None, None).
+    """
+    if not schema_profile:
+        return None, None
+    years: list[int] = []
+    for col_name, col_meta in schema_profile.items():
+        if not isinstance(col_meta, dict):
+            continue
+        role = str(col_meta.get("role", "")).lower()
+        if role not in ("time", "date"):
+            continue
+        for key in ("min", "max"):
+            val = col_meta.get(key)
+            if val:
+                match = re.match(r"(\d{4})", str(val))
+                if match:
+                    years.append(int(match.group(1)))
+    if not years:
+        return None, None
+    return min(years), max(years)
+
+
 def _parse_month_token(token: str) -> int | None:
     """Convierte un token a número de mes, o None si no es un mes."""
     cleaned = token.strip().lower().rstrip(".,;:")
@@ -210,6 +240,14 @@ def resolve_temporal_filter_value(
         iso_match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", value.strip())
         if iso_match:
             filter_year = int(iso_match.group(1))
+            # [FIX 2026-07-04] Verificar rango antes de corregir.
+            # Si el año está dentro del rango del dataset, NO corregirlo.
+            # Solo corregir años que están fuera de los límites reales.
+            min_year, max_year = _infer_dataset_year_range(schema_profile)
+            if min_year and max_year and min_year <= filter_year <= max_year:
+                # Año dentro del rango del dataset → preservar (no es alucinación)
+                return None  # Dejar que el filtro original pase sin cambios
+
             dataset_year = _infer_dataset_year(column, schema_profile)
             if dataset_year and filter_year != dataset_year:
                 corrected = (

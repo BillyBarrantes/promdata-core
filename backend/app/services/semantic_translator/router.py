@@ -89,6 +89,12 @@ def route_prompt_with_semantic_router(
     Si el usuario pide "graficar X pero ordenar por Y", usa plot_metric=X y ranking_metric=Y.
     Si el usuario excluye valores, usa negative_filters con operator="not_in" o "!=".
 
+    INSTRUCCIÓN CRÍTICA — MULTI-AGREGACIÓN:
+    Si el usuario pide "máximo Y mínimo" o "mínimo Y máximo" o "mayor Y menor"
+    o dos agregaciones distintas sobre la MISMA métrica, usa route="COMPLEJO".
+    La ruta SIMPLE solo soporta UNA agregación por plan.
+    NO colapses max+min en un solo plan con aggregation="sum" ni valor por defecto.
+
     IMPORTANTE — FORMATO DE FECHAS EN FILTROS:
     Los valores de filtros en columnas de fecha/timestamp DEBEN ser fechas ISO
     (YYYY-MM-DD) o expresiones numéricas. NUNCA uses nombres de meses ni palabras

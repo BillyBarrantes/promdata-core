@@ -2,6 +2,56 @@ import json
 from typing import Any, Optional, List
 
 from app.core.config import settings
+
+_MULTI_SHEET_INSTRUCTION = """
+    📋 [MULTI-HOJA] ANÁLISIS CROSS-SHEET:
+    - `primary_frame_id`: la hoja BASE del análisis (la hoja de "partida").
+      Ej: "cruza 2022 con 2023" → primary_frame_id: "sheet::2022"
+    - `related_frame_ids`: SOLO las hojas que necesitas ADICIONALES a la principal.
+      Ej: "cruza 2022 con 2023" → related_frame_ids: ["sheet::2023"]
+    - Si solo necesitas la hoja principal, DEJA `related_frame_ids` VACÍO
+      y `primary_frame_id` en "primary" (default).
+    - Si el prompt menciona años, regiones o nombres de pestañas,
+      úsalos para decidir los frame_ids. Usa formato `sheet::{nombre}`.
+    - `join_keys`: columnas que el usuario menciona EXPLÍCITAMENTE como llave de cruce.
+      Ej: "cruza usando la columna Placa Unidad como llave" → join_keys: ["placa_unidad"]
+      Ej: "cruce por DNI" → join_keys: ["dni"]
+      Si el contexto muestra "Claves de JOIN detectadas", úsalas SOLO si el prompt
+      las menciona o son la única opción razonable.
+      DEJA `join_keys` VACÍO si el prompt no menciona una llave de cruce específica.
+    - ⚠️ `pre_aggregation` (CRÍTICO PARA DATOS TRANSACCIONALES):
+      Si el prompt implica COMPARAR, CALCULAR VARIACIÓN o DIFERENCIA entre hojas/años,
+      y sospechas que el dataset es transaccional (múltiples filas por entidad, ej:
+      registros diarios por vehículo, ventas diarias por producto), DEBES especificar
+      `pre_aggregation` para consolidar los datos ANTES del cruce.
+      Ej: "cruza 2022 con 2025 y calcula la variación de Km por vehículo"
+      → pre_aggregation: {
+          group_by: ["placa_unidad"],
+          metrics: ["km_recorridos"],
+          aggregation: "sum"
+        }
+      Esto agrupa 43,800 filas diarias en 120 totales por vehículo antes del JOIN.
+      Si el dataset YA tiene una fila por entidad (ej: inventario por almacén),
+      DEJA `pre_aggregation` VACÍO.
+    - 🔄 COMPARACIÓN ENTRE HOJAS (VARIACIÓN / DIFERENCIA):
+      Si el prompt pide "variación", "diferencia", "comparar" o "delta" entre dos
+      hojas/años, NO necesitas hacer nada especial con las métricas. El motor de
+      ejecución detectará automáticamente las columnas del año destino y calculará:
+      columna_destino - columna_origen, mostrando la variación neta por entidad.
+      Solo asegúrate de que: (1) primary_frame_id = año BASE,
+      (2) related_frame_ids = [año COMPARADO], y (3) el metric/primary_metric
+      sea la columna que quieres comparar (ej: 'km_recorridos' o 'gasto_combustible_s').
+      NO especifiques la diferencia como una métrica aparte; el motor la calcula.
+      ⚠️ IMPORTANTE para comparaciones multi-entidad:
+      - NO uses "Top N" como límite a menos que el usuario lo pida explícitamente.
+        El motor mostrará automáticamente TODOS los datos en una tabla comparativa.
+      - Para distribuciones (Plan 2 y 3), mantén las mismas dimensiones del Plan 1
+        para que la comparación sea coherente. Ej: si el Plan 1 compara por placa_unidad,
+        el Plan 2 puede distribuir la variación por tipo_unidad.
+      - TODOS los gráficos de la Triple Vista deben apuntar a la comparación
+        (2021 vs 2025), no a un solo año. Cada plan debe reflejar la esencia
+        comparativa del prompt original.
+"""
 from app.core.semantic_grammar import (
     AnalysisPlan,
     DataFilter,
@@ -1011,6 +1061,7 @@ def translate(
     format_instruction: str = "",
     schema_profile: dict | None = None,
     dataset_contract: dict[str, Any] | None = None,
+    related_frames_context: str = "",
 ) -> Optional[List[AnalysisPlan]]:
     router_decision = route_prompt_with_semantic_router(
         prompt, list(columns or []),
@@ -1071,6 +1122,7 @@ def translate(
             "memory_context": memory_context,
             "memory_instruction": memory_instruction,
             "format_instruction": format_instruction,
+            "related_frames_context": related_frames_context,
             "semantic_router_decision": router_decision,
             "translator_contract_version": "semantic_router_v2",
         },
@@ -1113,7 +1165,8 @@ def translate(
     - CONTEXTO GLOSARIO: {glossary_context}
     - TOPOLOGÍA (Tipos de Datos): {topology_context}
     - SEMANTIC_ROUTER_DECISION (CONTRATO DE ALTA PRIORIDAD): {router_context_json}
-
+    {related_frames_context if related_frames_context else ''}
+    {_MULTI_SHEET_INSTRUCTION if related_frames_context else ''}
     --- 🔒 CONTRATO DEL ROUTER SEMÁNTICO ---
     - Debes respetar `detected_intent`, `reason_codes` y `semantic_contract` como señales superiores al texto suelto.
     - Si `reason_codes` contiene `multi_series`, `per_item` o `top_n_filter` con intención trend,

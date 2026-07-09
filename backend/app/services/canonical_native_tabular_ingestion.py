@@ -284,91 +284,24 @@ def _read_excel_frames(file_bytes: bytes, extension: str) -> list[dict[str, Any]
     if not raw_frames:
         return []
 
-    # Fase 2: Concatenación Inteligente — agrupar hojas con schema idéntico
-    # Si múltiples hojas comparten >= 90% de columnas, se unifican en un solo
-    # DataFrame (UNION) en vez de producir frames separados que el materializer
-    # convertiría en un JOIN incorrecto con columnas duplicadas.
-    union_groups: list[list[int]] = []
-    assigned: set[int] = set()
-
-    for i in range(len(raw_frames)):
-        if i in assigned:
-            continue
-        group = [i]
-        assigned.add(i)
-        ref_df = raw_frames[i]["dataframe"]
-        for j in range(i + 1, len(raw_frames)):
-            if j in assigned:
-                continue
-            if _header_overlap_ratio_df(ref_df, raw_frames[j]["dataframe"]) >= _UNION_HEADER_OVERLAP_THRESHOLD:
-                group.append(j)
-                assigned.add(j)
-        union_groups.append(group)
-
+    # [FIX 2026-07-04] Fase 2 simplificada: preservar cada hoja como frame independiente.
+    # La concatenación inteligente (UNION automático) se eliminó porque:
+    # 1. Destruye la capacidad de JOIN relacional entre hojas específicas.
+    # 2. pd.concat es O(n) en memoria y CPU — para datasets grandes (219K filas)
+    #    esto añade ~500MB de overhead innecesario.
+    # 3. DuckDB/Ibis ejecuta UNION/JOIN de forma lazy cuando el usuario lo solicita.
+    # La responsabilidad de unificar o relacionar hojas se delega al motor analítico.
     result_frames: list[dict[str, Any]] = []
-
-    for group in union_groups:
-        if len(group) == 1:
-            # Hoja solitaria o con schema único → frame individual
-            idx = group[0]
-            entry = raw_frames[idx]
-            result_frames.append(
-                {
-                    "frame_id": f"sheet::{entry['sheet_name']}",
-                    "label": entry["sheet_name"] or "Sheet",
-                    "sheet_name": entry["sheet_name"],
-                    "dataframe": entry["dataframe"],
-                    "metadata": entry["metadata"],
-                }
-            )
-        else:
-            # Múltiples hojas con schema compatible → UNION concatenado
-            sheet_names = [raw_frames[idx]["sheet_name"] for idx in group]
-            dfs_to_concat = [raw_frames[idx]["dataframe"] for idx in group]
-
-            # Usar las columnas de la primera hoja como referencia
-            ref_columns = list(dfs_to_concat[0].columns)
-
-            # Alinear columnas: cada DF se reindexará a las columnas de referencia
-            aligned_dfs: list[pd.DataFrame] = []
-            for df in dfs_to_concat:
-                aligned = df.reindex(columns=ref_columns)
-                aligned_dfs.append(aligned)
-
-            unified_df = pd.concat(aligned_dfs, ignore_index=True)
-
-            # Liberar memoria de los DataFrames individuales
-            del aligned_dfs
-            del dfs_to_concat
-            for idx in group:
-                raw_frames[idx]["dataframe"] = None  # type: ignore[assignment]
-
-            total_rows = len(unified_df)
-            unified_label = f"{'_'.join(sheet_names[:3])}{'_...' if len(sheet_names) > 3 else ''}"
-
-            print(
-                f"📋 [MULTI-SHEET UNION] {len(sheet_names)} hojas unificadas "
-                f"({', '.join(sheet_names)}) → {total_rows:,} filas, "
-                f"{len(ref_columns)} columnas"
-            )
-
-            result_frames.append(
-                {
-                    "frame_id": f"union::{'__'.join(sheet_names[:5])}",
-                    "label": unified_label,
-                    "sheet_name": None,
-                    "dataframe": unified_df,
-                    "metadata": {
-                        "source_sheets": sheet_names,
-                        "source_sheet_count": len(sheet_names),
-                        "union_strategy": "schema_compatible_concat",
-                        "source_row_count": total_rows,
-                        "source_column_count": len(ref_columns),
-                        "normalized_row_count": total_rows,
-                        "normalized_column_count": len(ref_columns),
-                    },
-                }
-            )
+    for entry in raw_frames:
+        result_frames.append(
+            {
+                "frame_id": f"sheet::{entry['sheet_name']}",
+                "label": entry["sheet_name"] or "Sheet",
+                "sheet_name": entry["sheet_name"],
+                "dataframe": entry["dataframe"],
+                "metadata": entry["metadata"],
+            }
+        )
 
     return result_frames
 

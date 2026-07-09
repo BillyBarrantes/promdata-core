@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
@@ -71,6 +71,15 @@ class CanonicalAnalyticalAdapterRuntime:
     analytical_bundle: CanonicalAnalyticalContractBundle
     candidate_dataframes: dict[str, pd.DataFrame]
     metadata: dict[str, Any]
+
+    # [FASE 1 MULTI-HOJA] Frames relacionados disponibles para análisis cross-sheet.
+    # Se pueblan desde build_canonical_analytical_adapter_runtime con todos los
+    # candidatos excepto el seleccionado como primario.
+    related_frame_ids: list[str] = field(default_factory=list)
+
+    # [FASE 1 MULTI-HOJA] Relaciones detectadas entre frames (JOIN/UNION).
+    # Se extraen del CanonicalIbisPreviewRuntime.metadata["frame_relations"].
+    frame_relations: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _table_kind_priority(table_name: str) -> int:
@@ -329,20 +338,36 @@ def build_canonical_analytical_adapter_runtime(
     )
     selected_candidate_id = candidates[0].candidate_id if candidates else None
 
+    # [FASE 1 MULTI-HOJA] Identificar frames relacionados (todos excepto el primario)
+    related_frame_ids = [
+        candidate.candidate_id
+        for candidate in candidates
+        if candidate.candidate_id != selected_candidate_id
+    ]
+
+    # [FASE 1 MULTI-HOJA] Extraer relaciones del preview_runtime metadata
+    frame_relations = list(
+        preview_runtime.metadata.get("frame_relations") or []
+    )
+
     analytical_bundle = CanonicalAnalyticalContractBundle(
         selected_candidate_id=selected_candidate_id,
         candidates=candidates,
         metadata={
             "candidate_count": len(candidates),
             "preview_backend": preview_runtime.metadata.get("preview_backend"),
+            "related_frame_count": len(related_frame_ids),
         },
     )
     return CanonicalAnalyticalAdapterRuntime(
         analytical_bundle=analytical_bundle,
         candidate_dataframes=candidate_dataframes,
+        related_frame_ids=related_frame_ids,
+        frame_relations=frame_relations,
         metadata={
             "selected_candidate_id": selected_candidate_id,
             "candidate_count": len(candidates),
+            "related_frame_count": len(related_frame_ids),
         },
     )
 
@@ -382,3 +407,15 @@ def get_selected_candidate_dataframe(
     if not selected_candidate_id:
         return None
     return adapter_runtime.candidate_dataframes.get(selected_candidate_id)
+
+
+def get_related_frames(
+    adapter_runtime: CanonicalAnalyticalAdapterRuntime,
+) -> dict[str, pd.DataFrame]:
+    """Retorna todos los frames relacionados disponibles para análisis cross-sheet."""
+    related_ids = getattr(adapter_runtime, "related_frame_ids", []) or []
+    return {
+        frame_id: adapter_runtime.candidate_dataframes[frame_id]
+        for frame_id in related_ids
+        if frame_id in adapter_runtime.candidate_dataframes
+    }

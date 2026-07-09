@@ -23,6 +23,34 @@ DENSITY_THRESHOLD: int = 20  # Categorías mínimas para activar Smart Table
 ROWS_PER_PAGE: int = 25
 
 # ---------------------------------------------------------------------------
+# HELPER: EXTRACCIÓN BIDIRECCIONAL DE CATEGORÍAS
+# ---------------------------------------------------------------------------
+
+def _get_categories(chart_option: dict[str, Any]) -> list[str]:
+    """Extrae categorías del eje categórico (X o Y) de un chart_option ECharts.
+    Soporta bar charts verticales (xAxis=category) y horizontales
+    (yAxis=category), ya que ChartFactory invierte los ejes con horizontal=True."""
+    x_axis = chart_option.get('xAxis')
+    y_axis = chart_option.get('yAxis')
+
+    def _axis_data(axis: Any) -> list[str]:
+        if not axis:
+            return []
+        if isinstance(axis, list):
+            axis = axis[0] if axis else {}
+        if not isinstance(axis, dict):
+            return []
+        if axis.get('type') != 'category':
+            return []
+        return axis.get('data', [])
+
+    cats = _axis_data(x_axis)
+    if cats:
+        return cats
+    return _axis_data(y_axis)
+
+
+# ---------------------------------------------------------------------------
 # SEMÁFORO DE DENSIDAD
 # ---------------------------------------------------------------------------
 
@@ -30,9 +58,12 @@ def should_use_smart_table(chart_option: dict[str, Any]) -> bool:
     """
     Evalúa si un gráfico ECharts debería renderizarse como Smart Table.
 
-    Regla: Si el eje X categórico tiene más de DENSITY_THRESHOLD categorías,
+    Regla: Si el eje categórico (X o Y) tiene más de DENSITY_THRESHOLD categorías,
     la visualización es demasiado densa para un gráfico y se beneficia de
     una tabla empresarial.
+
+    Soporta tanto bar charts verticales (xAxis=category) como horizontales
+    (yAxis=category), ya que ChartFactory invierte los ejes con horizontal=True.
 
     Args:
         chart_option: Diccionario ECharts option completo.
@@ -41,19 +72,29 @@ def should_use_smart_table(chart_option: dict[str, Any]) -> bool:
         True si debe mostrarse como Smart Table, False si el gráfico es adecuado.
     """
     x_axis = chart_option.get('xAxis')
-    if not x_axis:
-        return False
+    y_axis = chart_option.get('yAxis')
 
-    # Normalizar: xAxis puede ser dict o list
-    if isinstance(x_axis, list):
-        x_axis = x_axis[0] if x_axis else {}
+    def _check_axis(axis: Any) -> bool:
+        if not axis:
+            return False
+        if isinstance(axis, list):
+            axis = axis[0] if axis else {}
+        if not isinstance(axis, dict):
+            return False
+        if axis.get('type') != 'category':
+            return False
+        categories = axis.get('data', [])
+        return len(categories) >= DENSITY_THRESHOLD
 
-    # Solo aplica a ejes categóricos con datos explícitos
-    if x_axis.get('type') != 'category':
-        return False
+    # Caso 1: Bar chart vertical (xAxis es category)
+    if _check_axis(x_axis):
+        return True
 
-    categories = x_axis.get('data', [])
-    return len(categories) >= DENSITY_THRESHOLD
+    # Caso 2: Bar chart horizontal (yAxis es category)
+    if _check_axis(y_axis):
+        return True
+
+    return False
 
 
 def _looks_temporal_label(raw_value: Any) -> bool:
@@ -262,18 +303,71 @@ def echarts_to_smart_table(
         Diccionario con estructura smart_table completa, incluyendo
         el chart_option original para el toggle vista.
     """
-    x_axis = chart_option.get('xAxis', {})
-    if isinstance(x_axis, list):
-        x_axis = x_axis[0] if x_axis else {}
-
-    categories: list[str] = x_axis.get('data', [])
+    categories: list[str] = _get_categories(chart_option)
     series_list: list[dict] = chart_option.get('series', [])
+
+    # ── ADR-VISUAL-005 (Boxplot Smart Table Adapter) ──────────────────
+    # ECharts boxplot uses data: [[min,q1,median,q3,max], ...] which is
+    # incompatible with the standard series-per-column extractor below.
+    # Detect and transform into 5 named columns before falling through.
+    # ──────────────────────────────────────────────────────────────────
+    _primary_series = series_list[0] if series_list else {}
+    if isinstance(_primary_series, dict) and _primary_series.get('type') == 'boxplot':
+        _boxplot_stat_names = ['Mínimo', 'Q1', 'Mediana', 'Q3', 'Máximo']
+        _bp_data = _primary_series.get('data', [])
+        _bp_x_axis = chart_option.get('xAxis', {})
+        if isinstance(_bp_x_axis, list):
+            _bp_x_axis = _bp_x_axis[0] if _bp_x_axis else {}
+        _bp_columns: list[dict[str, Any]] = [
+            {"key": "dimension", "label": _bp_x_axis.get('name', '') or 'Categoría', "type": "text"},
+        ]
+        for si, stat_name in enumerate(_boxplot_stat_names):
+            _bp_columns.append({
+                "key": f"stat_{si}",
+                "label": stat_name,
+                "type": "number",
+                "bar": si == 2,  # Data bar solo en mediana
+            })
+        _bp_rows: list[dict[str, Any]] = []
+        for bi, cat in enumerate(categories):
+            row: dict[str, Any] = {"dimension": cat}
+            if bi < len(_bp_data) and isinstance(_bp_data[bi], (list, tuple)):
+                stats_arr = _bp_data[bi]
+                for si in range(min(5, len(stats_arr))):
+                    try:
+                        row[f"stat_{si}"] = float(stats_arr[si])
+                    except (TypeError, ValueError):
+                        row[f"stat_{si}"] = None
+            _bp_rows.append(row)
+        return {
+            "type": "smart_table",
+            "title": title,
+            "columns": _bp_columns,
+            "data": _bp_rows,
+            "sort_by": "stat_2",  # Sort by median
+            "sort_order": sort_order,
+            "original_chart_option": chart_option,
+            "default_view_mode": default_view_mode,
+            "row_count": len(_bp_rows),
+            "page_size": ROWS_PER_PAGE,
+        }
 
     # --- Construir definición de columnas ---
     columns: list[dict[str, Any]] = []
 
-    # Columna primaria: la dimensión del eje X
-    dim_label = x_axis.get('name', '')
+    # Columna primaria: la dimensión del eje categórico (X o Y)
+    _label_axis = chart_option.get('xAxis')
+    if isinstance(_label_axis, list):
+        _label_axis = _label_axis[0] if _label_axis else {}
+    if not (isinstance(_label_axis, dict) and _label_axis.get('type') == 'category'):
+        _label_axis = chart_option.get('yAxis')
+        if isinstance(_label_axis, list):
+            _label_axis = _label_axis[0] if _label_axis else {}
+    dim_label = (
+        _label_axis.get('name', '')
+        if isinstance(_label_axis, dict)
+        else ''
+    )
     if not dim_label:
         # Intentar extraer del title del chart como heurística
         title_obj = chart_option.get('title', {})

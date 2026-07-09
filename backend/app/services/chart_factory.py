@@ -568,7 +568,8 @@ class ChartFactory:
         Dispatcher Centralizado (Factory Method).
         """
         # ── Geometric fallback: Pie is 2D (name + value). Multi-series data
-        #     needs a 3rd dimension → redirect to stacked bar automatically.
+        #     needs a 3rd dimension → redirect to stacked bar.
+        #     Smart Table conversion is handled at the orchestrator level.
         if chart_type == 'pie' and ChartFactory._is_multiseries_pie_data(data):
             print(f"🔄 [CHART FACTORY] Pie → Stacked Bar (multi-series data detected)")
             chart_type = 'bar'
@@ -584,6 +585,7 @@ class ChartFactory:
         elif chart_type == 'gauge': return factory.build_gauge_chart(title, data)
         elif chart_type == 'scatter': return factory._build_scatter_chart(title, data, x_label, y_label)
         elif chart_type == 'bubble': return factory.build_bubble_chart(title, data, x_label, y_label)
+        elif chart_type == 'combo': return factory.build_combo_chart(title, data, currency_meta=currency_meta)
         elif chart_type == 'treemap': return factory._build_treemap_chart(title, data)
         elif chart_type == 'boxplot': return factory.build_boxplot(title, data)
         elif chart_type == 'gantt': return factory.build_gantt_chart(title, data)
@@ -1121,7 +1123,67 @@ class ChartFactory:
             }
         }]
         return ChartFactory._sanitize_for_json(option)
-        
+
+    # --- C O M B O   C H A R T   ( D U A L   A X I S ) ---
+    @staticmethod
+    def build_combo_chart(title, data, currency_meta=None):
+        """
+        Combo Chart (Dual Axis): Barras para metrica primaria + Linea para metrica secundaria.
+        Ordena descendentemente por la metrica primaria para legibilidad gerencial.
+        """
+        if not data or not isinstance(data, list):
+            return ChartFactory._get_base_option(title)
+
+        metric_keys = []
+        for k in data[0].keys():
+            if k not in ('name', 'extra_info') and not k.startswith('_'):
+                try:
+                    float(data[0][k])
+                    metric_keys.append(k)
+                except (ValueError, TypeError):
+                    continue
+            if len(metric_keys) >= 2:
+                break
+
+        if len(metric_keys) < 2:
+            return ChartFactory.build_bar_chart(title, data, currency_meta=currency_meta)
+
+        primary_metric = metric_keys[0]
+        secondary_metric = metric_keys[1]
+
+        sorted_data = sorted(data, key=lambda d: float(d.get(primary_metric, 0)), reverse=True)
+        categories = [str(d.get("name", "N/A")) for d in sorted_data]
+
+        option = ChartFactory._get_base_option(title)
+        option["tooltip"]["trigger"] = "axis"
+
+        x_label_opts = {"interval": 0}
+        if len(categories) > 10:
+            x_label_opts["rotate"] = 45
+        option["xAxis"] = {"type": "category", "data": categories, "axisLabel": x_label_opts}
+
+        option["yAxis"] = [
+            {"type": "value", "name": primary_metric.replace("_", " ").title(), "position": "left"},
+            {"type": "value", "name": secondary_metric.replace("_", " ").title(), "position": "right"},
+        ]
+
+        bar_data = [float(d.get(primary_metric, 0)) for d in sorted_data]
+        line_data = [float(d.get(secondary_metric, 0)) for d in sorted_data]
+
+        option["series"] = [
+            {"name": primary_metric.replace("_", " ").title(), "type": "bar", "data": bar_data,
+             "yAxisIndex": 0, "itemStyle": {"color": ChartFactory.COLORS[0]}},
+            {"name": secondary_metric.replace("_", " ").title(), "type": "line", "data": line_data,
+             "yAxisIndex": 1, "itemStyle": {"color": ChartFactory.COLORS[1]}, "smooth": True},
+        ]
+
+        if currency_meta:
+            sym = currency_meta.get('symbol', '')
+            if sym:
+                option["yAxis"][0]["axisLabel"] = {"formatter": f"{sym} {{value}}"}
+
+        return ChartFactory._sanitize_for_json(option)
+
     @staticmethod
     def build_pareto_chart(title, data, currency_meta=None):
         """
@@ -1210,7 +1272,7 @@ class ChartFactory:
             sym = currency_meta.get('symbol', '')
             if sym:
                 option["yAxis"][0]["axisLabel"] = {"formatter": f"{sym} {{value}}"}
-                option["tooltip"]["valueFormatter"] = f"(val) => val + ' %' if (val <= 100 && val > 0) else '{sym} ' + val"
+                option["tooltip"]["valueFormatter"] = f"(val) => '{sym} ' + val"
 
         return ChartFactory._sanitize_for_json(option)
 

@@ -18,6 +18,22 @@ class IbisEngine:
     Lee archivos Parquet (Fase 1.1) y ejecuta planes semánticos (Fase 1.2).
     """
 
+    @staticmethod
+    def _resolve_frame_key(frame_id: str, available_keys: list[str]) -> str | None:
+        """Resuelve frame_id corto ('sheet::2022') a clave completa con prefijo.
+
+        El LLM emite IDs en formato corto ('sheet::2022') pero las claves en
+        related_tables tienen prefijos ('primary__', 'related__'). Esta función
+        busca por sufijo para resolver el mismatch.
+        """
+        if frame_id in available_keys:
+            return frame_id
+        suffix = f"__{frame_id}"
+        for key in available_keys:
+            if key == suffix or key.endswith(suffix):
+                return key
+        return None
+
     # ═══════════════════════════════════════════════════════════════════
     # IBIS_FUNC_MAP — Catálogo de funciones de agregación soportadas
     # ═══════════════════════════════════════════════════════════════════
@@ -172,11 +188,45 @@ class IbisEngine:
         return any(token in col_type for token in numeric_tokens)
 
     @staticmethod
-    def _humanize_axis_label(column_name: str | None) -> str:
-        """Convierte snake_case a un label legible para ejes."""
+    def _normalize_metric_label(column_name: str | None) -> str:
+        """Convierte snake_case técnico a label legible universal.
+
+        Sin diccionarios estáticos ni condicionales fijos — usa patrones
+        regex universales para detectar sufijos/preposiciones/unidades.
+        """
         if not column_name:
             return "Valor"
-        return str(column_name).replace('_', ' ').strip().title()
+        name = str(column_name).strip()
+        tokens = re.split(r'_+', name)
+        mapped: list[str] = []
+        for t in tokens:
+            tl = t.lower()
+            if tl in ('s',):
+                mapped.append('(S/)')
+            elif tl in ('km',):
+                mapped.append('Km')
+            elif tl in ('id',):
+                mapped.append('ID')
+            elif tl in ('pct', 'porcentual'):
+                mapped.append('(%)')
+            elif tl in ('nro', 'n°', 'numero'):
+                mapped.append('N°')
+            elif tl in ('por',):
+                mapped.append('por')
+            elif tl in ('de',):
+                mapped.append('de')
+            elif tl in ('del',):
+                mapped.append('del')
+            elif tl in ('vs',):
+                mapped.append('vs')
+            elif tl in ('y',):
+                mapped.append('y')
+            else:
+                mapped.append(t.capitalize())
+        label = ' '.join(mapped).strip()
+        if not label:
+            return name.replace('_', ' ').title()
+        return label
 
     @staticmethod
     def _pick_reference_date_column(intent, table_columns: list[str], exclude: str | None = None) -> str | None:
@@ -280,12 +330,28 @@ class IbisEngine:
         gb = list(getattr(intent, 'group_by', None) or [])
 
         if dim and gb and dim in gb:
-            deduped = [c for c in gb if c != dim]
-            if len(deduped) < len(gb):
-                intent.group_by = deduped
+            # [FIX 2026-07-04] Preservar dimensiones originales del usuario.
+            # La columna en group_by es intencional (el Direction Guard o el usuario la
+            # pusieron allí). Ibis/DuckDB maneja columnas duplicadas entre dimension y
+            # group_by sin errores. NO eliminar la dimensión del usuario para evitar que
+            # el guard sobrescriba la intención original del prompt.
+            # Solo eliminar duplicados literales dentro de la misma lista.
+            unique_gb: list = []
+            seen: set = set()
+            for col in gb:
+                if col not in seen:
+                    unique_gb.append(col)
+                    seen.add(col)
+            if len(unique_gb) < len(gb):
+                intent.group_by = unique_gb
                 print(
-                    f"🧹 [IBIS SANITIZE] group_by deduplicado: "
-                    f"'{dim}' removido → {deduped}"
+                    f"🧹 [IBIS SANITIZE] Duplicados en group_by removidos: "
+                    f"{gb} → {unique_gb}"
+                )
+            else:
+                print(
+                    f"🧹 [IBIS SANITIZE] Dimensión '{dim}' también en group_by "
+                    f"— preservando ambas (intención del usuario)"
                 )
 
         # ── 2. Expansión de filtros 'between' ────────────────────────
@@ -430,11 +496,210 @@ class IbisEngine:
         return t
 
     @staticmethod
-    def execute_plan(parquet_path: str, plan: AnalysisPlan, protected_cols: list = [], recipe_mode: bool = True) -> dict:
+    def execute_plan(
+        parquet_path: str,
+        plan: AnalysisPlan,
+        protected_cols: list = [],
+        recipe_mode: bool = True,
+        related_parquets: dict[str, str] | None = None,
+    ) -> dict:
         # 1. Conexión de Alto Rendimiento (DuckDB In-Process)
         con = ibis.duckdb.connect()
+        con.con.execute("SET memory_limit='2GB'")
+        con.con.execute("SET threads=2")
         t = con.read_parquet(parquet_path)
         dataset_contract = DataEngine.load_semantic_contract(parquet_path)
+
+        # [FASE 3 MULTI-HOJA] Cargar frames relacionados en la misma conexión
+        related_tables: dict[str, Any] = {}
+        if related_parquets:
+            for frame_id, related_path in related_parquets.items():
+                try:
+                    related_t = con.read_parquet(related_path)
+                    table_name = frame_id.replace("__", "_").replace(":", "_")
+                    con.create_table(table_name, related_t, overwrite=True)
+                    related_tables[frame_id] = con.table(table_name)
+                    print(f"📋 [MULTI-HOJA] Frame relacionado cargado: {frame_id} → tabla '{table_name}'")
+                except Exception as _rel_err:
+                    print(f"⚠️ [MULTI-HOJA] Error cargando frame '{frame_id}': {_rel_err}")
+
+        # [FASE 3C MULTI-HOJA] Pre-agregación primaria para datasets transaccionales
+        # Si el plan especifica pre_aggregation (vía LLM o detector de cardinalidad),
+        # consolidar la tabla primaria ANTES del JOIN. Esto reduce 43,800 filas
+        # diarias a ~120 filas totales por entidad, evitando explosiones cartesianas.
+        _agg_spec = getattr(plan, "pre_aggregation", None)
+        if _agg_spec and _agg_spec.group_by and _agg_spec.metrics:
+            _agg_func_name = getattr(_agg_spec, "aggregation", "sum") or "sum"
+            _agg_func_name = IbisEngine.IBIS_FUNC_MAP.get(_agg_func_name, _agg_func_name)
+            _agg_exprs = {}
+            for _metric in _agg_spec.metrics:
+                if _metric in t.columns:
+                    _agg_exprs[_metric] = getattr(t[_metric], _agg_func_name)().name(_metric)
+            if _agg_exprs:
+                _before_rows = int(t.count().execute())
+                t = t.group_by(_agg_spec.group_by).aggregate(**_agg_exprs)
+                _after_rows = int(t.count().execute())
+                print(f"📊 [MULTI-HOJA] Tabla PRIMARIA pre-agregada: "
+                      f"{_before_rows} → {_after_rows} filas "
+                      f"(GROUP BY {_agg_spec.group_by}, {_agg_func_name}({list(_agg_exprs.keys())}))")
+
+        # [FASE 3B MULTI-HOJA] JOIN determinista con gobernanza por contrato
+        # Capa 1: plan.join_keys (LLM vía _MULTI_SHEET_INSTRUCTION)
+        # Capa 2: plan.join_keys heredadas del orchestrator (value overlap ratio)
+        # Capa 3: Heurístico de nombres (id_, cod, key) como último recurso
+        # Capa 4c: Guardián anti many-to-many post-JOIN (límite: max_rows × 10)
+        plan_frame_ids = list(getattr(plan, "related_frame_ids", []) or [])
+        if related_tables and plan_frame_ids:
+            related_keys = list(related_tables.keys())
+            _primary_rows = int(t.count().execute())
+            for frame_id in plan_frame_ids:
+                resolved_key = IbisEngine._resolve_frame_key(frame_id, related_keys)
+                if resolved_key is None:
+                    print(f"⚠️ [MULTI-HOJA] Frame '{frame_id}' solicitado en plan no encontrado en related_tables. Skip.")
+                    continue
+                related_table = related_tables[resolved_key]
+                print(f"📋 [MULTI-HOJA] Resuelto: '{frame_id}' → '{resolved_key}'")
+
+                # [FASE 3C MULTI-HOJA] Pre-agregación de tabla relacionada
+                if _agg_spec and _agg_spec.group_by and _agg_spec.metrics:
+                    _rel_agg_exprs = {}
+                    for _metric in _agg_spec.metrics:
+                        if _metric in related_table.columns:
+                            _rel_agg_exprs[_metric] = getattr(
+                                related_table[_metric], _agg_func_name
+                            )().name(_metric)
+                    if _rel_agg_exprs:
+                        _rel_before = int(related_table.count().execute())
+                        related_table = related_table.group_by(
+                            _agg_spec.group_by
+                        ).aggregate(**_rel_agg_exprs)
+                        _rel_after = int(related_table.count().execute())
+                        print(f"📊 [MULTI-HOJA] Tabla RELACIONADA '{frame_id}' pre-agregada: "
+                              f"{_rel_before} → {_rel_after} filas")
+
+                primary_cols = set(t.columns)
+                related_cols = set(related_table.columns)
+                join_key = None
+                used_keys: list[str] = []
+
+                # --- CAPA 1+2: Gobernanza por contrato (plan.join_keys) ---
+                # ── ADR-JOIN-001 (Guardián de Integridad de Contratos) ─────
+                # El LLM puede inyectar métricas flotantes como join_keys.
+                # Una métrica (float, int, decimal) NO es un identificador:
+                # produce many-to-many JOINs y explosiones cartesianas.
+                # Filtrar: solo aceptar columnas categóricas (string-based).
+                # ──────────────────────────────────────────────────────────
+                _plan_join_keys = getattr(plan, "join_keys", []) or []
+                if _plan_join_keys:
+                    valid_keys = [k for k in _plan_join_keys if k in primary_cols and k in related_cols]
+                    if valid_keys:
+                        _join_schema = t.schema()
+                        _categorical = [
+                            k for k in valid_keys
+                            if k in _join_schema and _join_schema[k].is_string()
+                        ]
+                        if _categorical:
+                            join_key = _categorical[0]
+                            used_keys = list(_categorical)
+                            _rejected = set(valid_keys) - set(_categorical)
+                            if _rejected:
+                                print(f"⚠️ [MULTI-HOJA] Contrato filtrado: {_rejected} "
+                                      f"rechazadas (métricas numéricas). "
+                                      f"Usando: {_categorical}")
+                            print(f"📋 [MULTI-HOJA] JOIN gobernado por contrato: '{join_key}'"
+                                  f" (plan.join_keys={_categorical})")
+                        else:
+                            _type_hints = {
+                                k: str(_join_schema[k]) for k in valid_keys
+                                if k in _join_schema
+                            }
+                            print(f"🛑 [MULTI-HOJA] Contrato RECHAZADO: todas las "
+                                  f"join_keys son métricas numéricas: {_type_hints}. "
+                                  f"Delegando a heurístico categórico.")
+                            # join_key queda None → cae a CAPA 3 heurístico
+                    else:
+                        print(f"⚠️ [MULTI-HOJA] join_keys del plan {_plan_join_keys} "
+                              f"no existen en ambas tablas. Delegando a heurístico.")
+
+                # --- CAPA 3: Heurístico de nombres (fallback) ---
+                if join_key is None:
+                    common_keys = [
+                        col for col in (primary_cols & related_cols)
+                        if col.lower().startswith("id_") or col.lower() == "id"
+                        or "id" in col.lower() or "cod" in col.lower() or "key" in col.lower()
+                    ]
+                    if not common_keys:
+                        common_keys = [col for col in (primary_cols & related_cols) if col in primary_cols]
+
+                    # --- CAPA 3b: Guardián de tipos para JOIN (solo categóricas) ---
+                    # Las columnas métricas (float, int, decimal) NO pueden usarse
+                    # como llaves de JOIN porque producen productos cartesianos o
+                    # joins semánticamente inválidos (una métrica no es un identificador).
+                    if common_keys:
+                        _join_schema = t.schema()
+                        _string_keys = [
+                            col for col in common_keys
+                            if col in _join_schema and _join_schema[col].is_string()
+                        ]
+                        if _string_keys:
+                            common_keys = _string_keys
+                        else:
+                            _type_hints = {
+                                col: str(_join_schema[col])
+                                for col in common_keys
+                                if col in _join_schema
+                            }
+                            print(f"🛑 [MULTI-HOJA] JOIN abortado: "
+                                  f"ninguna columna común es categórica. "
+                                  f"Tipos detectados: {_type_hints}")
+                            return {
+                                "error": (
+                                    f"Data Contract Violation: Join key must be categorical "
+                                    f"(string-based). Las columnas comunes "
+                                    f"({', '.join(str(k) for k in common_keys[:5])}) "
+                                    f"son numéricas/métricas. "
+                                    f"Usa una columna categórica como 'placa_unidad', "
+                                    f"'tipo_unidad' u 'origen' como llave de cruce."
+                                )
+                            }
+
+                    if common_keys:
+                        join_key = common_keys[0]
+                        used_keys = list(common_keys)
+                        print(f"📋 [MULTI-HOJA] JOIN heurístico: '{join_key}' "
+                              f"(detectado de {len(common_keys)} columnas comunes)")
+
+                if join_key:
+                    _related_rows = int(related_table.count().execute())
+                    print(f"📋 [MULTI-HOJA] Aplicando LEFT JOIN: primary.{join_key} = {frame_id}.{join_key}"
+                          f" ({_primary_rows}×{_related_rows} filas)")
+                    left_cols = {col: t[col] for col in t.columns}
+                    right_cols = {
+                        f"{col}_{frame_id.replace('__', '_').replace(':', '_')}": related_table[col]
+                        for col in related_cols
+                        if col not in used_keys
+                    }
+                    joined = t.left_join(related_table, join_key)
+                    all_cols = {**left_cols, **right_cols}
+                    t = joined.select(**all_cols)
+
+                    # --- CAPA 4c: Guardián anti many-to-many ---
+                    _joined_rows = int(t.count().execute())
+                    _max_allowed = max(_primary_rows, _related_rows) * 10
+                    if _joined_rows > _max_allowed:
+                        print(f"🛑 [MULTI-HOJA] JOIN con '{join_key}' produjo explosión: "
+                              f"{_primary_rows}+{_related_rows} → {_joined_rows} filas "
+                              f"(límite: {_max_allowed}). Abortando.")
+                        return {
+                            "error": (
+                                f"El cruce de tablas con la columna '{join_key}' produjo "
+                                f"{_joined_rows} filas ({_primary_rows} × {_related_rows}), "
+                                f"lo que sugiere un producto cartesiano (many-to-many). "
+                                f"Usa una columna con mayor unicidad como llave de JOIN "
+                                f"(ej: un identificador único por registro)."
+                            )
+                        }
+                    _primary_rows = _joined_rows
 
         # 🧬 [V7] UNIVERSAL SCHEMA INSPECTOR (Replaces hardcoded money_cols)
         print("\n" + "🔍" * 40)
@@ -576,9 +841,9 @@ class IbisEngine:
             elif intent.type == "descriptive":
                 result = IbisEngine._analyze_descriptive(t, intent, recipe_mode=recipe_mode)
             elif intent.type == "distribution":
-                result = IbisEngine._analyze_distribution(t, intent)
+                result = IbisEngine._analyze_distribution(t, intent, plan=plan)
             elif intent.type == "diagnostic":
-                result = IbisEngine._analyze_diagnostic(t, intent)
+                result = IbisEngine._analyze_diagnostic(t, intent, plan=plan)
             elif intent.type == "predictive":
                 result = IbisEngine._analyze_predictive(t, intent)
             else:
@@ -587,10 +852,15 @@ class IbisEngine:
             # 🧹 [FASE 1] Redondeo global — elimina decimales excesivos en TODA la salida
             rounded_result = IbisEngine._round_result(result)
 
-            # FASE 5: Añadir la dataframe granular filtrada para Cross-Filtering local
+            # FASE 5: Añadir el dataframe granular filtrado para Cross-Filtering local
             try:
-                # Nos aseguramos de inyectar exactamente el dataset que generó el gráfico (temporalidad correcta)
-                df_filtered = t.to_pandas()
+                MAX_GRANULAR_ROWS = 100000
+                row_count = int(t.count().execute())
+                if row_count > MAX_GRANULAR_ROWS:
+                    df_filtered = t.limit(MAX_GRANULAR_ROWS).to_pandas()
+                    print(f"⚠️ [IBIS] Dataset truncado a {MAX_GRANULAR_ROWS} filas para cross-filter (total: {row_count})")
+                else:
+                    df_filtered = t.to_pandas()
                 rounded_result['filtered_granular_df'] = df_filtered
             except Exception as e:
                 print(f"⚠️ [IBIS] Error extrayendo filtered_granular_df: {e}")
@@ -829,7 +1099,7 @@ class IbisEngine:
                         "y_axis": plot_metric,
                         "title": f"Evolución de {plot_metric} por {split_dim} (Top {split_limit})",
                         "hard_facts": hard_facts,
-                        "barmode": "group",  # Signal to ChartFactory for multi-series rendering
+                        "barmode": "grouped",  # Signal to ChartFactory for multi-series rendering
                     }
 
         # ═══════════════════════════════════════════════════════════════════
@@ -1152,18 +1422,53 @@ class IbisEngine:
             return None
 
     @staticmethod
-    def _analyze_distribution(t, intent: DistributionIntent):
+    def _analyze_distribution(t, intent: DistributionIntent, plan: AnalysisPlan | None = None):
         """
         [V6.4] Motor de 'Hard Facts' Estadísticos.
         Calcula: Pareto (80/20), Concentración.
         Soporta: Histogramas, Barras de Frecuencia.
         """
+        chart_data = []
         plot_metric = getattr(intent, "plot_metric", None) or intent.metric
         ranking_metric = getattr(intent, "ranking_metric", None) or plot_metric
         ranking_direction = str(getattr(intent, "ranking_direction", "desc") or "desc").lower()
         col_dim = t[intent.dimension]
         col_met = t[plot_metric]
         col_rank = t[ranking_metric]
+
+        # [FASE 4E COMPARISON ENGINE] Distribución comparativa
+        _dist_counterpart = None
+        for _col in t.columns:
+            if (_col.startswith(f"{plot_metric}_sheet__")
+                    or _col.startswith(f"{plot_metric}_related_")):
+                _dist_counterpart = _col
+                break
+        _dist_is_comparison = False
+        _year_from_label = "Base"
+        _year_to_label = "Comparado"
+        if _dist_counterpart:
+            _dist_is_comparison = True
+            _original_plot_metric = plot_metric
+            _original_ranking_metric = ranking_metric
+            t = t.mutate(_distribution_variation=t[_dist_counterpart] - t[plot_metric])
+            plot_metric = "_distribution_variation"
+            col_met = t[plot_metric]
+            col_rank = t[plot_metric]
+            ranking_metric = plot_metric
+            
+            _suffix = _dist_counterpart[len(_original_plot_metric):]
+            for _sep in ("_sheet__", "_related_"):
+                if _sep in _suffix:
+                    _year_to_label = _suffix.split(_sep, 1)[-1]
+                    break
+            if plan and hasattr(plan, 'primary_frame_id'):
+                _pf = plan.primary_frame_id or ""
+                _pf_parts = _pf.split("::")
+                _from = _pf_parts[-1] if len(_pf_parts) > 1 else _pf
+                if _from and _from != "primary":
+                    _year_from_label = _from
+
+            print(f"📊 [IBIS][DISTRIBUTION·COMPARISON] Variación detectada: {_dist_counterpart} - {plot_metric}")
 
         visual_protocol = getattr(intent, 'visual_protocol', None)
         visual_type = (
@@ -1178,11 +1483,12 @@ class IbisEngine:
         # Guardrails de cardinalidad (no rompe contrato: solo limita ruido visual)
         if not isinstance(intent.limit, int) or intent.limit <= 0:
             intent.limit = 10
-        intent.limit = min(intent.limit, 30)
+        if not _dist_is_comparison:
+            intent.limit = min(intent.limit, 30)
 
         dim_type = str(col_dim.type()).lower()
         is_string_dim = 'string' in dim_type or 'utf8' in dim_type or 'varchar' in dim_type
-        if is_string_dim:
+        if is_string_dim and not _dist_is_comparison:
             try:
                 unique_count = t.select(intent.dimension).distinct().count().execute()
                 print(f"📊 [DISTRIBUTION] Dimensión '{intent.dimension}' es String con {unique_count} valores únicos")
@@ -1214,16 +1520,48 @@ class IbisEngine:
 
         # --- BOXPLOT ---
         if visual_type in ['boxplot', 'boxplot_chart']:
-            print(f"   📊 [IBIS] Calculando Estadísticas de Caja para '{intent.dimension}'...")
-            stats_df = IbisEngine._calculate_boxplot_stats(t, col_met, col_dim)
-            if stats_df is not None:
-                return {
-                    "type": "echarts",
-                    "chart_type": "boxplot",
-                    "data": stats_df.to_dict(orient='records'),
-                    "title": f"Distribución de {intent.metric} por {intent.dimension}",
-                }
-            return {"error": "Error calculando Boxplot"}
+            # ── ADR-VISUAL-001 ──────────────────────────────────────────
+            # Boxplot Degeneration Guard: boxplot requires >1 observation
+            # per group to produce meaningful quartile statistics. On
+            # pre-aggregated JOIN data (e.g., 120 vehicles × 1 row each),
+            # min=q1=median=q3=max — the chart is visually useless and
+            # gets destructively downgraded to smart_table.
+            # Guard: count groups with >1 obs; if zero → fallback to bar.
+            # ───────────────────────────────────────────────────────────
+            _boxplot_viable = True
+            try:
+                _obs_per_group = (
+                    t.group_by(intent.dimension)
+                    .aggregate(_n=col_met.count())
+                    .filter(ibis.literal(True).ifelse(ibis._._n > 1, False))
+                )
+                _multi_obs_count = _obs_per_group.count().execute()
+                if _multi_obs_count == 0:
+                    _boxplot_viable = False
+                    print(f"⚠️ [IBIS][BOXPLOT] Degenerado: cada '{intent.dimension}' tiene ≤1 observación → fallback a bar_chart")
+            except Exception as _bp_err:
+                # If the viability check itself fails, try a simpler approach
+                try:
+                    _total_rows = t.count().execute()
+                    _unique_dims = t.select(intent.dimension).distinct().count().execute()
+                    if _unique_dims >= _total_rows:
+                        _boxplot_viable = False
+                        print(f"⚠️ [IBIS][BOXPLOT] Degenerado (fallback check): {_unique_dims} grupos, {_total_rows} filas → fallback a bar_chart")
+                except Exception:
+                    pass
+
+            if _boxplot_viable:
+                print(f"   📊 [IBIS] Calculando Estadísticas de Caja para '{intent.dimension}'...")
+                stats_df = IbisEngine._calculate_boxplot_stats(t, col_met, col_dim)
+                if stats_df is not None:
+                    return {
+                        "type": "echarts",
+                        "chart_type": "boxplot",
+                        "data": stats_df.to_dict(orient='records'),
+                        "title": f"Distribución de {intent.metric} por {intent.dimension}",
+                    }
+                return {"error": "Error calculando Boxplot"}
+            # else: fall through to standard bar/distribution flow below
 
         # --- FUNNEL ---
         if visual_type in ['funnel', 'funnel_chart']:
@@ -1347,28 +1685,53 @@ class IbisEngine:
             }
 
         if not has_secondary_dim:
-            # Flujo Estándar Uni-Dimensional
-            agged = (t.group_by(intent.dimension)
-                     .aggregate(valor=agg_expr, rank_val=rank_agg_expr)
-                     .order_by(rank_order)
-                     .limit(intent.limit))
-            df_res = agged.to_pandas()
-            
-            # 🛡️ Empty Data Guard
-            if df_res.empty:
-                return {"type": "echarts", "chart_type": "bar", "data": [], "title": f"Sin datos para {intent.metric}", "error": "empty_result"}
+            if _dist_is_comparison:
+                # [FASE 4E COMPARISON] Agregación multi-columna con TODAS las filas
+                agged = (t.group_by(intent.dimension)
+                         .aggregate(
+                             valor_base=t[_original_plot_metric].sum().name('valor_base'),
+                             valor_comparado=t[_dist_counterpart].sum().name('valor_comparado'),
+                         )
+                         .mutate(valor_variacion=ibis._.valor_comparado - ibis._.valor_base)
+                         .order_by(ibis.desc('valor_variacion')))
+                df_res = agged.to_pandas()
                 
-            total_sample = df_res['valor'].sum()
-            df_res['_cum_pct'] = (df_res['valor'].cumsum() / (total_sample if total_sample else 1) * 100)
-            
-            chart_data = []
-            for _, row in df_res.iterrows():
-                clean_name = IbisEngine._format_chart_name(intent.dimension, row[intent.dimension])
-                chart_data.append({
-                    "name": clean_name, 
-                    "value": float(row['valor']),
-                    "extra_info": { "cumulative": f"{row['_cum_pct']:.1f}%" }
-                })
+                if df_res.empty:
+                    return {"type": "echarts", "chart_type": "bar", "data": [], "title": f"Sin datos para {intent.metric}", "error": "empty_result"}
+                
+                total_sample = df_res['valor_variacion'].sum()
+                chart_data = []
+                _dist_metric_human = _original_plot_metric.replace("_", " ").title()
+                for _, row in df_res.iterrows():
+                    clean_name = IbisEngine._format_chart_name(intent.dimension, row[intent.dimension])
+                    chart_data.append({
+                        "name": clean_name,
+                        _dist_metric_human + f" ({_year_from_label})": float(row['valor_base']),
+                        _dist_metric_human + f" ({_year_to_label})": float(row['valor_comparado']),
+                        "Variación": float(row['valor_variacion']),
+                    })
+            else:
+                # Flujo Estándar Uni-Dimensional
+                agged = (t.group_by(intent.dimension)
+                         .aggregate(valor=agg_expr, rank_val=rank_agg_expr)
+                         .order_by(rank_order)
+                         .limit(intent.limit))
+                df_res = agged.to_pandas()
+                
+                if df_res.empty:
+                    return {"type": "echarts", "chart_type": "bar", "data": [], "title": f"Sin datos para {intent.metric}", "error": "empty_result"}
+                    
+                total_sample = df_res['valor'].sum()
+                df_res['_cum_pct'] = (df_res['valor'].cumsum() / (total_sample if total_sample else 1) * 100)
+                
+                chart_data = []
+                for _, row in df_res.iterrows():
+                    clean_name = IbisEngine._format_chart_name(intent.dimension, row[intent.dimension])
+                    chart_data.append({
+                        "name": clean_name, 
+                        "value": float(row['valor']),
+                        "extra_info": { "cumulative": f"{row['_cum_pct']:.1f}%" }
+                    })
         else:
             # Flujo Multi-Dimensional (Top N Principal + Desglose)
             sec_dim = intent.group_by[0] # Tomamos la primera dimensión secundaria
@@ -1432,10 +1795,45 @@ class IbisEngine:
                 "ranking_metric": ranking_metric,
             }
         }
+
+        if _dist_is_comparison and chart_data:
+            _dist_suffix = _dist_counterpart[len(_original_plot_metric):]
+            _dist_year_to = ""
+            for _sep in ("_sheet__", "_related_"):
+                if _sep in _dist_suffix:
+                    _dist_year_to = _dist_suffix.split(_sep, 1)[-1]
+                    break
+            _dist_metric_human = _original_plot_metric.replace("_", " ").title()
+            response["title"] = (
+                f"Variación de {_dist_metric_human} por {intent.dimension}"
+                + (f" ({_dist_year_to})" if _dist_year_to else "")
+            )
+            _positive = sum(1 for d in chart_data if d.get("Variación", 0) > 0)
+            _negative = sum(1 for d in chart_data if d.get("Variación", 0) < 0)
+            response["hard_facts"]["comparison"] = {
+                "metric": _original_plot_metric,
+                "metric_humanized": _dist_metric_human,
+                "year_to": _dist_year_to,
+                "total_variation": round(float(total_sample), 2) if total_sample else 0,
+                "positive_changes": _positive,
+                "negative_changes": _negative,
+                "total_entities": len(chart_data),
+            }
         
         # Inyectar barmode para que ChartFactory lo aplique si es necesario
         if has_secondary_dim:
             response["barmode"] = getattr(intent, 'barmode', 'stacked')
+        elif _dist_is_comparison:
+            response["barmode"] = "grouped"
+        elif _dist_is_comparison:
+            # ── ADR-VISUAL-002 ──────────────────────────────────────────
+            # Comparison data without group_by still has multi-column
+            # structure (Base, Comparado, Variación). Without barmode,
+            # ChartFactory takes the uni-dimensional path and destroys
+            # the comparison columns via _normalize_data_polymorphic.
+            # "grouped" signals multi-series rendering (side-by-side bars).
+            # ───────────────────────────────────────────────────────────
+            response["barmode"] = "grouped"
             
         return response
 
@@ -1444,12 +1842,13 @@ class IbisEngine:
     # Handles: Boxplot, Scatter, Funnel — schema-agnostic
     # =========================================================================
     @staticmethod
-    def _analyze_diagnostic(t, intent):
+    def _analyze_diagnostic(t, intent: DiagnosticIntent, plan: AnalysisPlan | None = None):
         """
         Diagnostic intent handler. Routes to the appropriate statistical analysis
         based on the visual_protocol or data characteristics.
         Works with ANY column names — uses only the column references in the intent.
         """
+        chart_data = []  # Defensive initialization
         visual_type = getattr(intent, 'visual_protocol', None)
         visual_str = visual_type.value if visual_type else 'boxplot'
         
@@ -1559,8 +1958,8 @@ class IbisEngine:
                 y_col = raw_metric_candidates[1]
                 x_expr = t[x_col]
                 y_expr = t[y_col]
-                x_label = IbisEngine._humanize_axis_label(x_col)
-                y_label = IbisEngine._humanize_axis_label(y_col)
+                x_label = IbisEngine._normalize_metric_label(x_col)
+                y_label = IbisEngine._normalize_metric_label(y_col)
 
                 def _derive_temporal_axis(metric_name: str):
                     reference_col = IbisEngine._pick_reference_date_column(intent, t.columns, exclude=metric_name)
@@ -1572,7 +1971,7 @@ class IbisEngine:
                     if any(token in metric_name_lower for token in ['venc', 'caduc', 'expiry', 'expir', 'prefercons']):
                         derived_label = "Días a vencimiento"
                     else:
-                        derived_label = f"Días desde {IbisEngine._humanize_axis_label(reference_col)}"
+                        derived_label = f"Días desde {IbisEngine._normalize_metric_label(reference_col)}"
 
                     return derived_expr, derived_label, reference_col
 
@@ -1607,7 +2006,7 @@ class IbisEngine:
                     x_expr = (t[expiry_col].epoch_seconds() - t[base_col].epoch_seconds()) / 86400
                     y_expr = t[y_metric_col]
                     x_label = "Días a vencimiento"
-                    y_label = IbisEngine._humanize_axis_label(y_metric_col)
+                    y_label = IbisEngine._normalize_metric_label(y_metric_col)
                     x_col = expiry_col
                     y_col = y_metric_col
                     print(
@@ -1699,9 +2098,9 @@ class IbisEngine:
                     "type": "echarts",
                     "chart_type": "scatter",
                     "data": scatter_data,
-                    "x_label": x_label,
-                    "y_label": y_label,
-                    "series_label": IbisEngine._humanize_axis_label(dimension_col) if dimension_col else None,
+                    "x_axis": x_label,
+                    "y_axis": y_label,
+                    "series_label": IbisEngine._normalize_metric_label(dimension_col) if dimension_col else None,
                     "title": f"Correlación: {x_label} vs {y_label}",
                     "hard_facts": {
                         "correlation": round(corr, 3),
@@ -1739,6 +2138,94 @@ class IbisEngine:
         
         # Fallback: gráfico agregado seguro para no perder el tercer visual
         print(f"⚠️ [IBIS][DIAGNOSTIC] Fallback agregado activado para protocolo '{visual_str}'")
+
+        # [FASE 4E COMPARISON ENGINE] Detectar columnas de JOIN y calcular variación
+        _counterpart = None
+        for _col in t.columns:
+            if (_col.startswith(f"{metric_col}_sheet__")
+                    or _col.startswith(f"{metric_col}_related_")):
+                _counterpart = _col
+                break
+        _original_metric_col = metric_col
+        if _counterpart:
+            print(f"📊 [IBIS][COMPARISON] Variación detectada: {_counterpart} - {metric_col}")
+            t = t.mutate(_variation=t[_counterpart] - t[metric_col])
+            metric_col = "_variation"
+            col_met = t[metric_col]
+
+        # === COMPARISON BRANCH: Todos los datos + multi-serie + narrativa enriquecida ===
+        if dimension_col and _counterpart:
+            _suffix = _counterpart[len(_original_metric_col):]
+            _year_to_label = ""
+            for _sep in ("_sheet__", "_related_"):
+                if _sep in _suffix:
+                    _year_to_label = _suffix.split(_sep, 1)[-1]
+                    break
+            # Extract year from plan's primary_frame_id when available
+            _year_from_label = "Base"
+            if plan and hasattr(plan, 'primary_frame_id'):
+                _pf = plan.primary_frame_id or ""
+                _pf_parts = _pf.split("::")
+                _from = _pf_parts[-1] if len(_pf_parts) > 1 else _pf
+                if _from and _from != "primary":
+                    _year_from_label = _from
+
+            _compare_df = (
+                t.select(dimension_col, _original_metric_col, _counterpart, "_variation")
+                .order_by(ibis.desc("_variation"))
+                .to_pandas()
+            )
+
+            if not _compare_df.empty:
+                _label_from = _year_from_label or _original_metric_col
+                _label_to = _year_to_label or _counterpart
+                chart_data = []
+                _positive = 0
+                _negative = 0
+                _total_var = 0.0
+                for _, row in _compare_df.iterrows():
+                    clean_name = IbisEngine._format_chart_name(dimension_col, row[dimension_col])
+                    _vf = float(row[_original_metric_col])
+                    _vt = float(row[_counterpart])
+                    _vv = float(row["_variation"])
+                    if _vv > 0:
+                        _positive += 1
+                    elif _vv < 0:
+                        _negative += 1
+                    _total_var += _vv
+                    chart_data.append({
+                        "name": clean_name,
+                        _label_from: _vf,
+                        _label_to: _vt,
+                        "Variación": _vv,
+                    })
+
+                _metric_human = IbisEngine._normalize_metric_label(_original_metric_col)
+                _dim_human = IbisEngine._normalize_metric_label(dimension_col) if not dimension_col.startswith("_") else dimension_col
+                return {
+                    "type": "echarts",
+                    "chart_type": "bar",
+                    "data": chart_data,
+                    "barmode": "grouped",
+                    "_ibis_fallback": True,
+                    "title": f"Variación de {_metric_human} por {_dim_human} ({_label_from} vs {_label_to})",
+                    "hard_facts": {
+                        "analysis_type": "comparison_variation",
+                        "metric": _original_metric_col,
+                        "metric_humanized": _metric_human,
+                        "dimension": dimension_col,
+                        "comparison": {
+                            "year_from": _label_from,
+                            "year_to": _label_to,
+                            "metric": _original_metric_col,
+                            "total_variation": round(_total_var, 2),
+                            "positive_changes": _positive,
+                            "negative_changes": _negative,
+                            "total_entities": len(chart_data),
+                        }
+                    }
+                }
+        # === END COMPARISON BRANCH ===
 
         aggregation = getattr(intent, 'aggregation', 'sum')
         if aggregation == "avg":
@@ -1787,6 +2274,52 @@ class IbisEngine:
                         "total_analyzed": total_val,
                     }
                 }
+
+        # [FASE 4E COMPARISON] KPI comparativo: total neto de variación entre períodos
+        if _counterpart and not dimension_col:
+            _total_var = float(t['_variation'].sum().execute())
+            _total_base = float(t[_original_metric_col].sum().execute())
+            _total_compared = float(t[_counterpart].sum().execute())
+            _var_pct = ((_total_compared - _total_base) / _total_base * 100) if abs(_total_base) > 0.001 else 0.0
+            _metric_human = IbisEngine._normalize_metric_label(_original_metric_col)
+            _suffix = _counterpart[len(_original_metric_col):]
+            _kpi_year_to = ""
+            for _sep in ("_sheet__", "_related_"):
+                if _sep in _suffix:
+                    _kpi_year_to = _suffix.split(_sep, 1)[-1]
+                    break
+            _kpi_year_from = "Base"
+            if plan and hasattr(plan, 'primary_frame_id'):
+                _pf = plan.primary_frame_id or ""
+                _pf_parts = _pf.split("::")
+                _from = _pf_parts[-1] if len(_pf_parts) > 1 else _pf
+                if _from and _from != "primary":
+                    _kpi_year_from = _from
+            return {
+                "type": "kpi",
+                "chart_type": "kpi",
+                "data": {
+                    f"{_metric_human} ({_kpi_year_from})": round(_total_base, 2),
+                    f"{_metric_human} ({_kpi_year_to})": round(_total_compared, 2),
+                    "Variación": round(_total_var, 2),
+                    "%": round(_var_pct, 1),
+                },
+                "barmode": "grouped",
+                "_ibis_fallback": True,
+                "title": f"Variación Total de {_metric_human} ({_kpi_year_from} vs {_kpi_year_to})",
+                "hard_facts": {
+                    "comparison": {
+                        "year_from": _kpi_year_from,
+                        "year_to": _kpi_year_to,
+                        "metric": _original_metric_col,
+                        "metric_humanized": _metric_human,
+                        "total_variation": round(_total_var, 2),
+                        "base_total": round(_total_base, 2),
+                        "compared_total": round(_total_compared, 2),
+                        "variation_pct": round(_var_pct, 1),
+                    }
+                }
+            }
 
         summary_df = t.aggregate(agg_expr).to_pandas()
         if not summary_df.empty and 'valor' in summary_df.columns:

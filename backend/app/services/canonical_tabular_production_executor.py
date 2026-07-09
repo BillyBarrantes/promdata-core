@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import unicodedata
 from typing import Any
 
 import pandas as pd
 
 from app.core.structured_logging import emit_structured_log
-from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe
+from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe, get_related_frames
 from app.services.canonical_dark_runtime_orchestrator import (
     run_canonical_dark_pipeline_for_uploaded_file,
 )
@@ -32,6 +33,7 @@ from app.services.analysis_memory_context import (
     unwrap_prompt_payload,
 )
 from app.services.semantic_translator import SemanticTranslator
+from app.core.semantic_grammar import PreAggregationSpec
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -308,6 +310,132 @@ def _auto_correct_hallucinated_metrics(
     return corrected_plans
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# [FASE 3B MULTI-HOJA] Resolución determinista de frame_ids para JOIN
+# ═══════════════════════════════════════════════════════════════════════════
+# Opera sobre frame_ids (nombres de hoja), NO columnas. Es schema-agnostic
+# y funciona con cualquier archivo porque solo mira identificadores
+# estructurales.
+#
+# Normalización Unicode:
+#   - NFKD decompose: "Logística" → "Logi\u0301stica"
+#   - Strip combining marks (categoría 'M'): → "Logistica"
+#   - .lower(): → "logistica"
+#
+# Esto garantiza que "logistica" en el prompt matchee "Logística" como hoja,
+# y viceversa, sin depender de cómo escribió el usuario los acentos.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _normalize_text(text: str) -> str:
+    """NFKD decompose → strip combining marks → lowercase.
+    'Logística' → 'logistica', 'Dirección' → 'direccion'."""
+    nfkd = unicodedata.normalize('NFKD', text)
+    cleaned = ''.join(c for c in nfkd if not unicodedata.category(c).startswith('M'))
+    return cleaned.lower()
+
+
+def _extract_frame_tokens(frame_id: str) -> list[str]:
+    """Extrae tokens significativos del nombre de hoja en un frame_id.
+
+    'related__sheet::Logística' → ['logistica']
+    'related__sheet::2023'     → ['2023']
+    'primary__csv::main'       → ['main']
+    'derived__A__B__join_preview' → [] (derivados no se matchean)
+    """
+    if frame_id.startswith("derived__"):
+        return []
+    source_id = frame_id.split('__', 1)[1] if '__' in frame_id else frame_id
+    meaningful = source_id.split('::', 1)[1] if '::' in source_id else source_id
+    tokens = []
+    for part in re.split(r'[_\s\-]+', meaningful):
+        normalized = _normalize_text(part.strip())
+        if len(normalized) >= 2:
+            tokens.append(normalized)
+    return tokens
+
+
+def _resolve_plan_frame_ids_deterministic(
+    prompt: str,
+    available_frame_ids: list[str],
+) -> list[str]:
+    """Fallback determinista: matchea prompt vs frame_id tokens con normalize de acentos.
+
+    Si el prompt contiene '2023' → matchea frame_id 'related__sheet::2023'.
+    Si el prompt contiene 'logistica' → matchea frame_id 'related__sheet::Logística'.
+    Si el prompt es 'analiza ventas' y no hay hoja 'ventas' → retorna [] (0 JOINs).
+    """
+    if not available_frame_ids:
+        return []
+    normalized_prompt = _normalize_text(prompt)
+    matched: list[str] = []
+    for frame_id in available_frame_ids:
+        for token in _extract_frame_tokens(frame_id):
+            if re.search(rf'\b{re.escape(token)}\b', normalized_prompt):
+                matched.append(frame_id)
+                break
+    return matched
+
+
+def _resolve_frame_key(
+    frame_id: str,
+    available_keys: list[str],
+) -> str | None:
+    """Resuelve un frame_id corto ('sheet::2022') a su clave completa con prefijo
+    ('related__sheet::2022' o 'primary__sheet::2022').
+
+    El LLM emite IDs en formato corto ('sheet::2022') pero las claves en los
+    diccionarios internos tienen prefijos ('primary__', 'related__', 'derived__').
+    Esta función busca por sufijo para resolver el mismatch.
+    """
+    # 1. Match exacto
+    if frame_id in available_keys:
+        return frame_id
+    # 2. Match por sufijo (prefijo + frame_id)
+    suffix = f"__{frame_id}"
+    for key in available_keys:
+        if key == suffix or key.endswith(suffix):
+            return key
+    return None
+
+
+def _resolve_primary_frame_from_plan(
+    plan: Any,
+    adapter_runtime: Any,
+    candidate_df: pd.DataFrame | None,
+    selected_candidate_id: str,
+) -> tuple[pd.DataFrame | None, str]:
+    """Re-selecciona el dataframe primario según el plan.
+
+    Si el LLM pobló primary_frame_id con una hoja específica (ej: 'sheet::2022'),
+    busca el DataFrame correspondiente en candidate_dataframes y lo retorna.
+    Esto garantiza que el motor Ibis arranque desde la hoja correcta (raw sheet)
+    en lugar de una vista derived__ pre-join que puede arrastrar datos espurios.
+
+    Si primary_frame_id no está seteado o no se encuentra, retorna los valores
+    actuales (0 regresión para consultas mono-hoja).
+    """
+    plan_primary_id = getattr(plan, "primary_frame_id", None) or ""
+    if not plan_primary_id or plan_primary_id == "primary":
+        return candidate_df, selected_candidate_id
+
+    candidate_dataframes = getattr(adapter_runtime, "candidate_dataframes", {}) or {}
+    available_keys = list(candidate_dataframes.keys())
+    resolved_key = _resolve_frame_key(plan_primary_id, available_keys)
+    if resolved_key and resolved_key in candidate_dataframes:
+        new_df = candidate_dataframes[resolved_key]
+        if new_df is not None:
+            emit_structured_log(
+                "primary_frame_re_selected",
+                original=selected_candidate_id,
+                resolved=resolved_key,
+                plan_primary=plan_primary_id,
+            )
+            return new_df, resolved_key
+
+    return candidate_df, selected_candidate_id
+
+
 @dataclass
 class CanonicalTabularProductionExecutionResult:
     status: str
@@ -379,6 +507,25 @@ def build_canonical_tabular_production_execution(
     actual_prompt, parent_task_id = unwrap_prompt_payload(prompt)
     schema_profile = dict((getattr(candidate_df, "attrs", {}) or {}).get("schema_profile", {}) or {})
     dataset_contract = dict((getattr(candidate_df, "attrs", {}) or {}).get("semantic_contract", {}) or {})
+
+    # [FASE 2 MULTI-HOJA] Construir contexto de frames relacionados
+    related_frames_context = ""
+    adapter_runtime = pipeline_result.analytical_adapter_runtime
+    if hasattr(adapter_runtime, "related_frame_ids") and adapter_runtime.related_frame_ids:
+        frame_ids = adapter_runtime.related_frame_ids
+        frame_relations = getattr(adapter_runtime, "frame_relations", []) or []
+        related_frames_context = f"- HOJAS RELACIONADAS ({len(frame_ids)}): {frame_ids}\n"
+        if frame_relations:
+            joined_keys = []
+            for rel in frame_relations:
+                if isinstance(rel, dict) and rel.get("join_keys"):
+                    joined_keys.extend(rel["join_keys"])
+            if joined_keys:
+                related_frames_context += (
+                    f"        Claves de JOIN detectadas: {list(set(joined_keys))}\n"
+                    f"        Puedes usar columnas de las hojas relacionadas con la clave común.\n"
+                )
+
     parent_context = load_parent_analysis_context(
         service_client=service_client,
         parent_task_id=parent_task_id,
@@ -393,11 +540,109 @@ def build_canonical_tabular_production_execution(
         memory_context=build_parent_memory_context_text(parent_context),
         schema_profile=schema_profile,
         dataset_contract=dataset_contract,
+        related_frames_context=related_frames_context,
     ) or []
     plans = apply_parent_context_to_placeholder_filters(
         plans=plans,
         parent_context=parent_context,
     )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [FASE 3B MULTI-HOJA] Resolver frame_ids para JOINs deterministas
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Capa 2: Si el LLM pobló related_frame_ids (Capa 1), se respeta.
+    # Capa 2 fallback: Si está vacío, matchea tokens del prompt vs frame_ids
+    # con normalización de acentos (NFKD).
+    # Schema-agnostic: solo mira identificadores de frames, no columnas.
+    # ═══════════════════════════════════════════════════════════════════════════
+    _available_frame_ids: list[str] = []
+    if hasattr(adapter_runtime, "related_frame_ids") and adapter_runtime.related_frame_ids:
+        _available_frame_ids = list(adapter_runtime.related_frame_ids)
+    if plans and actual_prompt:
+        for plan in plans:
+            if not getattr(plan, "related_frame_ids", None):
+                plan.related_frame_ids = _resolve_plan_frame_ids_deterministic(
+                    str(actual_prompt), _available_frame_ids,
+                )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [FASE 3C MULTI-HOJA] Herencia determinista de join_keys del orchestrator
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Capa 2: Si el LLM pobló join_keys (Capa 1), se respeta.
+    # Capa 2 fallback: Si está vacío, heredar del orchestrator que YA calculó
+    # las llaves con value overlap ratio durante la fase de canonical_bundle.
+    # Garantía: si el orchestrator detectó "placa_unidad" con 95% overlap,
+    # el plan la recibe aunque el LLM no la haya puesto en el JSON.
+    # ═══════════════════════════════════════════════════════════════════════════
+    _frame_relations = getattr(adapter_runtime, "frame_relations", []) or []
+    if plans and _frame_relations:
+        for plan in plans:
+            # Solo heredar join_keys si el plan realmente va a hacer JOIN
+            if not getattr(plan, "related_frame_ids", None):
+                continue
+            _plan_join_keys = getattr(plan, "join_keys", None)
+            if not _plan_join_keys:
+                for rel in _frame_relations:
+                    if isinstance(rel, dict) and rel.get("join_keys"):
+                        plan.join_keys = list(rel["join_keys"])
+                        break
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [FASE 3D MULTI-HOJA] Detector de cardinalidad — Pre-agregación automática
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Capa 2 fallback determinista: Si el LLM no especificó pre_aggregation,
+    # el sistema calcula la cardinalidad de las join_keys contra el dataset real.
+    # Si el ratio filas/entidad supera el umbral, los datos son transaccionales
+    # (múltiples filas por entidad) y se activa pre-agregación automática.
+    # Esta es la última línea de defensa que garantiza que ningún JOIN
+    # transaccional escape sin consolidación previa.
+    # ═══════════════════════════════════════════════════════════════════════════
+    if plans and candidate_df is not None and not candidate_df.empty:
+        for plan in plans:
+            # Solo detectar cardinalidad en planes cross-sheet (necesitan JOIN)
+            if not getattr(plan, "related_frame_ids", None):
+                continue
+            if getattr(plan, "pre_aggregation", None) is not None:
+                continue
+            _plan_join_keys = getattr(plan, "join_keys", []) or []
+            if not _plan_join_keys:
+                continue
+
+            join_key = _plan_join_keys[0]
+            if join_key not in candidate_df.columns:
+                continue
+
+            total_rows = len(candidate_df)
+            distinct_values = candidate_df[join_key].nunique()
+            if distinct_values == 0:
+                continue
+
+            entity_ratio = total_rows / distinct_values
+
+            _TRANSACTIONAL_THRESHOLD = 10
+            if entity_ratio > _TRANSACTIONAL_THRESHOLD:
+                numeric_cols = [
+                    col for col in candidate_df.columns
+                    if col != join_key
+                    and pd.api.types.is_numeric_dtype(candidate_df[col])
+                    and not col.lower().startswith(("id_", "cod_", "dni_", "ruc_", "sku_"))
+                ]
+                metrics = numeric_cols[:5]
+                if not metrics:
+                    continue
+
+                print(f"🧠 [FASE 3D] Cardinalidad detectada: {total_rows} filas / "
+                      f"{distinct_values} valores únicos de '{join_key}' = "
+                      f"{entity_ratio:.1f} filas por entidad "
+                      f"(umbral: {_TRANSACTIONAL_THRESHOLD})")
+                print(f"🧠 [FASE 3D] Pre-agregación automática ACTIVADA: "
+                      f"GROUP BY [{join_key}], SUM({metrics[:3]})...")
+
+                plan.pre_aggregation = PreAggregationSpec(
+                    group_by=[join_key],
+                    metrics=metrics,
+                    aggregation="sum",
+                )
 
     # ═══════════════════════════════════════════════════════════════════════════
     # [V3] LITERAL FILTER INDEXER — Corrección de filtros contra el dataset real
@@ -507,11 +752,41 @@ def build_canonical_tabular_production_execution(
     bounded_plans = list(plans[: max(int(max_plans or 0), 1)])
     plan_summaries = [_summarize_plan(plan, index + 1) for index, plan in enumerate(bounded_plans)]
 
-    shadow_file_id, parquet_path = _persist_shadow_candidate(
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [Fase 3B MULTI-HOJA] Re-seleccionar dataframe primario según el plan
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Si el LLM pobló primary_frame_id con una hoja específica (ej: "sheet::2022"),
+    # re-seleccionamos el DataFrame correspondiente. Esto evita que el análisis
+    # arranque desde una vista derived__ pre-join que arrastra datos de años no
+    # solicitados, garantizando pureza en los JOINs deterministas.
+    # ═══════════════════════════════════════════════════════════════════════════
+    if bounded_plans:
+        primary_plan = bounded_plans[0]
+        candidate_df, selected_candidate_id = _resolve_primary_frame_from_plan(
+            primary_plan, adapter_runtime, candidate_df, selected_candidate_id,
+        )
+        # Recalcular schema_profile y dataset_contract para el nuevo primary
+        if candidate_df is not None and not candidate_df.empty:
+            schema_profile = dict(
+                (getattr(candidate_df, "attrs", {}) or {}).get("schema_profile", {}) or {}
+            )
+
+    shadow_file_id, parquet_path, related_paths = _persist_shadow_candidate(
         candidate_df,
         file_id=file_id,
         candidate_id=selected_candidate_id,
+        related_frames=get_related_frames(pipeline_result.analytical_adapter_runtime)
+        if hasattr(pipeline_result, "analytical_adapter_runtime")
+        and hasattr(pipeline_result.analytical_adapter_runtime, "related_frame_ids") else None,
     )
+    # [FASE 3B MULTI-HOJA] Excluir vistas derivadas (JOINs pre-calculados del materializador).
+    # El engine Ibis hace sus propios JOINs desde hojas raw — las vistas derived__
+    # son pre-merged y no deben re-joinarse (causarían columnas duplicadas).
+    if related_paths:
+        related_paths = {
+            k: v for k, v in related_paths.items()
+            if not k.startswith("derived__")
+        }
     execution_summaries: list[dict[str, Any]] = []
     execution_results: list[dict[str, Any]] = []
     if parquet_path:
@@ -541,6 +816,7 @@ def build_canonical_tabular_production_execution(
                 plan,
                 protected_cols=protected_cols,
                 recipe_mode=True,
+                related_parquets=related_paths if related_paths else None,
             )
             execution_summaries.append(_summarize_execution_result(plan, result, index))
             execution_results.append(dict(result) if isinstance(result, dict) else {"error": "invalid_execution_result"})

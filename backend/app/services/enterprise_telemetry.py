@@ -42,6 +42,13 @@ def _safe_dict(value: Any) -> dict[str, Any]:
 
 
 def _series_visual_type(option: dict[str, Any]) -> str | None:
+    # FIRST: Look in visual_source_payload.chart_type (APPLIED type from ChartFactory conversion)
+    vsp = option.get("visual_source_payload")
+    if isinstance(vsp, dict):
+        applied_type = _normalize_text(vsp.get("chart_type"))
+        if applied_type:
+            return applied_type
+
     governance = option.get("visual_governance")
     if isinstance(governance, dict):
         for key in ("applied_visual", "requested_visual", "recommended_visual"):
