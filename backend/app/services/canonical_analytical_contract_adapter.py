@@ -83,6 +83,8 @@ class CanonicalAnalyticalAdapterRuntime:
 
 
 def _table_kind_priority(table_name: str) -> int:
+    if "unified_all__" in table_name:
+        return 4
     if table_name.startswith("derived__"):
         return 3
     if table_name.startswith("primary__"):

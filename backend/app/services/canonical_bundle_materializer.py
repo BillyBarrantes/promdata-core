@@ -128,6 +128,79 @@ def _status_from_inputs(statuses: list[CanonicalMaterializationStatus]) -> Canon
     return CanonicalMaterializationStatus.EMPTY
 
 
+def _header_overlap_from_names(names1: list[str], names2: list[str]) -> float:
+    if not names1 or not names2:
+        return 0.0
+    s1 = {n.lower().strip() for n in names1}
+    s2 = {n.lower().strip() for n in names2}
+    return len(s1 & s2) / max(len(s1), len(s2))
+
+
+def _build_unified_materialized_view(
+    primary_frame: CanonicalMaterializedFrame,
+    related_frames: list[CanonicalMaterializedFrame],
+) -> CanonicalMaterializedView | None:
+    """Build a unified view by UNIONing ALL raw frames with schema drift tolerance.
+
+    Normalizes column names (LOWER+TRIM), aligns by name, NULL-fills missing columns.
+    Only activates when 3+ frames share >=85% header overlap.
+    """
+    all_frames = [primary_frame] + (related_frames or [])
+    if len(all_frames) < 3:
+        return None
+
+    # Normalize column names per frame
+    normalized_schemas: list[dict[str, str]] = []
+    for frame in all_frames:
+        lowered = {col.lower().strip(): col for col in (frame.column_names or [])}
+        normalized_schemas.append(lowered)
+
+    # Header overlap check: all pairs must have >=85% overlap
+    for i in range(len(all_frames)):
+        for j in range(i + 1, len(all_frames)):
+            if _header_overlap_from_names(
+                all_frames[i].column_names or [],
+                all_frames[j].column_names or [],
+            ) < 0.85:
+                return None
+
+    # Column intersection: only columns present in ALL frames survive
+    common_cols_norm = set(normalized_schemas[0].keys())
+    for schema in normalized_schemas[1:]:
+        common_cols_norm &= set(schema.keys())
+    if not common_cols_norm:
+        return None
+
+    # Build unified records: concatenate all frames with normalized column names
+    unified_records: list[dict[str, Any]] = []
+    for i, frame in enumerate(all_frames):
+        schema = normalized_schemas[i]
+        for row in (frame.records or []):
+            unified_row: dict[str, Any] = {}
+            for col_norm in common_cols_norm:
+                original_col = schema[col_norm]
+                unified_row[col_norm] = row.get(original_col)
+            unified_records.append(unified_row)
+
+    if not unified_records:
+        return None
+
+    sorted_columns = sorted(common_cols_norm)
+    return CanonicalMaterializedView(
+        view_id="unified_all__sheets",
+        view_type="likely_union",
+        status=primary_frame.status,
+        source_frame_ids=[f.frame_id for f in all_frames],
+        row_count=len(unified_records),
+        column_names=sorted_columns,
+        records=unified_records,
+        metadata={
+            "materialization_mode": "unified_all",
+            "unified_frame_count": len(all_frames),
+        },
+    )
+
+
 def _concat_records(
     left: CanonicalMaterializedFrame,
     right: CanonicalMaterializedFrame,
@@ -247,6 +320,19 @@ def materialize_bundle(
             derived = None
         if derived is not None:
             derived_views.append(derived)
+
+    # ── UNIFIED ALL SHEETS VIEW ────────────────────────────────
+    # If 3+ frames share >=85% schema overlap, build a unified
+    # view that UNIONs ALL raw frames with schema drift tolerance.
+    # This becomes the highest-priority candidate, ensuring ALL
+    # dashboard plans see the complete multi-year dataset.
+    # ───────────────────────────────────────────────────────────
+    if primary_materialized and related_materialized:
+        unified_view = _build_unified_materialized_view(
+            primary_materialized, related_materialized,
+        )
+        if unified_view:
+            derived_views.append(unified_view)
 
     overall_status = _status_from_inputs(
         [primary_materialized.status, *[frame.status for frame in related_materialized], *[view.status for view in derived_views]]

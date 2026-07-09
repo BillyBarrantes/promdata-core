@@ -787,6 +787,18 @@ def build_canonical_tabular_production_execution(
             k: v for k, v in related_paths.items()
             if not k.startswith("derived__")
         }
+
+    # ── UNIFIED DATA MODEL: Skip JOIN logic ────────────────────
+    # When the selected candidate is the unified_all__ view,
+    # all cross-sheet data is already consolidated. Clear
+    # related_frame_ids on all plans so the JOIN section in
+    # ibis_engine is skipped entirely.
+    # ───────────────────────────────────────────────────────────
+    if selected_candidate_id and "unified_all__" in str(selected_candidate_id):
+        related_paths = {}
+        for plan in (bounded_plans or []):
+            plan.related_frame_ids = []
+
     execution_summaries: list[dict[str, Any]] = []
     execution_results: list[dict[str, Any]] = []
     if parquet_path:
