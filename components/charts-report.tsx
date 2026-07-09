@@ -140,7 +140,9 @@ const inferTableColumnType = (key: string, values: unknown[]): SmartTableColumn[
 
   if (numericValues.length === values.filter((value) => value !== undefined && value !== null).length && numericValues.length > 0) {
     const keyLabel = key.toLowerCase();
-    if (keyLabel.includes("%") || keyLabel.includes("variaci") || keyLabel.includes("growth") || keyLabel.includes("ratio")) {
+    const pctIndicators = ["%", "variaci", "growth", "ratio"];
+    const pctMatchCount = pctIndicators.filter((ind) => keyLabel.includes(ind)).length;
+    if (pctMatchCount >= 2) {
       return "percentage";
     }
     return "number";
@@ -497,6 +499,14 @@ const ChartsReportComponent = ({
           sourcePayload,
         )
       );
+      setVisualPickerOpen(false);
+      return;
+    }
+
+    if (visualId === "smart_table") {
+      setVisualOverride(visualId);
+      setVisualError(null);
+      setViewMode('table');
       setVisualPickerOpen(false);
       return;
     }

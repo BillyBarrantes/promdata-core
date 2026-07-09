@@ -77,6 +77,7 @@ const TRANSFORMABLE_VISUALS = new Set<VisualId>([
   "histogram_chart",
   "gantt_chart",
   "pareto_chart",
+  "smart_table",
 ]);
 
 const baseOption = (): EChartsOption => ({
@@ -451,10 +452,6 @@ function getPayloadTransformFailureReason(
     return "Este visual no expone datos fuente suficientes para reconstruccion local.";
   }
 
-  if (visualId === "smart_table") {
-    return "Smart Table se activa desde la vista tabular o por densidad automatica.";
-  }
-
   if (visualId === "stacked_bar_chart" && !hasStackedShape(rows)) {
     return "Stacked Bar requiere categorias con al menos dos series comparables.";
   }
@@ -540,7 +537,6 @@ export const getTransformSupportReason = (
     return getPayloadTransformFailureReason(payload, visualId);
   }
   if (TRANSFORMABLE_VISUALS.has(visualId)) return null;
-  if (visualId === "smart_table") return "Smart Table se activa desde la vista tabular o por densidad automatica.";
   return "Este visual aun no tiene reemplazo local instantaneo.";
 };
 
