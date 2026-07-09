@@ -473,6 +473,8 @@ def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tup
         return False, "Gantt requiere campos operativos de inicio y fin; aun no hay contrato automatico suficiente."
     if visual == "pareto_chart" and intent_type not in {"distribution", "descriptive"}:
         return False, "Pareto solo aplica a concentracion y ranking."
+    if visual == "smart_table" and rows <= 6:
+        return False, "Smart Table requiere mas de 6 categorias para justificar la vista tabular."
     return True, None
 
 
@@ -546,11 +548,6 @@ def _build_visual_catalog(
             or visual_id == recommended
             or visual_id == applied
         )
-
-        if visual_id == "smart_table" and visual_id not in allowed_set:
-            is_enabled = False
-            if not invalid_reason:
-                invalid_reason = "Smart Table se activa cuando la densidad del dataset lo justifica."
 
         catalog.append(
             {

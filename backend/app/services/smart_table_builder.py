@@ -195,20 +195,31 @@ def should_offer_hybrid_smart_table(chart_option: dict[str, Any]) -> bool:
 # CONVERTIDOR ECHARTS → SMART TABLE
 # ---------------------------------------------------------------------------
 
-def _detect_column_type(series_name: str) -> str:
+def _detect_column_type(series_name: str, is_percentage_override: bool | None = None) -> str:
     """
-    Detecta el tipo de columna basándose en el nombre de la serie.
-    Data-driven: busca patrones comunes de porcentaje y variación.
+    Detecta el tipo de columna basándose en metadata del contrato, dtype, o nombre.
+
+    Jerarquía (Pilar 1):
+    1. Si is_percentage_override es True -> 'percentage' (metadata del contrato)
+    2. Si is_percentage_override es False -> 'number' (metadata del contrato)
+    3. Si no hay override -> heurística estricta de nombre (≥2 indicadores)
 
     Args:
         series_name: Nombre de la serie ECharts.
+        is_percentage_override: Override opcional desde metadata del plan.
 
     Returns:
         'percentage' si parece porcentaje, 'number' si no.
     """
+    if is_percentage_override is True:
+        return 'percentage'
+    if is_percentage_override is False:
+        return 'number'
+
     name_lower = series_name.lower()
-    percentage_indicators = ['%', 'variaci', 'porcentaje', 'tasa', 'margen', 'ratio', 'pct']
-    if any(indicator in name_lower for indicator in percentage_indicators):
+    percentage_indicators = ['%', 'variaci', 'porcentaje', 'porcentual', 'tasa', 'margen', 'ratio', 'pct']
+    match_count = sum(1 for ind in percentage_indicators if ind in name_lower)
+    if match_count >= 2:
         return 'percentage'
     return 'number'
 
@@ -285,6 +296,7 @@ def echarts_to_smart_table(
     title: str,
     sort_order: str = 'desc',
     default_view_mode: str = 'table',
+    is_percentage: bool | None = None,
 ) -> dict[str, Any]:
     """
     Convierte un ECharts option con muchas categorías en un payload Smart Table.
@@ -298,6 +310,7 @@ def echarts_to_smart_table(
         chart_option: Diccionario ECharts option completo.
         title: Título del análisis para la tabla.
         sort_order: Orden inicial ('asc' o 'desc').
+        is_percentage: Override para forzar/inhibir detección de porcentaje.
 
     Returns:
         Diccionario con estructura smart_table completa, incluyendo
@@ -399,7 +412,7 @@ def echarts_to_smart_table(
     for idx, series in enumerate(series_list):
         series_name = series.get('name', f'Valor {idx + 1}')
         col_key = f"serie_{idx}"
-        col_type = _detect_column_type(series_name)
+        col_type = _detect_column_type(series_name, is_percentage_override=is_percentage)
 
         col_def: dict[str, Any] = {
             "key": col_key,
@@ -461,4 +474,84 @@ def echarts_to_smart_table(
         "default_view_mode": default_view_mode,
         "row_count": len(data),
         "page_size": ROWS_PER_PAGE
+    }
+
+
+# ---------------------------------------------------------------------------
+# CONSTRUCTOR DIRECTO DESDE RECORDS (Smart Table Contractual)
+# ---------------------------------------------------------------------------
+
+def build_smart_table_from_records(
+    records: list[dict[str, Any]],
+    title: str,
+    sort_order: str = 'desc',
+    is_percentage: bool = False,
+) -> dict[str, Any] | None:
+    """
+    Construye un payload Smart Table directamente de records (list[dict])
+    sin pasar por ECharts.
+
+    Ruta para cuando visual_recommendation_engine elige 'smart_table'
+    como tipo visual primario (no por densidad post-hoc).
+
+    ── ADR-VISUAL-006 ──────────────────────────────────────────────────
+    Cuando el motor visual recomienda smart_table, el chart_type llega
+    como "smart_table" a _build_chart_option. ChartFactory NO tiene
+    handler para este tipo → caería a bar_chart. Esta función construye
+    el payload directamente, preservando TODAS las columnas del record.
+    ────────────────────────────────────────────────────────────────────
+
+    Args:
+        records: Lista de diccionarios (output del motor Ibis).
+        title: Título del análisis para la tabla.
+        sort_order: Orden inicial ('asc' o 'desc').
+        is_percentage: Si True, columnas numéricas se formatean como %.
+
+    Returns:
+        Diccionario con estructura smart_table completa, o None si vacío.
+    """
+    if not records or not isinstance(records[0], dict):
+        return None
+
+    first = records[0]
+    columns: list[dict[str, Any]] = []
+    sort_by: str | None = None
+
+    for key in first:
+        if str(key).startswith("_"):
+            continue
+        sample_val = first[key]
+        label = str(key).replace("_", " ").strip().title()
+
+        if isinstance(sample_val, (int, float)):
+            col_type = "percentage" if is_percentage else "number"
+            columns.append({
+                "key": key,
+                "label": label,
+                "type": col_type,
+                "bar": sort_by is None,   # First numeric col gets data bar
+                "heatmap": is_percentage,
+            })
+            if sort_by is None:
+                sort_by = key
+        else:
+            columns.append({
+                "key": key,
+                "label": label,
+                "type": "text",
+            })
+
+    if not columns:
+        return None
+
+    return {
+        "type": "smart_table",
+        "title": title,
+        "columns": columns,
+        "data": records,
+        "sort_by": sort_by or columns[0]["key"],
+        "sort_order": sort_order,
+        "default_view_mode": "table",
+        "row_count": len(records),
+        "page_size": ROWS_PER_PAGE,
     }
