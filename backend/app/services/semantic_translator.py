@@ -1034,6 +1034,7 @@ class SemanticTranslator:
         return normalized_filters
 
     @staticmethod
+    @staticmethod
     def _build_plan_from_router_contract(
         router_decision: dict[str, Any],
         columns: list[str],

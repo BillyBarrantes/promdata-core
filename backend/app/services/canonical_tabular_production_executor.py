@@ -66,7 +66,12 @@ def _extract_categorical_dimension(
     prompt: str | None,
     candidate_df: pd.DataFrame,
 ) -> str | None:
-    """Busca columnas categóricas (cardinalidad 2-20) relevantes en el prompt."""
+    """Busca columnas categóricas (cardinalidad 2-20) relevantes en el prompt.
+
+    Prioriza coincidencia textual exacta (word-boundary) sobre heurística
+    de cardinalidad, para que 'departamento' en el prompt → columna departamento
+    incluso si otra columna (ej. cargo) tiene menor cardinalidad.
+    """
     if candidate_df is None or candidate_df.empty:
         return None
     categorical_columns = [
@@ -79,6 +84,12 @@ def _extract_categorical_dimension(
     if not prompt:
         return categorical_columns[0]
     prompt_lower = prompt.lower()
+    # Paso 1: coincidencia exacta con word boundary (\b)
+    for col in categorical_columns:
+        col_lower = col.lower()
+        if re.search(r'\b' + re.escape(col_lower) + r'\b', prompt_lower):
+            return col
+    # Paso 2: coincidencia por substring (fallback para nombres compuestos)
     for col in categorical_columns:
         if col.lower() in prompt_lower:
             return col
@@ -283,7 +294,12 @@ def _auto_correct_hallucinated_metrics(
     candidate_df: pd.DataFrame | None,
     prompt: str | None = None,
 ) -> list[Any]:
-    """Auto-corrige métricas alucinadas en los planes generados por Gemini."""
+    """Auto-corrige métricas alucinadas en los planes generados por Gemini.
+
+    [V9] AVG IMMUNITY: Si el plan explícitamente usa aggregation="avg" sobre
+    columnas numéricas válidas, no se sobrescribe la agregación. El sistema de
+    corrección solo actúa sobre métricas alucinadas o bloques incompletos.
+    """
     if not plans or candidate_df is None:
         return plans if plans else []
 
@@ -295,6 +311,12 @@ def _auto_correct_hallucinated_metrics(
     corrected_plans: list[Any] = []
     for plan in plans:
         try:
+            # [V9] AVG IMMUNITY: preservar si el plan ya especifica avg sobre
+            # columnas numéricas válidas — el LLM decidió correctamente.
+            if _plan_has_valid_avg_on_numeric(plan, candidate_df):
+                corrected_plans.append(plan)
+                continue
+
             blocked_metrics = _blocked_plan_metrics(plan, candidate_df)
             if blocked_metrics:
                 _apply_metric_correction(
@@ -308,6 +330,90 @@ def _auto_correct_hallucinated_metrics(
         corrected_plans.append(plan)
 
     return corrected_plans
+
+
+def _plan_has_valid_avg_on_numeric(plan: Any, candidate_df: pd.DataFrame | None) -> bool:
+    """Verifica si el plan usa aggregation='avg' sobre columnas numéricas válidas.
+
+    Si el LLM ya especificó correctamente un promedio sobre columnas numéricas
+    reales, el sistema de corrección NO debe intervenir — inmunidad anti-regresión.
+
+    [V9] TimeTrendIntent: Si value_column es una columna numérica válida, se
+    inmuniza aunque no tenga campo de agregación explícito. La agregación
+    la define el engine internamente.
+    """
+    if not plan or candidate_df is None or candidate_df.empty:
+        return False
+    intent = getattr(plan, "main_intent", None)
+    if not intent:
+        return False
+    intent_type = getattr(intent, "type", None)
+
+    if intent_type == "descriptive":
+        if getattr(intent, "aggregation", None) == "avg":
+            for m in (getattr(intent, "metrics", None) or []):
+                if m in candidate_df.columns and pd.api.types.is_numeric_dtype(candidate_df[m]):
+                    return True
+
+    if intent_type == "diagnostic":
+        if getattr(intent, "aggregation", None) == "avg":
+            metrics_list = (getattr(intent, "metrics", None) or [])
+            if getattr(intent, "metric", None) and getattr(intent, "metric", None) not in metrics_list:
+                metrics_list = list(metrics_list) + [getattr(intent, "metric", None)]
+            for m in metrics_list:
+                if m and m in candidate_df.columns and pd.api.types.is_numeric_dtype(candidate_df[m]):
+                    return True
+
+    # [V9] TimeTrendIntent: inmunizar si value_column es numérica válida
+    if intent_type == "trend":
+        vc = getattr(intent, "value_column", None)
+        if vc and vc in candidate_df.columns and pd.api.types.is_numeric_dtype(candidate_df[vc]):
+            return True
+
+    return False
+
+
+def _is_plan_count_metric(plan: Any, metric: str) -> bool:
+    """Verifica si una métrica es usada como count_metric legítima en el plan.
+
+    El sistema de corrección automática reemplaza métricas alucinadas por
+    columnas de tipo ID para conteo volumétrico (COUNT). Esta función detecta
+    si una métrica bloqueada por el Metric Guard es en realidad un count_metric
+    legítimo, otorgando inmunidad para evitar falsos bloqueos.
+
+    [V2.2] Expansión a trend: TimeTrendIntent con value_column/plot_metric string
+    (ej: id_empleado como conteo volumétrico en tendencia con split_dimension).
+    """
+    if not plan or not plan.main_intent:
+        return False
+    intent = plan.main_intent
+    intent_type = getattr(intent, "type", None)
+
+    # DescriptiveIntent: aggregation="count" con métrica en metrics[]
+    if intent_type == "descriptive":
+        return str(getattr(intent, "metric", "")) == metric
+
+    # DistributionIntent: metric field — siempre es conteo de registros
+    if intent_type == "distribution":
+        return str(getattr(intent, "metric", "")) == metric
+
+    # DiagnosticIntent: aggregation="count" con métrica en metrics o metric
+    if intent_type == "diagnostic":
+        if getattr(intent, "aggregation", None) == "count":
+            if metric in (getattr(intent, "metrics", None) or []):
+                return True
+            if getattr(intent, "metric", None) == metric:
+                return True
+
+    # [FIX V2.2] Permitir conteos volumétricos en análisis de tendencias
+    # [FIX V2.3] Añadir ranking_metric para cubrir id_empleado en plan de ranking+trend
+    if intent_type == "trend":
+        val_col = str(getattr(intent, "value_column", ""))
+        plot_col = str(getattr(intent, "plot_metric", ""))
+        rank_col = str(getattr(intent, "ranking_metric", ""))
+        return metric in (val_col, plot_col, rank_col)
+
+    return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -541,6 +647,7 @@ def build_canonical_tabular_production_execution(
         schema_profile=schema_profile,
         dataset_contract=dataset_contract,
         related_frames_context=related_frames_context,
+        candidate_df=candidate_df,
     ) or []
     plans = apply_parent_context_to_placeholder_filters(
         plans=plans,
@@ -679,6 +786,8 @@ def build_canonical_tabular_production_execution(
                             # [V5] TOKEN BOUNDARY GUARD: Solo inyectar si el valor
                             # aparece como palabra completa en el prompt Y tiene ≥4 chars.
                             # Previene falsos positivos como 'ENT' matcheando en 'vENcimiento'.
+                            # [V9] Tolerancia morfológica: sufijo plural 's' opcional
+                            # para que "inactivos" en el prompt matchee "Inactivo" del catálogo.
                             _lf_val_str = str(lf.value).strip()
                             if len(_lf_val_str) < 4:
                                 print(
@@ -688,14 +797,14 @@ def build_canonical_tabular_production_execution(
                                 )
                                 continue
                             if not re.search(
-                                rf'\b{re.escape(_lf_val_str)}\b',
+                                rf'\b{re.escape(_lf_val_str)}s?\b',
                                 str(actual_prompt),
                                 re.IGNORECASE,
                             ):
                                 print(
                                     f"⚠️ [LITERAL FILTER → BLOCKED] "
                                     f"'{_lf_val_str}' no es token completo en el prompt. "
-                                    f"Posible substring match."
+                                    f"Posible substring match o variante morfológica."
                                 )
                                 continue
                             # Columna no filtrada por Gemini → inyectar filtro literal
@@ -806,6 +915,22 @@ def build_canonical_tabular_production_execution(
         ibis_engine_cls = _get_ibis_engine_cls()
         for index, plan in enumerate(bounded_plans, start=1):
             blocked_metrics = _blocked_plan_metrics(plan, candidate_df)
+            # 🛡️ [V9] COUNT METRIC IMMUNITY: métricas de ID usadas como count
+            # no son alucinaciones — el sistema de corrección las reemplazó
+            # legítimamente para conteo volumétrico de registros.
+            # Se verifica que el plan use aggregation="count" o sea un
+            # DistributionIntent (que siempre cuenta registros).
+            _immunized = [
+                m for m in (blocked_metrics or [])
+                if _is_plan_count_metric(plan, m)
+            ]
+            if _immunized:
+                for m in _immunized:
+                    blocked_metrics.remove(m)
+                    print(
+                        f"🛡️ [METRIC GUARD → IMMUNIZED] "
+                        f"'{m}' es count_metric del plan — inmunizada."
+                    )
             if blocked_metrics:
                 blocked_result = _blocked_execution_result(
                     plan,
@@ -910,8 +1035,31 @@ def execute_canonical_tabular_production_analysis(
     # _build_final_struct() ya filtra resultados con error (línea 361-362),
     # así que solo los gráficos buenos llegan al frontend.
     if successful_count <= 0:
+        _pq_status = execution.metadata.get('production_query_status', '')
+        # ═══════════════════════════════════════════════════════════════
+        # Fix 4: Mensaje descriptivo cuando no hay planes válidos.
+        # En lugar de un error crudo, informar qué columnas SÍ tiene
+        # el dataset para que el usuario entienda el mismatch.
+        # ═══════════════════════════════════════════════════════════════
+        _col_hint = ""
+        if _pq_status == "no_plans":
+            try:
+                _hint_df = get_selected_candidate_dataframe(
+                    pipeline_result.analytical_adapter_runtime
+                )
+                if _hint_df is not None:
+                    _available = sorted(
+                        c for c in _hint_df.columns if not c.startswith('_')
+                    )
+                    if _available:
+                        _col_hint = (
+                            f" Columnas disponibles en tu dataset: "
+                            f"{', '.join(_available[:15])}"
+                        )
+            except Exception:
+                pass  # best-effort hint, never blocks error path
         raise RuntimeError(
-            f"canonical_production_not_ready:{execution.metadata.get('production_query_status')}:{successful_count}:{_dominant_error}"
+            f"canonical_production_not_ready:{_pq_status}:{successful_count}:{_dominant_error}{_col_hint}"
         )
     final_struct, dataset_contract, cleaning_notes = _build_final_struct(execution)
     final_struct.setdefault("traceability", {})

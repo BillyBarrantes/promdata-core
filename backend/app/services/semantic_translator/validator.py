@@ -490,8 +490,9 @@ def normalize_router_filters(
         # ── Fin Temporal Resolver ──
 
         role = col_role
-        if operator in ("==", "=") and role == "dimension":
-            operator = "ilike"
+        # [V2.3] Eliminado: conversión ilike para dimensiones. Causaba falsos
+        # positivos (ej: "Inactivo" contiene "activo"). El motor Ibis ya maneja
+        # lowercase/uppercase exacto vía UPPER(col) == UPPER(val) en ibis_engine.py:454.
         try:
             validated = DataFilter.model_validate(
                 {"column": resolved_column, "operator": operator, "value": value}
@@ -572,7 +573,31 @@ def finalize_plans(
         rationale=decision.get("rationale"),
         schema_keys=list((schema_profile or {}).keys())[:15],
     )
-    return apply_direction_guard_to_distribution_plans(plans, schema_profile)
+    guarded_plans = apply_direction_guard_to_distribution_plans(plans, schema_profile)
+
+    # [FIX V2.4] Desduplicar planes basandose en estructura del intent +
+    # dimensión + métrica + función de agregación + tipo visual.
+    # Previene duplicados donde 2 planes tienen la misma data pero distinto título
+    # (ej: "Salario del Cargo con Mejor Desempeño" vs "Desempeño Promedio por Cargo").
+    dedup_plans = []
+    seen = set()
+    for p in guarded_plans:
+        intent_type = getattr(p.main_intent, "type", "")
+        dimension = getattr(p.main_intent, "dimension", "") or getattr(p.main_intent, "date_column", "")
+        metric = (
+            getattr(p.main_intent, "metric", "")
+            or getattr(p.main_intent, "value_column", "")
+            or getattr(p.main_intent, "analysis_metric", "")
+            or getattr(p.main_intent, "target_metric", "")
+        )
+        agg_function = getattr(p.main_intent, "aggregation", "") or getattr(p, "aggregation_function", "")
+        visual_type = str(getattr(p, "visual_protocol", ""))
+        signature = f"{intent_type}_{dimension}_{metric}_{agg_function}_{visual_type}"
+        if signature not in seen:
+            seen.add(signature)
+            dedup_plans.append(p)
+
+    return dedup_plans
 
 
 def detect_prompt_complexity(surface_prompt: str) -> dict[str, Any]:

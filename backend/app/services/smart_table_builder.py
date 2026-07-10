@@ -54,7 +54,7 @@ def _get_categories(chart_option: dict[str, Any]) -> list[str]:
 # SEMÁFORO DE DENSIDAD
 # ---------------------------------------------------------------------------
 
-def should_use_smart_table(chart_option: dict[str, Any]) -> bool:
+def should_use_smart_table(chart_option: dict[str, Any], *, chart_type: str | None = None) -> bool:
     """
     Evalúa si un gráfico ECharts debería renderizarse como Smart Table.
 
@@ -62,15 +62,23 @@ def should_use_smart_table(chart_option: dict[str, Any]) -> bool:
     la visualización es demasiado densa para un gráfico y se beneficia de
     una tabla empresarial.
 
+    [V2.3] chart_type: si es line_chart o area_chart, retorna False inmediatamente.
+    Los trends con split generan muchos periodos en el eje X (ej: 101 meses),
+    pero siguen siendo legibles como líneas; smart_table degradaría el UX.
+
     Soporta tanto bar charts verticales (xAxis=category) como horizontales
     (yAxis=category), ya que ChartFactory invierte los ejes con horizontal=True.
 
     Args:
         chart_option: Diccionario ECharts option completo.
+        chart_type: Tipo visual original (line_chart, bar_chart, etc.). Opcional.
 
     Returns:
         True si debe mostrarse como Smart Table, False si el gráfico es adecuado.
     """
+    if chart_type and chart_type in ("line_chart", "area_chart", "scatter_plot"):
+        return False
+
     x_axis = chart_option.get('xAxis')
     y_axis = chart_option.get('yAxis')
 

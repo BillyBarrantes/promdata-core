@@ -213,10 +213,10 @@ class DataEngine:
         Evita alucinaciones del LLM imponiendo la realidad del archivo.
         """
         currency_map = {
-            'PEN': r'(PEN|S/|SOLES|NUEVOS SOLES)',
-            'USD': r'(USD|\$|DOLLAR|DOLARES)',
-            'EUR': r'(EUR|€|EURO|EUROS)',
-            'MXN': r'(MXN|PESOS)'
+            'PEN': r'\b(PEN|S/|SOLES|NUEVOS SOLES)\b',
+            'USD': r'\b(USD|\$|DOLLAR|DOLARES)\b',
+            'EUR': r'\b(EUR|€|EURO|EUROS)\b',
+            'MXN': r'\b(MXN|PESOS)\b'
         }
         
         # Nivel 1: Headers (Prioridad Alta)
@@ -1020,6 +1020,7 @@ class DataEngine:
         total_rows = int(len(df))
         unique_dates = int(valid_dates.nunique())
         avg_rows_per_period = total_rows / max(unique_dates, 1)
+        min_date = valid_dates.min()
         max_date = valid_dates.max()
         max_date_mask = date_series == max_date
         rows_at_max_date = int(max_date_mask.fillna(False).sum())
@@ -1132,6 +1133,7 @@ class DataEngine:
             'total_rows': total_rows,
             'unique_dates': unique_dates,
             'avg_rows_per_period': round(avg_rows_per_period, 4),
+            'min_date': DataEngine._to_json_safe(min_date),
             'max_date': DataEngine._to_json_safe(max_date),
             'rows_at_max_date': rows_at_max_date,
             'rows_at_max_ratio': round(rows_at_max_ratio, 4),

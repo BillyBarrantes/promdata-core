@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 from typing import Any
+from dateutil import parser as dateparser
 
 # ── Mapeo de nombres de meses (ES + EN) ────────────────────────────────
 _MONTH_NAMES: dict[str, int] = {
@@ -47,6 +48,23 @@ _MONTH_DAYS = {
 }
 
 
+def _extract_year_from_any_string(raw: Any) -> int | None:
+    """Extrae el año de cualquier string de fecha usando parser flexible.
+
+    Tolerante a ISO (2021-01-15), latino (15/01/2021), US (01/15/2021),
+    texto (January 15, 2021), etc. Retorna None si no puede extraer.
+    """
+    if raw is None:
+        return None
+    try:
+        dt = dateparser.parse(str(raw).strip(), fuzzy=True)
+        if dt is not None:
+            return dt.year
+    except (ValueError, TypeError, OverflowError, AttributeError):
+        pass
+    return None
+
+
 def _extract_year_from_col_profile(
     column: str,
     schema_profile: dict[str, Any] | None,
@@ -61,15 +79,9 @@ def _extract_year_from_col_profile(
         raw_val = col_meta.get(key)
         if not raw_val:
             continue
-        raw_str = str(raw_val).strip()
-        match = re.match(r"(\d{4})-\d{2}-\d{2}", raw_str)
-        if match:
-            return int(match.group(1))
-        match = re.match(r"(\d{4})", raw_str)
-        if match:
-            year = int(match.group(1))
-            if 1900 <= year <= 2100:
-                return year
+        year = _extract_year_from_any_string(raw_val)
+        if year is not None:
+            return year
     return None
 
 
@@ -147,27 +159,46 @@ def _infer_dataset_year_range(
     schema_profile: dict[str, Any] | None,
 ) -> tuple[int | None, int | None]:
     """
-    Extrae (min_year, max_year) del dataset desde columnas temporales.
+    Extrae (min_year, max_year) del dataset desde el schema_profile.
 
-    Usa los campos min/max de columnas con role="time" o role="date"
-    para determinar el rango real del dataset. Si no hay columnas
-    temporales, retorna (None, None).
+    Busca en orden de prioridad:
+    1. Claves top-level _dataset_year_min / _dataset_year_max
+       (inyectadas por canonical_analytical_contract_adapter.py desde datos reales)
+    2. Columnas con role="time" o role="date" que tengan min/max en el perfil
+    3. Columnas con dtype date/timestamp/datetime que tengan min/max
+
+    Esto asegura que el Fortress preventivo en resolve_temporal_filter_value
+    se active incluso sin etiquetas semánticas en los nombres de columna.
     """
     if not schema_profile:
         return None, None
+
+    # Prioridad 1: rangos inyectados desde datos reales
+    _min = schema_profile.get("_dataset_year_min")
+    _max = schema_profile.get("_dataset_year_max")
+    if _min is not None and _max is not None:
+        return int(_min), int(_max)
+
     years: list[int] = []
     for col_name, col_meta in schema_profile.items():
         if not isinstance(col_meta, dict):
             continue
         role = str(col_meta.get("role", "")).lower()
-        if role not in ("time", "date"):
+        col_dtype = str(col_meta.get("dtype", "")).lower()
+        is_temporal = (
+            role in ("time", "date")
+            or 'date' in col_dtype
+            or 'timestamp' in col_dtype
+            or 'datetime' in col_dtype
+        )
+        if not is_temporal:
             continue
         for key in ("min", "max"):
             val = col_meta.get(key)
             if val:
-                match = re.match(r"(\d{4})", str(val))
-                if match:
-                    years.append(int(match.group(1)))
+                year = _extract_year_from_any_string(val)
+                if year is not None:
+                    years.append(year)
     if not years:
         return None, None
     return min(years), max(years)

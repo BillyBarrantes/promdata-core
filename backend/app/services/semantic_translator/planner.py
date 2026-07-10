@@ -1,5 +1,6 @@
 import json
 from typing import Any, Optional, List
+import pandas as pd
 
 from app.core.config import settings
 
@@ -134,11 +135,143 @@ def select_alternate_distribution_visual(
     return "bar_chart"
 
 
+def _resolve_abstract_count_metric(
+    surface_prompt: str,
+    columns: list[str],
+    schema_profile: dict | None = None,
+    candidate_df: pd.DataFrame | None = None,
+) -> str | None:
+    """Resuelve métricas abstractas de conteo (ej. 'cantidad de empleados')
+    a la columna ID del dataset, forzando aggregation=count.
+
+    Cascada de 3 fallbacks:
+    1. Coincidencia por prefijo (id_, id)
+    2. Coincidencia por rol semántico (role=identifier)
+    3. Cardinalidad real desde candidate_df (>80% unique en columna string)
+    100% schema-agnostic: el paso 3 funciona aunque schema_profile sea vacío.
+    """
+    if not surface_prompt or not columns:
+        return None
+    prompt_lower = surface_prompt.lower().strip()
+    count_keywords = {"cantidad", "número", "numero", "total", "conteo", "cuenta", "num"}
+    if not any(kw in prompt_lower for kw in count_keywords):
+        return None
+
+    # Fallback 1: columna con prefijo id_
+    for col in columns:
+        col_lower = col.lower().strip()
+        if col_lower.startswith("id_") or col_lower == "id":
+            role = (schema_profile or {}).get(col, {}).get("role") if schema_profile else None
+            if role in ("identifier", None):
+                return col
+        if col_lower in ("identificador", "identificateur", "employee_id", "user_id", "usuario_id"):
+            return col
+
+    # Fallback 2: columna marcada como identifier en schema_profile
+    for col in columns:
+        role = (schema_profile or {}).get(col, {}).get("role") if schema_profile else None
+        if role == "identifier":
+            return col
+
+    # Fallback 3: cardinalidad real desde candidate_df (>80% unique)
+    if candidate_df is not None and not candidate_df.empty:
+        id_candidates: list[tuple[int, str]] = []
+        for col in columns:
+            if col not in candidate_df.columns:
+                continue
+            if not pd.api.types.is_string_dtype(candidate_df[col]):
+                continue
+            try:
+                nunique = int(candidate_df[col].nunique())
+                total = len(candidate_df)
+                if nunique > 1 and total > 0 and (nunique / total) > 0.8:
+                    id_candidates.append((nunique, col))
+            except Exception:
+                continue
+        if id_candidates:
+            id_candidates.sort(key=lambda x: x[0], reverse=True)
+            return id_candidates[0][1]
+
+    return None
+
+
+def _build_trend_from_distribution_contract(
+    contract: dict, columns: list[str],
+    positive_filters: list, negative_filters: list,
+    metric_column: str, ranking_metric_column: str | None,
+    ranking_direction: str, metric_unit, metric_label: str,
+    schema_profile: dict,
+) -> list[AnalysisPlan]:
+    """[V2.2] Redirige un contrato distribution+requires_time a trend con split_dimension.
+
+    Cuando el router detecta 'distribución por períodos' (ej: "empleados
+    activos por cargo para cada período"), la respuesta correcta NO es
+    un total agregado sino una evolución temporal con split por dimensión.
+    """
+    date_column = resolve_contract_column(
+        contract.get("time_axis"), columns,
+        schema_profile=schema_profile, allowed_roles={"date"},
+    )
+    if not date_column:
+        date_column = pick_primary_date_column(
+            columns, schema_profile=schema_profile,
+        )
+    if not date_column:
+        return []
+
+    dimension_column = resolve_contract_column(
+        contract.get("dimension"), columns,
+        schema_profile=schema_profile, allowed_roles={"dimension", "identifier"},
+    )
+
+    top_n = contract.get("top_n")
+    if top_n is None and dimension_column:
+        cardinality = int(schema_profile.get(dimension_column, {}).get("cardinality") or 0)
+        top_n = min(cardinality, 10) if 0 < cardinality <= 12 else 10
+
+    split_limit = max(2, min(int(top_n), 15)) if top_n else None
+
+    grain = str(contract.get("grain") or "month")
+    visual_protocol = VisualProtocol.LINE
+    date_label = humanize_column_alias(date_column)
+    column_aliases = {metric_column: metric_label, date_column: date_label}
+    if dimension_column:
+        column_aliases[dimension_column] = humanize_column_alias(dimension_column)
+
+    return [
+        AnalysisPlan(
+            main_intent={
+                "type": "trend",
+                "rationale": "Ejecuto contrato distribution+requires_time como trend con split_dimension.",
+                "filters": positive_filters,
+                    "positive_filters": positive_filters,
+                    "negative_filters": negative_filters,
+                    "metric_unit": metric_unit.value if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER.value,
+                    "visual_protocol": visual_protocol.value,
+                    "date_column": date_column,
+                    "value_column": metric_column,
+                    "plot_metric": metric_column,
+                    "ranking_metric": ranking_metric_column,
+                    "ranking_direction": ranking_direction,
+                    "grain": grain,
+                    "fill_missing": True,
+                    "split_dimension": dimension_column,
+                    "split_limit": split_limit,
+                    "top_n_aggregation_mode": "split",
+            },
+            title=f"Evolución de {metric_label} por {date_label}",
+            column_aliases=column_aliases,
+            metric_polarity=MetricPolarity.NEUTRAL,
+        )
+    ]
+
+
 def build_plan_from_router_contract(
     router_decision: dict[str, Any],
     columns: list[str],
     schema_profile: dict | None = None,
     dataset_contract: dict[str, Any] | None = None,
+    candidate_df: pd.DataFrame | None = None,
 ) -> Optional[List[AnalysisPlan]]:
     if not settings.DETERMINISTIC_VISUAL_FASTPATH_ENABLED:
         return None
@@ -150,14 +283,32 @@ def build_plan_from_router_contract(
         return None
 
     intent = str(contract.get("intent") or router_decision.get("detected_intent") or "unknown")
-    metric_column = resolve_contract_column(
-        contract.get("plot_metric") or contract.get("metric"),
-        columns, schema_profile=schema_profile, allowed_roles={"metric"},
-    )
+
+    # Step 1: Try exact column match
+    contract_metric_hint = str(contract.get("plot_metric") or contract.get("metric") or "").strip()
+    if contract_metric_hint and contract_metric_hint in columns:
+        metric_column = contract_metric_hint
+    else:
+        metric_column = None
+
+    # Step 2: [V9] Resolver metrica abstracta de conteo (ej. "cantidad de empleados")
+    # Se ejecuta ANTES del fuzzy match con role filter para evitar que
+    # prompts de conteo abstracto ("cantidad de empleados") sean interceptados
+    # por columnas metricas ("nivel_desempeno" por la keyword "cantidad").
     if not metric_column:
-        contract_metric_hint = str(contract.get("plot_metric") or contract.get("metric") or "").strip()
-        if contract_metric_hint and contract_metric_hint in columns:
-            metric_column = contract_metric_hint
+        metric_column = _resolve_abstract_count_metric(
+            str(contract.get("metric") or ""), columns,
+            schema_profile=schema_profile, candidate_df=candidate_df,
+        )
+
+    # Step 3: Fuzzy column resolution with role filter
+    if not metric_column:
+        metric_column = resolve_contract_column(
+            contract.get("plot_metric") or contract.get("metric"),
+            columns, schema_profile=schema_profile, allowed_roles={"metric"},
+        )
+
+    # Step 4: Infer default metric column
     if not metric_column:
         metric_column = infer_default_metric_column(
             str(contract.get("metric") or ""), columns, schema_profile=schema_profile,
@@ -232,6 +383,7 @@ def build_plan_from_router_contract(
                     "type": "trend",
                     "rationale": "Ejecuto el contrato semántico simple emitido por el router.",
                     "filters": positive_filters,
+                    "positive_filters": positive_filters,
                     "negative_filters": negative_filters,
                     "metric_unit": metric_unit.value if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER.value,
                     "visual_protocol": visual_protocol.value,
@@ -253,6 +405,16 @@ def build_plan_from_router_contract(
         ]
 
     if intent == "distribution":
+        # [V2.2] Redirect: distribution + requires_time → trend with split_dimension
+        if contract.get("requires_time") or contract.get("time_axis"):
+            print(f"🔄 [DISTRIBUTION→TREND] Redirigiendo distribución con tiempo a trend+split "
+                  f"(dimension={contract.get('dimension')}, time_axis={contract.get('time_axis')})")
+            return _build_trend_from_distribution_contract(
+                contract, columns, positive_filters, negative_filters,
+                metric_column, ranking_metric_column, ranking_direction,
+                metric_unit, metric_label, schema_profile,
+            )
+
         dimension_column = resolve_contract_column(
             contract.get("dimension"), columns,
             schema_profile=schema_profile, allowed_roles={"dimension", "identifier"},
@@ -284,6 +446,7 @@ def build_plan_from_router_contract(
                     "type": "distribution",
                     "rationale": "Ejecuto el contrato semántico simple emitido por el router.",
                     "filters": positive_filters,
+                    "positive_filters": positive_filters,
                     "negative_filters": negative_filters,
                     "metric_unit": metric_unit.value if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER.value,
                     "visual_protocol": visual_protocol.value,
@@ -345,8 +508,9 @@ def build_plan_from_router_contract(
                     main_intent={
                         "type": "distribution",
                         "rationale": "Ejecuto el contrato semántico simple segmentado emitido por el router.",
-                        "filters": positive_filters,
-                        "negative_filters": negative_filters,
+                "filters": positive_filters,
+                "positive_filters": positive_filters,
+                "negative_filters": negative_filters,
                         "metric_unit": metric_unit.value if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER.value,
                         "visual_protocol": visual_protocol.value,
                         "dimension": dimension_column,
@@ -1062,6 +1226,7 @@ def translate(
     schema_profile: dict | None = None,
     dataset_contract: dict[str, Any] | None = None,
     related_frames_context: str = "",
+    candidate_df: pd.DataFrame | None = None,
 ) -> Optional[List[AnalysisPlan]]:
     router_decision = route_prompt_with_semantic_router(
         prompt, list(columns or []),
@@ -1074,6 +1239,7 @@ def translate(
         fast_path_plans = build_plan_from_router_contract(
             router_decision, list(columns or []),
             schema_profile=schema_profile, dataset_contract=dataset_contract,
+            candidate_df=candidate_df,
         )
         if fast_path_plans:
             emit_structured_log(
@@ -1258,26 +1424,30 @@ def translate(
          Sugiero agregar al Glosario qué columna contiene esta información."
        - NUNCA hagas un análisis diferente al que pidió el usuario. Si no puedes hacerlo, usa glossary_hint.
 
-    6. 📊 TRIPLE VISTA (Dashboard Automático) — [FASE 3C]:
-       - Para análisis generales, DEBES generar EXACTAMENTE 3 planes complementarios:
-         1) Vista Principal: El análisis EXACTO que pidió el usuario.
-         2) Vista Complementaria: Un análisis que ENRIQUEZCA el primero con otra perspectiva.
-            Ej: si el principal es "trend" → complementa con "distribution" del top.
-            Ej: si el principal es "descriptive" → complemento con "trend" de la métrica.
-         3) Vista Diagnóstica: Análisis que revele CAUSAS o ANOMALÍAS.
-            REGLA DE GRÁFICO PARA DIAGNÓSTICA:
-            - NO uses boxplot por defecto. Solo boxplot si el usuario pide variabilidad, outliers, dispersión o boxplot explícitamente.
-            - Si el principal es trend → diagnóstica con barras Top N de los drivers de cambio.
-            - Si el principal es distribution → diagnóstica con línea temporal del top 1.
-            - Si el principal es descriptive → diagnóstica con distribución por categoría (barras).
-            - Si el principal es predictive → complementaria con dual_axis (histórico vs variación %).
-              Diagnóstica con distribución Top N de los items que más impulsan el cambio proyectado.
-              Los planes complementarios DEBEN estar vinculados al pronóstico, NO ser análisis genéricos del dataset.
-       - EXCEPCIONES (generar UN solo plan):
-         a) El usuario pide explícitamente un solo gráfico ("quiero un pie chart")
-         b) El prompt es una pregunta simple de KPI ("cuánto vendimos")
-       - Si el usuario PIDE explícitamente N gráficos (ej: "dame 4 gráficos"), genera EXACTAMENTE N planes.
-       - OUTPUT: Array JSON `[{{plan1}}, {{plan2}}, {{plan3}}]` o un solo objeto JSON `{{plan1}}`.
+     6. 📊 TRIPLE VISTA (Dashboard Automático) — [FASE 3C], [V2.2 PRIORIDAD]:
+        - REGLA DE ORO: El Plan 1 DEBE responder EXACTAMENTE la pregunta principal del usuario.
+          Los planes 2 y 3 son complementarios y NUNCA deben sacrificar la calidad del Plan 1.
+        - Si el prompt contiene "tendencia", "evolución", "año tras año", "período", "mensual",
+          "temporal" o similar, el Plan 1 DEBE ser de tipo "trend" con visual_protocol "line_chart".
+        - Para análisis generales, debes generar obligatoriamente 3 planes complementarios:
+          1) Vista Principal: El análisis EXACTO que pidió el usuario (OBLIGATORIO, siempre presente).
+          2) Vista Complementaria (OPCIONAL): Un análisis que ENRIQUEZCA el primero con otra perspectiva.
+             Ej: si el principal es "trend" → complementa con "distribution" del top.
+             Ej: si el principal es "descriptive" → complemento con "trend" de la métrica.
+          3) Vista Diagnóstica (OPCIONAL): Análisis que revele CAUSAS o ANOMALÍAS.
+             REGLA DE GRÁFICO PARA DIAGNÓSTICA:
+             - NO uses boxplot por defecto. Solo boxplot si el usuario pide variabilidad, outliers, dispersión o boxplot explícitamente.
+             - Si el principal es trend → diagnóstica con barras Top N de los drivers de cambio.
+             - Si el principal es distribution → diagnóstica con línea temporal del top 1.
+             - Si el principal es descriptive → diagnóstica con distribución por categoría (barras).
+             - Si el principal es predictive → complementaria con dual_axis (histórico vs variación %).
+               Diagnóstica con distribución Top N de los items que más impulsan el cambio proyectado.
+               Los planes complementarios DEBEN estar vinculados al pronóstico, NO ser análisis genéricos del dataset.
+        - EXCEPCIONES (generar UN solo plan):
+          a) El usuario pide explícitamente un solo gráfico ("quiero un pie chart")
+          b) El prompt es una pregunta simple de KPI ("cuánto vendimos")
+        - Si el usuario PIDE explícitamente N gráficos (ej: "dame 4 gráficos"), genera EXACTAMENTE N planes.
+        - OUTPUT: Array JSON `[{{plan1}}, {{plan2}}, {{plan3}}]` o un solo objeto JSON `{{plan1}}`.
 
     7. 🔄 GRÁFICOS COMBINADOS (Dual-Axis):
        - Cuando el análisis involucre DOS MÉTRICAS con ESCALAS DISTINTAS (ej: Volumen absoluto + % Variación),
@@ -1303,13 +1473,13 @@ def translate(
        - IMPORTANTE: Infiere la polaridad del CONTEXTO del prompt, no solo del nombre de la columna.
          Ej: "productos a vencer" → unfavorable | "producción mensual" → favorable | "stock por almacén" → neutral
 
-    10. 🎯 DIVERSIDAD OBLIGATORIA EN TRIPLE VISTA — [FASE 3E]:
-       - Los 3 planes DEBEN tener TIPOS DE GRÁFICO VISUAL DISTINTOS (visual_protocol diferente).
-       - PROHIBIDO: 2 planes con el mismo visual_protocol (ej: dos line_chart, dos bar_chart).
-       - Si el principal es line_chart → complementario con bar_chart, pie_chart, dual_axis_chart o treemap.
-       - DIVERSIFICA métricas y dimensiones entre planes, no solo el título.
-       - Ejemplo INCORRECTO: [line_chart stock total, line_chart stock diario, bar_chart top]
-       - Ejemplo CORRECTO:   [line_chart stock mensual, bar_chart top 10 almacenes, pie_chart distribución %]
+      10. 🎯 DIVERSIDAD OBLIGATORIA EN TRIPLE VISTA — [V2.3]:
+        - CUANDO generes 3 planes, se SUGIERE diversificar visual_protocol entre ellos
+          (evitar 3 line_chart idénticos). Sin embargo, la REGLA DE ORO (Plan 1 = respuesta
+          principal) PREVALECE sobre la diversidad visual.
+        - Si el Plan 1 requiere line_chart (por ser tendencia), está BIEN que Plan 1 y Plan 2
+          tengan line_chart siempre que respondan preguntas diferentes.
+        - DIVERSIFICA métricas y dimensiones entre planes, no solo el título.
 
     11. 🧾 SOBERANÍA DE FORMATO (Kill Switch por Solicitud):
        - Si recibes una INSTRUCCIÓN EXPLÍCITA de formato para ESTA solicitud (ej: "solo tabla", "sin gráficos", "datos crudos"),
@@ -1333,7 +1503,27 @@ def translate(
          análisis descriptivos/distributivos como "último corte" salvo que el usuario pida historia, comparación o tendencia.
        - La presencia de columnas de fecha NO implica snapshot. El contrato manda.
 
-    --- 🧠 MEMORIA Y REGLAS DE NEGOCIO --- [FASE 3F]
+     13. 🚫 PROHIBICIÓN DE SÍMBOLOS MONETARIOS EN MÉTRICAS DE CONTEO:
+        - PROHIBIDO usar símbolos monetarios (S/, $, €, etc.) en métricas que sean
+          conteos de registros, id_empleado, cantidad de personas, o cualquier
+          agregación COUNT/distinct count.
+        - Las columnas con valores numéricos que representan escalas (como
+          'nivel_desempeno', 'puntuacion', 'rating', 'score') son escalas numéricas,
+          NO montos monetarios. No uses S/, $, € para ellas.
+        - REGLA: solo usa símbolo monetario si la TOPOLOGÍA o el GLOSARIO indican
+          explícitamente que la columna es de tipo currency/dinero.
+
+     14. 📝 TÍTULOS EN LENGUAJE NATURAL (No nombres de columna crudos):
+        - Los títulos de los planes DEBEN ser frases en lenguaje natural que el
+          usuario entienda de inmediato, NO concatenaciones de nombres técnicos.
+        - Ejemplo correcto: "Evolución del Desempeño en Ventas"
+        - Ejemplo incorrecto: "Tendencia de nivel_desempeno por departamento"
+        - Usa los alias humanizados del `column_aliases` para construir los títulos.
+        - Si el alias no existe, infiere un nombre natural a partir del contexto.
+        - EVITA a toda costa mostrar nombres de columnas crudos (con guiones bajos
+          o nombres técnicos) en los títulos.
+
+     --- 🧠 MEMORIA Y REGLAS DE NEGOCIO --- [FASE 3F]
     - Si `DATASET_CONTRACT.mode=snapshot`, usa el último corte como referencia natural solo cuando el análisis sea de estado actual.
     - Si `DATASET_CONTRACT.mode=flow`, trata las fechas como una serie transaccional completa y NO inventes un filtro al último corte.
     - MEMORIA DE SESIÓN: {memory_context if memory_context else 'Sin contexto previo. Nueva conversación.'}
@@ -1351,6 +1541,30 @@ def translate(
         )
 
         if not plans:
+            # ═══════════════════════════════════════════════════════════
+            # COMPLEJO→SIMPLE fallback: el LLM generó planes inválidos
+            # (Pydantic rechazó todos). Intentar construir un plan
+            # determinista desde el router_contract usando columnas
+            # REALES del dataset (no alucinadas por el LLM).
+            # ═══════════════════════════════════════════════════════════
+            router_contract_plans = build_plan_from_router_contract(
+                router_decision, list(columns or []),
+                schema_profile=schema_profile, dataset_contract=dataset_contract,
+                candidate_df=candidate_df,
+            )
+            if router_contract_plans:
+                set_cached_json(
+                    "semantic_translator", translator_cache_key,
+                    [plan.model_dump(mode="json") for plan in router_contract_plans],
+                    settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
+                )
+                emit_structured_log(
+                    "semantic_translator_hallucination_fallback_to_router_contract",
+                    prompt=prompt[:200], primary_model=primary_model_name,
+                    plan_count=len(router_contract_plans),
+                    reason="all_llm_plans_invalid",
+                )
+                return finalize_plans(router_contract_plans, schema_profile)
             return None
 
         set_cached_json(

@@ -7,7 +7,7 @@ description: >
 ---
 
 # PromData Fortress Standard
-**Version:** 3.0 (Fortress Edition)  
+**Version:** 3.1 (Titanium Edition)  
 **Status:** Active  
 **Context:** Production-Grade Multi-Tenant Analytics Platform (Python/FastAPI + Next.js)
 
@@ -97,6 +97,14 @@ Antes de presentar cambios como "listos":
 2. Verificar que las funciones modificadas mantienen compatibilidad de firma.
 3. Verificar que no se eliminó ningún bloque de código.
 
+### 1.5 Ley de Import Blindness (Import faltante)
+
+- **PROHIBIDO** usar un símbolo en el cuerpo de una función sin que esté importado explícitamente en el bloque de imports del archivo.
+- Por cada nuevo símbolo importado en el cuerpo (ej: `emit_structured_log`), verificar que el `import` esté presente en la cabecera del archivo.
+- **PROHIBIDO** usar `from X import *` salvo en `__init__.py` de paquetes.
+
+**Check automático post-cambio:** `grep -n "import " <archivo_modificado>` + revisar que todo símbolo usado en el cuerpo tenga su import correspondiente.
+
 ---
 
 ## 🏗️ MÓDULO 2: THE ENGINEER (Estándar de Ingeniería, No Parches)
@@ -141,6 +149,32 @@ Se **PERMITE** modificar código estable y actualmente funcional **solo si** la 
 - mejorar el módulo correcto manteniendo compatibilidad,
 
 el agente debe elegir la **segunda opción**.
+
+### 2.1.2 Ley Anti-Shadowing (Flujos Muertos)
+
+Está **ESTRICTAMENTE PROHIBIDO** introducir condicionales (`if`/`return`) en la parte superior de una función (early returns) que provoquen que la lógica base del sistema (Guardias, Shields o Validaciones) quede aislada y nunca se ejecute.
+
+**Reglas operativas:**
+1. Todo nuevo fast-path debe **ceder el control al flujo original** si no es aplicable — nunca hacer un "bypass" ciego.
+2. Si un fast-path retorna temprano, debe hacerlo SOLO cuando las condiciones del fast-path se cumplan exactamente. Si no, debe delegar al flujo original.
+3. Está permitido agregar guards al inicio que validen precondiciones (ej: `if df.empty: return []`), pero no para desviar lógica de negocios hacia un camino alternativo no autorizado.
+
+**Ejemplo prohibido:**
+```python
+def analyze(intent):
+    if intent.type == "trend" and intent.split_dimension:
+        return _fast_trend_path(intent)  # ❌ Bypassa todo el engine legacy
+```
+
+**Ejemplo permitido:**
+```python
+def analyze(intent):
+    if intent.type == "trend" and intent.split_dimension:
+        if _fast_trend_applies(intent):
+            return _fast_trend_path(intent)  # ✅ Fast-path condicional
+    # Si no aplica, cae al flujo original
+    return _legacy_engine(intent)
+```
 
 ### 2.2 Ley del Código Hardcodeado (Zero Hardcode)
 
@@ -248,6 +282,9 @@ Después de cada cambio, el agente debe verificar:
 3. [ ] Las firmas de funciones existentes no cambiaron.
 4. [ ] El código nuevo tiene Type Hints y docstrings.
 5. [ ] No hay valores hardcodeados.
+6. [ ] **Git Diff Audit:** Ejecutar `git diff --stat` + `git diff <archivos_tocados>` para demostrar matemáticamente que NO se eliminaron líneas de lógica existente (solo se permiten líneas borradas si son whitespace, reemplazos exactos de firmas con wrappers, o bajo `[OVERRIDE]`).
+7. [ ] **Import Blindness Check:** Revisar que todo nuevo símbolo usado en el cuerpo tenga su import correspondiente en la cabecera del archivo.
+8. [ ] **Pydantic Field Drift Check:** Por cada `getattr(modelo, "campo", ...)`, verificar que `"campo"` exista como field declarado en el modelo.
 
 ### 5.3 Protocolo de Comunicación
 
@@ -279,3 +316,13 @@ Después de cada cambio, el agente debe verificar:
 
 - Si se crea un nuevo motor/approach, el anterior debe seguir funcionando.
 - Ejemplo: Si se crea `ibis_engine_v2.py`, `ibis_engine.py` sigue activo hasta migración explícita.
+
+### 6.4 Ley de Pydantic Field Drift (Campos Fantasma)
+
+Cuando un dict contiene una key que el código espera leer via `getattr(intent, key, [])`:
+1. Verificar que el field exista como atributo declarado en el modelo Pydantic correspondiente.
+2. Si el field **no existe**, Pydantic v2 (con `extra="ignore"` por defecto) lo descarta silenciosamente y `getattr` retorna siempre el default.
+3. **Obligatorio:** declarar el field explícitamente en el modelo con `Field(default_factory=list)` o el tipo adecuado.
+4. Excepción: si el modelo usa `model_config = {"extra": "allow"}`, los campos extra se preservan pero deben ser accedidos via `model.extra` o validación explícita.
+
+**Check automático:** por cada `getattr(modelo, "campo_no_estandar", ...)`, verificar que `"campo_no_estandar" in type(modelo).model_fields` retorne True.

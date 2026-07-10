@@ -1877,6 +1877,7 @@ def build_canonical_shadow_query_execution(
             memory_context=build_parent_memory_context_text(parent_context),
             schema_profile=schema_profile,
             dataset_contract=dataset_contract,
+            candidate_df=candidate_df,
         ) or []
     )
     plans = apply_parent_context_to_placeholder_filters(

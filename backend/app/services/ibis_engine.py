@@ -6,6 +6,7 @@ from app.services.data_engine import DataEngine
 from app.services.snapshot_guard import should_apply_latest_snapshot_filter
 from app.services.semantic_translator.temporal_resolver import (
     normalize_intent_temporal_filters,
+    _extract_year_from_any_string,
 )
 from app.core.semantic_grammar import (
     AnalysisPlan, DescriptiveIntent, TimeTrendIntent, DistributionIntent, 
@@ -148,6 +149,12 @@ class IbisEngine:
             return f"{clean_col} {val_str}"
         return val_str
 
+    _MONTH_NAMES_ES = {
+        1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr',
+        5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+        9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dic',
+    }
+
     @staticmethod
     def _format_period_label(period_obj, grain: TimeGrain):
         """
@@ -155,7 +162,8 @@ class IbisEngine:
         """
         if isinstance(period_obj, pd.Timestamp):
             if grain == TimeGrain.MONTH:
-                return period_obj.strftime('%b-%Y') # e.g., Mar-2021
+                month_es = IbisEngine._MONTH_NAMES_ES.get(period_obj.month, '???')
+                return f"{month_es}-{period_obj.year}"
             elif grain == TimeGrain.YEAR:
                 return period_obj.strftime('%Y') # e.g., 2021
             elif grain == TimeGrain.WEEK:
@@ -279,7 +287,10 @@ class IbisEngine:
 
     @staticmethod
     def _normalize_filter_operator(operator) -> str:
-        return str(getattr(operator, "value", operator) or "").strip().lower()
+        normalized = str(getattr(operator, "value", operator) or "").strip().lower()
+        if normalized == "=":
+            normalized = "=="
+        return normalized
 
     @staticmethod
     def _coerce_filter_scalar(col_type: str, value):
@@ -480,7 +491,19 @@ class IbisEngine:
 
     @staticmethod
     def _apply_intent_filters(t, intent):
-        for f in list(getattr(intent, "filters", []) or []):
+        # [V2.2] Merge pre-loop: unificar positive_filters + filters
+        # como defense in depth. positive_filters no es un campo del
+        # modelo BaseIntent, pero si algún código futuro lo pasa en el
+        # dict de creación, Pydantic v2 lo ignora silenciosamente.
+        # Este merge lo captura y lo unifica antes del loop principal.
+        all_filters = list(getattr(intent, "filters", []) or [])
+        positive_filters = list(getattr(intent, "positive_filters", []) or [])
+        if positive_filters:
+            all_filters = positive_filters + all_filters
+            print(f"🛡️ [INTENT FILTERS] positive_filters mergeado pre-loop: "
+                  f"{len(positive_filters)} filtro(s) unificado(s) con {len(all_filters) - len(positive_filters)} existente(s)")
+
+        for f in all_filters:
             expr = IbisEngine._build_filter_expression(t, f)
             if expr is not None:
                 t = t.filter(expr)
@@ -782,7 +805,35 @@ class IbisEngine:
             metric_value = getattr(intent, optional_metric_field, None)
             if metric_value and not _validate_col(metric_value, optional_metric_field):
                 setattr(intent, optional_metric_field, None)
-        
+
+        # E. Validate dimension column (distribution/diagnostic)
+        if hasattr(intent, 'dimension') and intent.dimension:
+            if not _validate_col(intent.dimension, "dimension"):
+                return {
+                    "error": f"Columna de dimensión '{intent.dimension}' no existe en el dataset. "
+                             f"Columnas disponibles: {sorted(available_columns)}"
+                }
+
+        # F. Validate metric column (singular — distribution/diagnostic)
+        if hasattr(intent, 'metric') and intent.metric:
+            if not _validate_col(intent.metric, "metric"):
+                _numeric_fallbacks = [
+                    c for c in sorted(available_columns)
+                    if not c.startswith('_') and c in t.columns and t[c].type().is_numeric()
+                ]
+                if _numeric_fallbacks:
+                    _original_metric = intent.metric
+                    intent.metric = _numeric_fallbacks[0]
+                    print(
+                        f"🔄 [DATA SHIELD] Métrica singular '{_original_metric}' "
+                        f"alucinada → auto-corregida a '{intent.metric}'"
+                    )
+                else:
+                    return {
+                        "error": f"Métrica '{intent.metric}' no existe y no hay alternativas numéricas. "
+                                 f"Columnas: {sorted(available_columns)}"
+                    }
+
         print(f"✅ [DATA SHIELD] Validación de columnas completada. {len(available_columns)} columnas disponibles.")
 
         # ═══════════════════════════════════════════════════════════════
@@ -802,11 +853,16 @@ class IbisEngine:
             temporal_schema: dict = {}
             evidence = dataset_contract.get('evidence', {})
             if isinstance(evidence, dict):
-                max_date = str(evidence.get('max_date', '')).strip()
-                if max_date:
-                    year_match = re.match(r'(\d{4})', max_date)
-                    if year_match:
-                        temporal_schema['_dataset_year'] = int(year_match.group(1))
+                max_year = _extract_year_from_any_string(evidence.get('max_date'))
+                if max_year is not None:
+                    temporal_schema['_dataset_year'] = max_year
+                # [V9] Inyectar rango real de años desde datos para activar
+                # el Fortress preventivo en resolve_temporal_filter_value.
+                min_year = _extract_year_from_any_string(evidence.get('min_date'))
+                if min_year is not None:
+                    temporal_schema['_dataset_year_min'] = min_year
+                if max_year is not None:
+                    temporal_schema['_dataset_year_max'] = max_year
             for date_col in dataset_contract.get('date_columns', []) or []:
                 if date_col not in temporal_schema:
                     temporal_schema[date_col] = {'type': 'temporal', 'role': 'date'}
@@ -1108,8 +1164,11 @@ class IbisEngine:
 
         # 1. Extracción Pesada (Ibis)
         t = t.mutate(periodo=trunc_op)
+        # [FIX V2.2] Soporte volumétrico: count() para strings, sum() para numéricos
+        met_type_single = str(col_val.type()).lower()
+        agg_expr_single = col_val.count() if 'string' in met_type_single else col_val.sum()
         agged = (t.group_by('periodo')
-                 .aggregate(valor=col_val.sum())
+                 .aggregate(valor=agg_expr_single)
                  .order_by('periodo'))
         df_res = agged.to_pandas()
 
@@ -1202,6 +1261,26 @@ class IbisEngine:
         Calcula: Share, Ranking, Top 1 vs Promedio.
         Soporta: Barras, Pie, Waterfall.
         """
+        # ═══════════════════════════════════════════════════════════════
+        # 🛡️ Guard: Métricas vacías (post-sanitización por Data Shield)
+        # Si todas las métricas del plan fueron alucinadas y limpiadas,
+        # intent.metrics queda []. Sin este guard:
+        #   L1226: intent.metrics[0] → IndexError
+        #   L1231: .aggregate([]) → DuckDB "SELECT clause without selection list"
+        # ═══════════════════════════════════════════════════════════════
+        if not intent.metrics:
+            _avail_numeric = sorted(
+                c for c in t.columns
+                if not c.startswith('_') and t[c].type().is_numeric()
+            )
+            return {
+                "error": "empty_metrics",
+                "message": (
+                    "Las métricas solicitadas no existen en este dataset. "
+                    f"Columnas numéricas disponibles: {_avail_numeric}"
+                ),
+            }
+
         exprs = []
         for m in intent.metrics:
             col = t[m]
@@ -1214,6 +1293,13 @@ class IbisEngine:
             elif intent.aggregation == "count": exprs.append(col.count().name(m))
             elif intent.aggregation == "max": exprs.append(col.max().name(m))
             elif intent.aggregation == "min": exprs.append(col.min().name(m))
+
+        # Guard secundario: si ninguna expresión se construyó (ej: aggregation desconocida)
+        if not exprs:
+            return {
+                "error": "empty_metrics",
+                "message": "No se pudieron construir expresiones de agregación válidas.",
+            }
         
         # 🚀 CASO A: DASHBOARD AGRUPADO (Estructural)
         if intent.group_by:

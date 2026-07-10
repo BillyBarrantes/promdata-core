@@ -66,6 +66,37 @@ def is_canonical_analytical_contract_adapter_enabled() -> bool:
     return settings.CANONICAL_ANALYTICAL_CONTRACT_ADAPTER_ENABLED
 
 
+def _compute_year_range(df: pd.DataFrame) -> tuple[int | None, int | None]:
+    """Extrae (min_year, max_year) real del dataset desde columnas date/time.
+
+    Escanea todas las columnas del DataFrame con dtype datetime, timestamp o date
+    y computa el rango de años real de los datos. Esto se inyecta en schema_profile
+    como _dataset_year_min / _dataset_year_max para que el Temporal Fortress
+    pueda verificar si el año del filtro LLM está dentro del rango real del dataset.
+    """
+    if df is None or df.empty:
+        return None, None
+    years: set[int] = set()
+    for col in df.columns:
+        if not pd.api.types.is_datetime64_any_dtype(df[col]):
+            continue
+        try:
+            series = pd.to_datetime(df[col], errors='coerce')
+            if series.empty:
+                continue
+            col_min = series.min()
+            col_max = series.max()
+            if pd.notna(col_min):
+                years.add(col_min.year)
+            if pd.notna(col_max):
+                years.add(col_max.year)
+        except Exception:
+            continue
+    if not years:
+        return None, None
+    return min(years), max(years)
+
+
 @dataclass
 class CanonicalAnalyticalAdapterRuntime:
     analytical_bundle: CanonicalAnalyticalContractBundle
@@ -264,6 +295,16 @@ def _build_candidate_for_table(
 
     if reference_date:
         schema_profile["_dataset_year"] = int(reference_date[:4])
+
+    # Inyectar rango de años real del dataset para el Fortress temporal.
+    # _infer_dataset_year_range en temporal_resolver.py usa estas claves
+    # como prioridad 1 para activar el guard que preserva filtros de año
+    # cuando están dentro del rango real de datos.
+    _dataset_min_year, _dataset_max_year = _compute_year_range(working_df)
+    if _dataset_min_year is not None:
+        schema_profile["_dataset_year_min"] = _dataset_min_year
+    if _dataset_max_year is not None:
+        schema_profile["_dataset_year_max"] = _dataset_max_year
 
     working_df = _attach_dataframe_contract_attrs(
         working_df,

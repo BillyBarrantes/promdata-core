@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.core.structured_logging import emit_structured_log
 from app.core.arrow_utils import dataframe_to_arrow_base64, records_to_arrow_base64
 from app.services.analysis_memory_context import build_plan_query_contract, build_result_semantic_context
 from app.services.canonical_analytical_contract_adapter import get_selected_candidate_dataframe
@@ -96,14 +97,19 @@ def _analysis_line_from_hard_facts(title: str, hard_facts: dict[str, Any]) -> st
         return f"## {title}\nResultado analítico generado por Universal Pipeline."
     return f"## {title}\nHallazgo: {' | '.join(parts[:4])}."
 
+def _get_plan_intent_prop(plan: Any, prop: str) -> Any:
+    if isinstance(plan, dict):
+        return plan.get("main_intent", {}).get(prop)
+    intent = getattr(plan, "main_intent", None)
+    return getattr(intent, prop, None)
 
 def _safe_metric_unit(plan: Any) -> str | None:
-    metric_unit = getattr(getattr(plan, "main_intent", None), "metric_unit", None)
+    metric_unit = _get_plan_intent_prop(plan, "metric_unit")
     return getattr(metric_unit, "value", metric_unit) if metric_unit is not None else None
 
 
 def _get_plan_visual_protocol(plan: Any) -> str | None:
-    vp = getattr(getattr(plan, "main_intent", None), "visual_protocol", None)
+    vp = _get_plan_intent_prop(plan, "visual_protocol")
     if hasattr(vp, "value"):
         return str(vp.value)
     return str(vp) if vp else None
@@ -417,6 +423,30 @@ def _build_chart_option(
     _app_visual = visual_governance.get("applied_visual")
     _llm_vp = _get_plan_visual_protocol(plan)
     _eng_ct = result_payload.get("chart_type")
+
+    # [V2.2] PREMIUM VISUALS OVERRIDE: Si governance recomienda un
+    # visual premium (combo_chart, dual_axis_chart, smart_table),
+    # forzar el override incluso si el engine no hizo fallback.
+    # El UX premium gana sobre la timidez del motor.
+    # [V2.3] TEMP-001: No forzar smart_table sobre line_chart para trends.
+    #   Un trend+split con 101 registros es normal; smart_table degrada el UX.
+    PREMIUM_VISUALS = {"combo_chart", "dual_axis_chart", "smart_table"}
+    if (_rec_visual and _rec_visual in PREMIUM_VISUALS
+        and _rec_visual != ui_chart_type):
+        _skip_smart_table = (
+            _rec_visual == "smart_table"
+            and (
+                _get_plan_intent_prop(plan, "type") == "trend"
+                or (_llm_vp and normalize_visual_id(_llm_vp) in ("line_chart", "scatter_plot"))
+            )
+        )
+        if _skip_smart_table:
+            print(f"🔄 [TEMP-001] Eximiendo trend/line_chart/scatter_plot de smart_table override (manteniendo {ui_chart_type})")
+        else:
+            print(f"🔄 [PREMIUM OVERRIDE] Gov recomienda: {_rec_visual}, forzando override desde {ui_chart_type}")
+            ui_chart_type = _rec_visual
+            chart_type = _normalize_chart_type(_rec_visual)
+
     if (_rec_visual and _app_visual and _rec_visual != _app_visual
         and _llm_vp and _eng_ct
         and normalize_visual_id(_llm_vp) != normalize_visual_id(_eng_ct)):
@@ -491,8 +521,10 @@ def _build_chart_option(
 
     safe_metric_unit = _safe_metric_unit(plan)
     # Smart Table detection: if chart has >20 categories, convert to Smart Table
+    # [V2.3] Pasar chart_type original para que should_use_smart_table pueda
+    # eximir line_chart/area_chart (trends con split tienen muchos periodos).
     _applied_type = ui_chart_type
-    if should_use_smart_table(option):
+    if should_use_smart_table(option, chart_type=original_ui_chart_type):
         smart_table_payload = echarts_to_smart_table(option, title, is_percentage=safe_metric_unit == "percentage")
         if smart_table_payload and smart_table_payload.get("type") == "smart_table":
             option = smart_table_payload
@@ -641,6 +673,27 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 print(f"⚠️ [SNAPSHOT-RESOLVED-DIRECT] Error en parsing cronológico: {e}")
 
     analysis_blocks: list[str] = []
+    _primary_plan_failed = False
+    _primary_plan_error = None
+    for plan_idx, (plan, result_payload) in enumerate(zip(execution.plans, execution.execution_results)):
+        if not isinstance(result_payload, dict):
+            result_payload = {}
+        if result_payload.get("error"):
+            if plan_idx == 0:
+                _primary_plan_failed = True
+                _primary_plan_error = str(result_payload.get("error"))
+                emit_structured_log(
+                    "primary_plan_failed",
+                    plan_idx=0,
+                    intent_type=getattr(getattr(plan, "main_intent", None), "type", None),
+                    error=_primary_plan_error,
+                    total_plans=len(execution.plans),
+                    successful_plans=sum(1 for r in execution.execution_results if isinstance(r, dict) and not r.get("error")),
+                )
+                print(f"⚠️ [PRIMARY PLAN FAILED] Plan 1 ({getattr(getattr(plan, 'main_intent', None), 'type', '?')}) "
+                      f"falló: {_primary_plan_error}")
+            continue
+
     for plan, result_payload in zip(execution.plans, execution.execution_results):
         if not isinstance(result_payload, dict):
             continue
@@ -657,11 +710,16 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
             continue
 
         if result_type == "echarts":
+            # [FIX V2.2] Doble barrera: No inyectar moneda si el plan explícitamente la prohíbe
+            # [FIX V2.3] Usar _safe_metric_unit en vez de getattr encadenado (soporta dict + Pydantic)
+            plan_metric_unit = str(_safe_metric_unit(plan) or "").lower()
+            plan_currency_meta = None if plan_metric_unit in ["number", "percentage"] else currency_meta
+
             option = _build_chart_option(
                 plan=plan,
                 title=title,
                 result_payload=result_payload,
-                currency_meta=currency_meta,
+                currency_meta=plan_currency_meta,
                 schema_profile=_safe_dict(attrs.get("schema_profile")),
                 _snapshot_resolved_date=_snapshot_resolved_date,
             )
@@ -695,6 +753,18 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                     "hard_facts": hard_facts,
                 }
             )
+
+    if _primary_plan_failed:
+        final_struct["traceability"]["primary_plan_failed"] = True
+        final_struct["traceability"]["primary_plan_error"] = _primary_plan_error
+        # [V2.2] Buscar plan de reemplazo en los resultados exitosos.
+        # Si Plan 1 (el principal) falló, pero hay charts exitosos,
+        # reetiquetar el primer chart exitoso como "primary_replacement"
+        # para que el frontend pueda destacarlo.
+        exitosos = [o for o in final_struct.get("chart_options", []) if o.get("type")]
+        if exitosos:
+            exitosos[0]["is_primary_replacement"] = True
+            print(f"🔄 [PRIMARY RECOVERY] Reetiquetando chart '{exitosos[0].get('title', '?')}' como primary_replacement")
 
     if not analysis_blocks:
         raise RuntimeError(f"canonical_canary_empty_result:{execution.metadata.get('shadow_query_status')}")

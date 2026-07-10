@@ -163,6 +163,7 @@ class BaseIntent(BaseModel):
     """Clase padre para todas las intenciones analíticas"""
     rationale: str = Field(..., description="Explicación breve de por qué se eligió esta operación")
     filters: List[DataFilter] = Field(default_factory=list, description="Filtros globales a aplicar antes del cálculo")
+    positive_filters: List[DataFilter] = Field(default_factory=list, description="[V2.2] Filtros de inclusión generados por el router. Pydantic v2 descarta campos extra del dict, por lo que este campo existe explícitamente para que _apply_intent_filters pueda leerlos en el merge pre-loop.")
     metric_unit: Optional[MetricUnit] = Field(
         default=None,
         description="Unidad semántica de la métrica principal. Se usa para blindar narrativa y formato visual."

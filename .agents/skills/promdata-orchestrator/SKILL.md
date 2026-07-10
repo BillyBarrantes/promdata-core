@@ -7,6 +7,13 @@ description: Secuenciador y validador determinista de los 17 skills y reglas de 
 
 Al recibir una tarea, el agente debe ejecutar esta secuencia de control antes de modificar código:
 
+### Etapa 0: Alineamiento Arquitectónico (Planificación)
+
+Antes de tocar cualquier archivo del Core:
+- Generar un artefacto Markdown llamado `implementation_plan.md` en `/tmp/` o la raíz del proyecto.
+- Detallar: qué módulos de la Bóveda Intocable se evaden, qué firmas se preservan, cómo el cambio actúa como extensión y no como rewrite.
+- Esperar la aprobación explícita del humano antes de escribir la primera línea de código.
+
 ### Etapa 1: Validación de Inmutabilidad y Anti-Patterns
 
 - Cargar las reglas de la carpeta `.agents/skills/promdata-fortress-standard` (Fortress Standard).
@@ -26,6 +33,13 @@ Al recibir una tarea, el agente debe ejecutar esta secuencia de control antes de
 
 - Cargar el skill `supabase-postgres-best-practices`.
 - Validar que toda consulta mantenga el aislamiento de datos mediante la inclusión obligatoria de `tenant_id` y `file_id`.
+
+### Etapa 3.5: Cobertura Obligatoria (TDD)
+
+Por cada fix, extensión o nueva funcionalidad implementada:
+- El agente TIENE PROHIBIDO pasar a la Etapa 4 sin haber creado o actualizado un test unitario que valide específicamente el nuevo comportamiento.
+- El test debe probar el escenario exacto de fallo que el fix resuelve, documentando la intención del cambio.
+- **Un bug arreglado sin un test que lo blinde para el futuro es un bug que volverá.**
 
 ### Etapa 4: Automatización de Pruebas Reales (Ejecución Física Obligatoria)
 

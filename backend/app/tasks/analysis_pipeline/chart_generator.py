@@ -124,23 +124,27 @@ def build_chart_config(
             currency_meta=use_currency, outliers=ibis_output.get('outliers'),
         )
     elif c_type in ['scatter', 'scatter_plot', 'scatter_chart']:
+        scatter_x = ibis_output.get('x_axis', ibis_output.get('x_label', ''))
+        scatter_y = ibis_output.get('y_axis', ibis_output.get('y_label', ''))
         chart_opt = ChartFactory.create_chart('scatter', plan.title, ibis_output['data'],
-            x_label=ibis_output.get('x_label', ''), y_label=ibis_output.get('y_label', ''))
+            x_label=scatter_x, y_label=scatter_y)
     elif c_type in ['bubble', 'bubble_chart']:
+        bubble_x = ibis_output.get('x_axis', ibis_output.get('x_label', ''))
+        bubble_y = ibis_output.get('y_axis', ibis_output.get('y_label', ''))
         chart_opt = ChartFactory.create_chart(
             'bubble', plan.title, ibis_output['data'],
-            x_label=ibis_output.get('x_label', ''),
-            y_label=ibis_output.get('y_label', ''),
+            x_label=bubble_x, y_label=bubble_y,
         )
     elif c_type in ['treemap', 'treemap_chart']:
         chart_opt = ChartFactory.create_chart('treemap', plan.title, ibis_output['data'])
     elif c_type in ['histogram', 'histogram_chart']:
         chart_opt = ChartFactory.create_chart('histogram', plan.title, ibis_output['data'])
     elif c_type in ['heatmap', 'heatmap_chart']:
+        heatmap_x = ibis_output.get('x_axis', ibis_output.get('x_label', ''))
+        heatmap_y = ibis_output.get('y_axis', ibis_output.get('y_label', ''))
         chart_opt = ChartFactory.create_chart(
             'heatmap', plan.title, ibis_output['data'],
-            x_label=ibis_output.get('x_label', ''),
-            y_label=ibis_output.get('y_label', ''),
+            x_label=heatmap_x, y_label=heatmap_y,
         )
     elif c_type in ['gauge', 'gauge_chart']:
         chart_opt = ChartFactory.build_gauge_chart(plan.title, ibis_output['data'])
@@ -215,8 +219,8 @@ def build_chart_config(
             "chart_type": c_type,
             "requested_chart_type": requested_chart_type,
             "rows": ibis_output.get('data', []),
-            "x_label": ibis_output.get('x_label'),
-            "y_label": ibis_output.get('y_label'),
+            "x_label": ibis_output.get('x_axis', ibis_output.get('x_label')),
+            "y_label": ibis_output.get('y_axis', ibis_output.get('y_label')),
             "barmode": ibis_output.get('barmode'),
             "metric_unit": metric_unit,
         }
