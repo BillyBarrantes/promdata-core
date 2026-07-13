@@ -155,6 +155,43 @@ class IbisEngine:
         9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dic',
     }
 
+    _MONTH_FULL_ES = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre',
+    }
+
+    @staticmethod
+    def _apply_month_sort_if_needed(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+        """
+        [V2.5] Orden cronológico para meses en español (string no-temporal).
+        Reordena filas del DataFrame para que meses como "Enero, Febrero, Marzo..."
+        aparezcan en orden cronológico en vez de alfabético o por valor.
+        Detecta automáticamente si los valores son nombres de mes en español
+        usando el primer valor de la columna como muestra.
+        Schema-agnostic: funciona con cualquier nombre de columna.
+        """
+        if df.empty or column_name not in df.columns:
+            return df
+
+        _month_map = {}
+        for k, v in IbisEngine._MONTH_NAMES_ES.items():
+            _month_map[v.lower()] = k
+        for k, v in IbisEngine._MONTH_FULL_ES.items():
+            _month_map[v.lower()] = k
+
+        first_val = str(df[column_name].iloc[0]).lower()
+        if first_val not in _month_map:
+            return df
+
+        df = df.copy()
+        df['_month_num'] = df[column_name].apply(
+            lambda x: _month_map.get(str(x).lower(), 99)
+        )
+        df = df.sort_values('_month_num').drop(columns=['_month_num'])
+        df = df.reset_index(drop=True)
+        return df
+
     @staticmethod
     def _format_period_label(period_obj, grain: TimeGrain):
         """
@@ -970,10 +1007,17 @@ class IbisEngine:
         col_val = t[plot_metric]
         col_rank = t[ranking_metric]
         
-        # Selección de granularidad
-        trunc_op = col_date.truncate('M') if intent.grain == TimeGrain.MONTH else \
-                   col_date.truncate('W') if intent.grain == TimeGrain.WEEK else \
-                   col_date.truncate('Y') if intent.grain == TimeGrain.YEAR else col_date.truncate('D')
+        # [V2.4] Selección de granularidad con guard de tipo temporal.
+        # Si la columna es string (ej: "Enero", "Febrero"), no se puede truncar;
+        # se usan los valores crudos como periodos.
+        if IbisEngine._is_temporal_column(t, intent.date_column):
+            trunc_op = col_date.truncate('M') if intent.grain == TimeGrain.MONTH else \
+                       col_date.truncate('W') if intent.grain == TimeGrain.WEEK else \
+                       col_date.truncate('Y') if intent.grain == TimeGrain.YEAR else col_date.truncate('D')
+        else:
+            trunc_op = col_date
+            print(f"🔄 [TREND] Columna '{intent.date_column}' no es temporal (string). "
+                  f"Usando valores crudos como periodos sin truncar.")
 
         chart_type = intent.visual_protocol.value if intent.visual_protocol else "line"
 
@@ -1079,6 +1123,11 @@ class IbisEngine:
                         aggfunc='sum',
                     ).fillna(0)
                     df_pivot = df_pivot.sort_index()
+                    # [V2.5] Orden cronológico para meses string en multi-series
+                    if not IbisEngine._is_temporal_column(t, intent.date_column):
+                        df_pivot = df_pivot.reset_index()
+                        df_pivot = IbisEngine._apply_month_sort_if_needed(df_pivot, 'periodo')
+                        df_pivot = df_pivot.set_index('periodo')
 
                     # Format period labels
                     period_labels = [
@@ -1171,6 +1220,12 @@ class IbisEngine:
                  .aggregate(valor=agg_expr_single)
                  .order_by('periodo'))
         df_res = agged.to_pandas()
+
+        # [V2.5] Orden cronológico para meses en español (string no-temporal).
+        # Usa helper _apply_month_sort_if_needed para asegurar consistencia DRY
+        # entre trend, descriptive, y distribution.
+        if not IbisEngine._is_temporal_column(t, intent.date_column):
+            df_res = IbisEngine._apply_month_sort_if_needed(df_res, 'periodo')
 
         # 🛡️ [V2] Guard de DataFrame Vacío — Previene crash de argmax/idxmax/iloc
         # sobre secuencias vacías. Devuelve un error estructurado que el orquestador
@@ -1322,6 +1377,8 @@ class IbisEngine:
                     recipe_sql = str(ibis.to_sql(agged))
             
             df_res = agged.to_pandas()
+            # [V2.5] Orden cronológico para meses string en descriptive
+            df_res = IbisEngine._apply_month_sort_if_needed(df_res, dimension_col)
             
             # 🛡️ [V2] Guard de DataFrame Vacío en modo agrupado
             if df_res.empty:
@@ -1803,6 +1860,8 @@ class IbisEngine:
                          .order_by(rank_order)
                          .limit(intent.limit))
                 df_res = agged.to_pandas()
+                # [V2.5] Orden cronológico para meses string en distribución uni-dimensional
+                df_res = IbisEngine._apply_month_sort_if_needed(df_res, intent.dimension)
                 
                 if df_res.empty:
                     return {"type": "echarts", "chart_type": "bar", "data": [], "title": f"Sin datos para {intent.metric}", "error": "empty_result"}
@@ -1852,6 +1911,8 @@ class IbisEngine:
             value_cols = [c for c in df_pivot.columns if c != str(intent.dimension)]
             df_pivot['_total'] = df_pivot[value_cols].sum(axis=1)
             df_pivot = df_pivot.sort_values('_total', ascending=False).drop(columns=['_total'])
+            # [V2.5] Orden cronológico para meses string en distribución multi-dimensional
+            df_pivot = IbisEngine._apply_month_sort_if_needed(df_pivot, str(intent.dimension))
             
             total_sample = df_long['valor'].sum()
             
@@ -2142,6 +2203,8 @@ class IbisEngine:
                         .to_pandas()
                     )
                     scatter_df = scatter_df.dropna(subset=['x_value', 'y_value'])
+                    # [V2.6] Orden cronológico para meses string en scatter (diagnostic)
+                    scatter_df = IbisEngine._apply_month_sort_if_needed(scatter_df, dimension_col)
                     scatter_data = [
                         {
                             "name": IbisEngine._format_chart_name(dimension_col, row[dimension_col]),
@@ -2165,10 +2228,10 @@ class IbisEngine:
                     df_scatter = df_scatter.dropna(subset=['x_value', 'y_value'])
                     scatter_data = [
                         {
-                            "name": f"Punto {idx + 1}",
-                            "raw_name": f"Punto {idx + 1}",
-                            "x_value": float(row['x_value']),
-                            "y_value": float(row['y_value']),
+                            "name": (lambda v: str(round(float(v), 2)) if v is not None and not pd.isna(v) else "N/A")(row.get('x_value')),
+                            "raw_name": (lambda v: str(round(float(v), 2)) if v is not None and not pd.isna(v) else "N/A")(row.get('x_value')),
+                            "x_value": float(row['x_value']) if not pd.isna(row['x_value']) else 0.0,
+                            "y_value": float(row['y_value']) if not pd.isna(row['y_value']) else 0.0,
                         }
                         for idx, (_, row) in enumerate(df_scatter.iterrows())
                     ]

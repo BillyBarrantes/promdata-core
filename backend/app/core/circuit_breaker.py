@@ -24,6 +24,21 @@ class GeminiCircuitOpenError(RuntimeError):
         )
 
 
+class GeminiQuotaExceededError(RuntimeError):
+    """Raised when Gemini quota is exhausted after all retries are consumed.
+
+    Signals a transient Vertex AI regional congestion — the user should retry
+    in ~1 minute. This is NOT a code bug, it is a cloud provider capacity event.
+    """
+
+    def __init__(self, message: str = "") -> None:
+        super().__init__(
+            message
+            or "Vertex AI experimenta congestión regional temporal. "
+               "Por favor, reintente en 1 minuto."
+        )
+
+
 def is_recoverable_gemini_error(error: BaseException) -> bool:
     """Classify transient Gemini failures without depending on SDK internals."""
 
@@ -128,6 +143,18 @@ class GeminiCircuitBreaker:
                 if not is_recoverable or is_last:
                     # Error no-recuperable o reintentos agotados → fallo real
                     self.record_failure(error)
+                    # Si es 429/RESOURCE_EXHAUSTED y se agotaron reintentos,
+                    # propagar excepción específica para graceful degradation.
+                    if is_last and is_recoverable:
+                        _error_text = str(error).lower()
+                        if "429" in _error_text or "resource_exhausted" in _error_text:
+                            emit_structured_log(
+                                "vertex_ai_429_count",
+                                level="warning",
+                                error_snippet=str(error)[:200],
+                                retries_exhausted=self._max_retries,
+                            )
+                            raise GeminiQuotaExceededError(str(error)[:200])
                     raise
 
                 # ── Exponential Backoff + Jitter ──

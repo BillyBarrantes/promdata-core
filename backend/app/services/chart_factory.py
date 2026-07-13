@@ -585,7 +585,7 @@ class ChartFactory:
         elif chart_type == 'gauge': return factory.build_gauge_chart(title, data)
         elif chart_type == 'scatter': return factory._build_scatter_chart(title, data, x_label, y_label)
         elif chart_type == 'bubble': return factory.build_bubble_chart(title, data, x_label, y_label)
-        elif chart_type == 'combo': return factory.build_combo_chart(title, data, currency_meta=currency_meta)
+        elif chart_type == 'combo': return factory.build_combo_chart(title, data, currency_meta=currency_meta, x_label=x_label, y_label=y_label)
         elif chart_type == 'treemap': return factory._build_treemap_chart(title, data)
         elif chart_type == 'boxplot': return factory.build_boxplot(title, data)
         elif chart_type == 'gantt': return factory.build_gantt_chart(title, data)
@@ -1125,11 +1125,44 @@ class ChartFactory:
         return ChartFactory._sanitize_for_json(option)
 
     # --- C O M B O   C H A R T   ( D U A L   A X I S ) ---
+    _MONTH_NAMES_ES = {
+        1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr',
+        5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+        9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dic',
+    }
+
+    _MONTH_FULL_ES = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre',
+    }
+
     @staticmethod
-    def build_combo_chart(title, data, currency_meta=None):
+    def _is_month_category(data, name_key='name'):
+        """Detecta si las categorias son nombres de mes en español."""
+        if not data or not isinstance(data, list) or len(data) < 2:
+            return False
+        vals = []
+        for d in data:
+            if isinstance(d, dict):
+                v = str(d.get(name_key, '')).strip().lower()
+                if v:
+                    vals.append(v)
+        if len(vals) < 2:
+            return False
+        _month_set = set()
+        for _map in (ChartFactory._MONTH_NAMES_ES, ChartFactory._MONTH_FULL_ES):
+            for v in _map.values():
+                _month_set.add(v.lower())
+        match_count = sum(1 for v in vals if v in _month_set)
+        return match_count >= len(vals) * 0.5
+
+    @staticmethod
+    def build_combo_chart(title, data, currency_meta=None, x_label=None, y_label=None):
         """
         Combo Chart (Dual Axis): Barras para metrica primaria + Linea para metrica secundaria.
-        Ordena descendentemente por la metrica primaria para legibilidad gerencial.
+        [V2.5] Acepta x_label/y_label opcionales para nombres de eje humanizados.
+        Si la dimension son meses, preserva el orden cronologico (no re-ordena por valor).
         """
         if not data or not isinstance(data, list):
             return ChartFactory._get_base_option(title)
@@ -1151,8 +1184,15 @@ class ChartFactory:
         primary_metric = metric_keys[0]
         secondary_metric = metric_keys[1]
 
-        sorted_data = sorted(data, key=lambda d: float(d.get(primary_metric, 0)), reverse=True)
-        categories = [str(d.get("name", "N/A")) for d in sorted_data]
+        # [V2.5] Preservar orden cronologico si la dimension son meses.
+        # Solo re-ordenar por valor si NO son meses.
+        is_months = ChartFactory._is_month_category(data)
+        if is_months:
+            sorted_data = list(data)
+            categories = [str(d.get("name", "N/A")) for d in sorted_data]
+        else:
+            sorted_data = sorted(data, key=lambda d: float(d.get(primary_metric, 0)), reverse=True)
+            categories = [str(d.get("name", "N/A")) for d in sorted_data]
 
         option = ChartFactory._get_base_option(title)
         option["tooltip"]["trigger"] = "axis"
@@ -1162,18 +1202,30 @@ class ChartFactory:
             x_label_opts["rotate"] = 45
         option["xAxis"] = {"type": "category", "data": categories, "axisLabel": x_label_opts}
 
+        # [V2.5] Nombres de series para tooltips correctos (D2 fix).
+        # Si primary_metric es "value" (formato IbisEngine generico), usar y_label
+        # como nombre amigable. Si es nombre real (scatter->combo), usarlo directo.
+        if primary_metric == "value":
+            left_name = (y_label or primary_metric).replace("_", " ").title()
+        else:
+            left_name = primary_metric.replace("_", " ").title()
+        # Si secondary_metric es "mom_pct", mostrar nombre amigable.
+        if secondary_metric == "mom_pct":
+            right_name = "Variación En %"
+        else:
+            right_name = secondary_metric.replace("_", " ").title()
         option["yAxis"] = [
-            {"type": "value", "name": primary_metric.replace("_", " ").title(), "position": "left"},
-            {"type": "value", "name": secondary_metric.replace("_", " ").title(), "position": "right"},
+            {"type": "value", "name": left_name, "position": "left"},
+            {"type": "value", "name": right_name, "position": "right"},
         ]
 
         bar_data = [float(d.get(primary_metric, 0)) for d in sorted_data]
         line_data = [float(d.get(secondary_metric, 0)) for d in sorted_data]
 
         option["series"] = [
-            {"name": primary_metric.replace("_", " ").title(), "type": "bar", "data": bar_data,
+            {"name": left_name, "type": "bar", "data": bar_data,
              "yAxisIndex": 0, "itemStyle": {"color": ChartFactory.COLORS[0]}},
-            {"name": secondary_metric.replace("_", " ").title(), "type": "line", "data": line_data,
+            {"name": right_name, "type": "line", "data": line_data,
              "yAxisIndex": 1, "itemStyle": {"color": ChartFactory.COLORS[1]}, "smooth": True},
         ]
 

@@ -81,7 +81,7 @@ def _compute_year_range(df: pd.DataFrame) -> tuple[int | None, int | None]:
         if not pd.api.types.is_datetime64_any_dtype(df[col]):
             continue
         try:
-            series = pd.to_datetime(df[col], errors='coerce')
+            series = df[col]
             if series.empty:
                 continue
             col_min = series.min()

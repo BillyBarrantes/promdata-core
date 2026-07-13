@@ -914,8 +914,10 @@ export function ChatInterface() {
       eventSource.close();
 
       try {
+        const pollToken = await getChatAccessToken();
         const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
           cache: 'no-store',
+          headers: pollToken ? { 'Authorization': `Bearer ${pollToken}` } : undefined,
         });
         if (response.ok) {
           pendingTaskResultRef.current = {
@@ -987,9 +989,11 @@ export function ChatInterface() {
           data = pendingTaskResultRef.current.data;
           pendingTaskResultRef.current = null;
         } else {
+          const pollToken = await getChatAccessToken();
           const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
             signal: controller.signal,
             cache: 'no-store',
+            headers: pollToken ? { 'Authorization': `Bearer ${pollToken}` } : undefined,
           });
           if (!response.ok) {
             scheduleNextPoll(POLLING_FAST_INTERVAL_MS);

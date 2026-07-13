@@ -14,7 +14,7 @@ from typing import Any
 
 from celery.exceptions import SoftTimeLimitExceeded
 
-from app.core.circuit_breaker import GeminiCircuitOpenError
+from app.core.circuit_breaker import GeminiCircuitOpenError, GeminiQuotaExceededError
 from app.core.config import settings
 from app.core.supabase_client import get_supabase_client
 from app.core.structured_logging import emit_structured_log
@@ -756,6 +756,35 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             }, cls=CustomEncoder),
         }).eq('id', task_id).execute()
         return "rate_limited"
+    except GeminiQuotaExceededError as quota_error:
+        _record_stage_latency("worker_task_failed", started_at=task_started_at, status="quota_exceeded")
+        _flush_stage_latency_buffer()
+        emit_structured_log(
+            "vertex_ai_quota_exceeded_task",
+            level="warning",
+            task_id=task_id,
+            file_id=file_id,
+            runtime=runtime_label,
+            error_snippet=str(quota_error)[:200],
+        )
+        sb.table('analysis_tasks').update({
+            'status': 'failed',
+            'results_json': json.dumps({
+                "analysis": (
+                    "## ⚠️ Servicio de IA congestionado\n\n"
+                    "Vertex AI experimenta congestión regional temporal. "
+                    "Por favor, reintente en 1 minuto."
+                ),
+                "metrics": {},
+                "chart_options": [],
+                "data": [],
+                "recommendations": [],
+                "explainability": [],
+                "error_trace": str(quota_error)[:300],
+                "error_code": "QUOTA_EXCEEDED",
+            }, cls=CustomEncoder),
+        }).eq('id', task_id).execute()
+        return "failed"
     except Exception as canary_error:
         _record_stage_latency("worker_task_failed", started_at=task_started_at, status="failed")
         _flush_stage_latency_buffer()

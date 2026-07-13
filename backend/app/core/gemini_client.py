@@ -9,7 +9,7 @@ from app.core.circuit_breaker import GeminiCircuitBreaker
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
 
-_HTTP_TIMEOUT_MS = int(os.getenv("GEMINI_HTTP_TIMEOUT_MS", "60000") or "60000")
+_HTTP_TIMEOUT_MS = int(os.getenv("GEMINI_HTTP_TIMEOUT_MS", "50000") or "50000")
 
 _HAS_GENAI_SDK = False
 _GENAI_SDK = None

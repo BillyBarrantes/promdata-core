@@ -312,8 +312,9 @@ const applyBusinessTooltip = (currentOption: any): any => {
   const primaryType = String(primarySeries?.type || "").toLowerCase();
   const xAxis = Array.isArray(currentOption.xAxis) ? currentOption.xAxis[0] : currentOption.xAxis;
   const yAxis = Array.isArray(currentOption.yAxis) ? currentOption.yAxis[0] : currentOption.yAxis;
-  const xName = xAxis?.name || "Dimensión";
-  const yName = yAxis?.name || "Valor";
+  const vsp = (currentOption as any)?.visual_source_payload;
+  const xName = xAxis?.name || vsp?.x_label || "Dimensión";
+  const yName = yAxis?.name || vsp?.y_label || "Valor";
 
   currentOption.tooltip = {
     confine: true,
@@ -1115,12 +1116,13 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
           const dataName = nameRaw ? `<b>${nameRaw}</b><br/>` : '';
           const seriesName = p.seriesName ? `<span style="font-size:10px;color:#888">${p.seriesName}</span><br/>` : '';
 
-          // Infer labels from axes definitions
+          // Infer labels from axes definitions + visual_source_payload fallback
           const xAx = Array.isArray(currentOption.xAxis) ? currentOption.xAxis[0] : currentOption.xAxis;
           const yAx = Array.isArray(currentOption.yAxis) ? currentOption.yAxis[0] : currentOption.yAxis;
+          const vsp = (currentOption as any)?.visual_source_payload;
 
-          const xLabel = xAx?.name || 'Eje X';
-          const yLabel = yAx?.name || 'Eje Y';
+          const xLabel = xAx?.name || vsp?.x_label || 'Eje X';
+          const yLabel = yAx?.name || vsp?.y_label || 'Eje Y';
 
           // Detección Inteligente de Moneda en Frontend (Mirroring Backend Logic)
           const isCurrency = (label: string) => {

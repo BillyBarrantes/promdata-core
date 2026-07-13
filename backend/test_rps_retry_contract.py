@@ -255,7 +255,7 @@ class TestRPSThresholds:
 
     def test_retry_config_defaults(self):
         """Retry settings tienen los valores del plan RPS."""
-        assert settings.GEMINI_RETRY_MAX_RETRIES == 3
+        assert settings.GEMINI_RETRY_MAX_RETRIES == 4
         assert settings.GEMINI_RETRY_BASE_DELAY_SECONDS == 1.0
         assert settings.GEMINI_RETRY_MAX_DELAY_SECONDS == 15.0
         assert settings.GEMINI_RETRY_JITTER_SECONDS == 0.5

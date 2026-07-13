@@ -1217,9 +1217,15 @@ class DataEngine:
         ]
         for ref_col in date_cols:
             try:
-                result = str(pd.to_datetime(df[ref_col], errors='coerce').max().date())
-                emit_structured_log("reference_date_detected", reference_date=result, method="role_date")
-                return result
+                col = df[ref_col]
+                if pd.api.types.is_datetime64_any_dtype(col):
+                    max_date = col.max()
+                    result = str(max_date.date()) if pd.notna(max_date) else None
+                else:
+                    result = str(pd.to_datetime(col, errors='coerce').max().date())
+                if result:
+                    emit_structured_log("reference_date_detected", reference_date=result, method="role_date")
+                    return result
             except Exception:
                 continue
 

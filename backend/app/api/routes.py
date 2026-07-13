@@ -611,12 +611,12 @@ def start_analysis(
 # (Removed ReportSaveRequest class definition from here)
 
 @router.get("/tasks/{task_id}")
-def get_task_status(task_id: str):
+def get_task_status(task_id: str, token: str = Depends(oauth2_scheme)):
     """Consulta el estado y el resultado de una tarea de análisis."""
     try:
-        supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        supabase, user = _get_authenticated_user(token)
 
-        response = supabase.table('analysis_tasks').select('status, results_json').eq('id', task_id).single().execute()
+        response = supabase.table('analysis_tasks').select('status, results_json').eq('id', task_id).eq('user_id', user.id).single().execute()
 
         if response.data and response.data.get('status') in ['completed', 'failed', 'timeout', 'rate_limited']:
             results_payload = response.data.get('results_json')

@@ -447,6 +447,29 @@ def _build_chart_option(
             ui_chart_type = _rec_visual
             chart_type = _normalize_chart_type(_rec_visual)
 
+            # [V2.5] Scatter→Combo data transformation
+            # Cuando el override convierte scatter_plot → combo_chart, los datos
+            # vienen como {x_value, y_value, raw_name}. build_combo_chart espera
+            # {name, <metrica_1>, <metrica_2>}. Renombramos dinámicamente usando
+            # x_axis/y_axis del payload como nombres de métrica humanizados.
+            if _rec_visual == "combo_chart" and (_llm_vp and normalize_visual_id(_llm_vp) == "scatter_plot"):
+                _raw_data = result_payload.get("data")
+                _x_axis = str(result_payload.get("x_axis", "Metrica X"))
+                _y_axis = str(result_payload.get("y_axis", "Metrica Y"))
+                if isinstance(_raw_data, list) and _raw_data:
+                    _transformed = []
+                    for _rec in _raw_data:
+                        if isinstance(_rec, dict) and "x_value" in _rec and "y_value" in _rec:
+                            _name = str(_rec.get("raw_name", _rec.get("name", f"Punto {len(_transformed)+1}")))
+                            _transformed.append({
+                                "name": _name,
+                                _x_axis: float(_rec.get("x_value", 0)),
+                                _y_axis: float(_rec.get("y_value", 0)),
+                            })
+                    if _transformed:
+                        result_payload["data"] = _transformed
+                        print(f"🔄 [SCATTER→COMBO] Transformados {len(_transformed)} registros: {_x_axis} (bar) + {_y_axis} (line)")
+
     if (_rec_visual and _app_visual and _rec_visual != _app_visual
         and _llm_vp and _eng_ct
         and normalize_visual_id(_llm_vp) != normalize_visual_id(_eng_ct)):
@@ -506,6 +529,54 @@ def _build_chart_option(
                 print(f"📊 [SMART TABLE] Contractual: {len(_raw_data)} records → smart_table directa")
                 return smart_payload
         # Si records vacíos o malformados, fall through a ChartFactory
+
+    # [V2.6] Promover extra_info.secondary_value a top-level key para que
+    # build_combo_chart lo detecte como 2da métrica numérica.
+    # El descriptive guarda la 2da métrica en extra_info (no como top-level).
+    # [V2.7] Usar nombre real de la métrica desde plan.main_intent.metrics en
+    # vez de la clave generica "secondary_metric" (D3 - fix tooltip names).
+    if chart_type == "combo":
+        _raw_data = result_payload.get("data")
+        if isinstance(_raw_data, list):
+            for _rec in _raw_data:
+                if isinstance(_rec, dict):
+                    _xtra = _rec.get("extra_info")
+                    if isinstance(_xtra, dict) and "secondary_value" in _xtra:
+                        _sec_metric_name = "secondary_metric"
+                        if plan and hasattr(plan, "main_intent") and plan.main_intent:
+                            _metrics_list = getattr(plan.main_intent, "metrics", None) or []
+                            if len(_metrics_list) >= 2 and _metrics_list[1]:
+                                _sec_metric_name = _metrics_list[1]
+                        _rec[_sec_metric_name] = float(_xtra["secondary_value"])
+
+    # [V2.5] Dual-axis derivation: si el chart_type final es combo (dual_axis_chart
+    # o combo_chart) pero los datos tienen solo 1 metrica numerica, derivar
+    # la 2da serie como % de variacion intermensual (MoM).
+    # El .fillna(0.0) evita NaN en la primera fila que rompe serializacion JSON.
+    if chart_type == "combo":
+        _raw_data = result_payload.get("data")
+        if isinstance(_raw_data, list) and len(_raw_data) >= 2:
+            _num_keys = []
+            if _raw_data and isinstance(_raw_data[0], dict):
+                for _k in _raw_data[0].keys():
+                    if _k not in ('name', 'extra_info') and not _k.startswith('_'):
+                        try:
+                            float(_raw_data[0][_k])
+                            _num_keys.append(_k)
+                        except (ValueError, TypeError):
+                            continue
+            if len(_num_keys) == 1:
+                _primary_key = _num_keys[0]
+                _mom_col = "mom_pct"
+                _prev_val = None
+                for _rec in _raw_data:
+                    _cur_val = float(_rec.get(_primary_key, 0))
+                    if _prev_val is not None and _prev_val != 0:
+                        _rec[_mom_col] = round((_cur_val - _prev_val) / _prev_val * 100, 2)
+                    else:
+                        _rec[_mom_col] = 0.0
+                    _prev_val = _cur_val
+                print(f"🔄 [DUAL-AXIS] Derivada metrica MoM: {_mom_col} para {len(_raw_data)} periodos")
 
     option = ChartFactory.create_chart(
         chart_type,

@@ -15,11 +15,11 @@ from app.core.config import settings
 class TestCeleryConfTimeouts:
     """Valida que la configuración de Celery tiene los límites inyectados."""
 
-    def test_config_soft_time_limit_is_180(self):
-        assert settings.CELERY_TASK_SOFT_TIME_LIMIT == 180
+    def test_config_soft_time_limit_is_300(self):
+        assert settings.CELERY_TASK_SOFT_TIME_LIMIT == 300
 
-    def test_config_hard_time_limit_is_240(self):
-        assert settings.CELERY_TASK_HARD_TIME_LIMIT == 240
+    def test_config_hard_time_limit_is_330(self):
+        assert settings.CELERY_TASK_HARD_TIME_LIMIT == 330
 
     def test_celery_conf_soft_limit_matches_config(self):
         assert celery_app.conf.task_soft_time_limit == settings.CELERY_TASK_SOFT_TIME_LIMIT

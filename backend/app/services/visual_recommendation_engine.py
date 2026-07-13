@@ -514,7 +514,7 @@ def _recommend_visual(plan: Any, ibis_output: dict[str, Any]) -> tuple[str, str]
         return "line_chart", "La evolucion temporal se entiende mejor con Line."
     if intent_type == "diagnostic" and scatter_ready and not _has_dual_numeric_metrics(plan, ibis_output):
         return "scatter_plot", "La intencion diagnostica prioriza relacion y dispersion entre variables."
-    if intent_type == "diagnostic" and _has_dual_numeric_metrics(plan, ibis_output):
+    if has_temporal and intent_type == "diagnostic" and _has_dual_numeric_metrics(plan, ibis_output):
         return "combo_chart", "Dos metricas dispares se visualizan mejor con Combo (Barras + Linea)."
     if intent_type == "diagnostic" and bubble_metric:
         return "bubble_chart", "La lectura diagnostica expone una tercera magnitud util para Bubble."
