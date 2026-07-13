@@ -113,8 +113,8 @@ def _preview_text(value: Optional[str], limit: int = 120) -> str:
 
 
 def _get_authenticated_user(token: str):
-    client = get_supabase_user_client(token)
     try:
+        client = get_supabase_user_client(token)
         user_response = client.auth.get_user()
     except Exception:
         raise HTTPException(status_code=401, detail="Token de usuario inválido o expirado.")
