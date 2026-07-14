@@ -4,11 +4,14 @@ SSE Endpoint para streaming en tiempo real del progreso de las tareas (Pub/Sub).
 """
 import asyncio
 import json
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from fastapi.security import OAuth2PasswordBearer
 from app.core.redis_client import get_pubsub_client
-from app.core.supabase_client import get_supabase_service_client
+from app.core.supabase_client import get_supabase_service_client, get_supabase_user_client
 from app.core.config import settings
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 router = APIRouter()
 
@@ -81,15 +84,37 @@ async def sse_generator(request: Request, task_id: str):
         pubsub.close()
 
 @router.get("/tasks/{task_id}/stream", tags=["Tasks"])
-async def stream_task_progress(task_id: str, request: Request):
+async def stream_task_progress(task_id: str, request: Request, token: str = Depends(oauth2_scheme)):
     """
     Endpoint de Server-Sent Events (SSE) para recibir el progreso de una tarea
     en tiempo real a través de Redis Pub/Sub.
     """
+    # Validar token y ownership de la tarea
+    try:
+        client = get_supabase_user_client(token)
+        user_response = client.auth.get_user()
+        if not user_response or not user_response.user or not user_response.user.id:
+            raise HTTPException(status_code=401, detail="Token de usuario inválido o expirado.")
+        user_id = user_response.user.id
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token de usuario inválido o expirado.")
+
+    try:
+        sb = get_supabase_service_client()
+        row = sb.table("analysis_tasks").select("id").eq("id", task_id).eq("user_id", user_id).single().execute()
+        if not row.data:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada o no pertenece al usuario.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada o no pertenece al usuario.")
+
     # Graceful degradation si pubsub no está activo
     if not get_pubsub_client():
         raise HTTPException(status_code=503, detail="Streaming de progreso no disponible actualmente")
-        
+
     return StreamingResponse(
         sse_generator(request, task_id),
         media_type="text/event-stream",

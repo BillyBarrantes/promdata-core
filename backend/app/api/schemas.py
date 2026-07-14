@@ -1,11 +1,20 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+PROMPT_MAX_LENGTH = 5000
 
 class AnalysisRequest(BaseModel):
     """Modelo para la solicitud de un nuevo análisis."""
     file_id: str  # Mantenemos este como string, lo cual es correcto
     prompt: str
+
+    @field_validator("prompt")
+    @classmethod
+    def prompt_length_limit(cls, v: str) -> str:
+        if len(v) > PROMPT_MAX_LENGTH:
+            raise ValueError(f"El prompt no puede exceder {PROMPT_MAX_LENGTH} caracteres.")
+        return v.replace('\x00', '')
 
 class AnalysisTaskResponse(BaseModel):
     """Modelo para la respuesta al iniciar un análisis."""
@@ -106,6 +115,13 @@ class ChatMessage(BaseModel):
     content: list | dict | str # Flexibilidad para contenido rico o texto simple
     file_id: str | None = None
     created_at: str | None = None
+
+    @field_validator("content")
+    @classmethod
+    def content_length_limit(cls, v: list | dict | str) -> list | dict | str:
+        if isinstance(v, str) and len(v) > PROMPT_MAX_LENGTH:
+            raise ValueError(f"El contenido no puede exceder {PROMPT_MAX_LENGTH} caracteres.")
+        return v
 
 class ChartRecipe(BaseModel):
     """Modelo de Contrato Reactivo (Receta) para Frontend DuckDB-Wasm"""
@@ -361,7 +377,7 @@ class KnowledgeDocumentUploadResponse(BaseModel):
 
 
 class KnowledgeQueryRequest(BaseModel):
-    query: str
+    query: str = Field(max_length=PROMPT_MAX_LENGTH)
     limit: int = 4
     document_ids: list[str] | None = None
 
@@ -385,7 +401,7 @@ class KnowledgeQueryResponse(BaseModel):
 
 
 class KnowledgeAskRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=PROMPT_MAX_LENGTH)
     limit: int = 4
     document_ids: list[str] | None = None
 

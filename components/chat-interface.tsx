@@ -20,6 +20,7 @@ import { Database, Paperclip, SendHorizonal, X, Trash2, Square, Mic, MicOff, Lay
 import { cn } from "@/lib/utils"
 import { API_BASE_URL } from "@/lib/api-config"
 import { toast } from "sonner"
+import { fetchEventSource } from "@microsoft/fetch-event-source"
 import { useSupabase } from '@/lib/supabase-provider'
 import {
   Dialog,
@@ -862,80 +863,99 @@ export function ChatInterface() {
     pendingTaskResultRef.current = null;
     setPollingFallbackEnabled(false);
 
-    if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
-      setPollingFallbackEnabled(true);
-      return;
-    }
-
-    let closed = false;
-    let opened = false;
-    const eventSource = new EventSource(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}/stream`);
+    const sseCtrl = new AbortController();
+    let sseOpened = false;
+    let sseFallbackTriggered = false;
 
     const fallbackToPolling = () => {
-      if (closed) return;
-      closed = true;
-      eventSource.close();
+      if (sseFallbackTriggered) return;
+      sseFallbackTriggered = true;
+      sseCtrl.abort();
       setPollingFallbackEnabled(true);
     };
 
     const connectGuard = window.setTimeout(() => {
-      if (!opened) {
+      if (!sseOpened) {
         console.warn('⚠️ [SSE] No conectó a tiempo; fallback a polling.');
         fallbackToPolling();
       }
     }, 4000);
 
-    eventSource.onopen = () => {
-      opened = true;
-      window.clearTimeout(connectGuard);
-    };
-
-    eventSource.onerror = () => {
-      console.warn('⚠️ [SSE] Stream no disponible; fallback a polling.');
-      fallbackToPolling();
-    };
-
-    eventSource.onmessage = async (event) => {
-      if (closed) return;
-      let payload: any = null;
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
+    (async () => {
+      const token = await getChatAccessToken();
+      if (!token || sseFallbackTriggered) {
+        if (!token) fallbackToPolling();
         return;
       }
 
-      const status = String(payload?.status || '').toLowerCase();
-      if (!['completed', 'success', 'failed', 'timeout', 'rate_limited'].includes(status)) {
-        return;
-      }
-
-      closed = true;
-      window.clearTimeout(connectGuard);
-      eventSource.close();
-
       try {
-        const pollToken = await getChatAccessToken();
-        const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
-          cache: 'no-store',
-          headers: pollToken ? { 'Authorization': `Bearer ${pollToken}` } : undefined,
+        await fetchEventSource(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}/stream`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: sseCtrl.signal,
+          async onopen(response) {
+            if (response.ok) {
+              sseOpened = true;
+              window.clearTimeout(connectGuard);
+            } else if (response.status === 401 || response.status === 404) {
+              throw new Error(`SSE rejected: ${response.status}`);
+            } else {
+              throw new Error(`SSE failed: ${response.status}`);
+            }
+          },
+          onmessage(event) {
+            if (sseFallbackTriggered) return;
+            let payload: any = null;
+            try {
+              payload = JSON.parse(event.data);
+            } catch {
+              return;
+            }
+
+            const status = String(payload?.status || '').toLowerCase();
+            if (!['completed', 'success', 'failed', 'timeout', 'rate_limited'].includes(status)) {
+              return;
+            }
+
+            window.clearTimeout(connectGuard);
+            sseFallbackTriggered = true;
+            sseCtrl.abort();
+
+            (async () => {
+              try {
+                const pollToken = await getChatAccessToken();
+                const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${activeTaskId}`, {
+                  cache: 'no-store',
+                  headers: pollToken ? { 'Authorization': `Bearer ${pollToken}` } : undefined,
+                });
+                if (response.ok) {
+                  pendingTaskResultRef.current = {
+                    taskId: activeTaskId,
+                    data: await response.json(),
+                  };
+                }
+              } catch (error) {
+                console.warn('⚠️ [SSE] No se pudo resolver resultado final; fallback a polling.', error);
+              } finally {
+                setPollingFallbackEnabled(true);
+              }
+            })();
+          },
+          onerror(err) {
+            console.warn('⚠️ [SSE] Error; fallback a polling.', err);
+            fallbackToPolling();
+            throw err;
+          },
         });
-        if (response.ok) {
-          pendingTaskResultRef.current = {
-            taskId: activeTaskId,
-            data: await response.json(),
-          };
-        }
-      } catch (error) {
-        console.warn('⚠️ [SSE] No se pudo resolver resultado final; fallback a polling.', error);
-      } finally {
-        setPollingFallbackEnabled(true);
+      } catch {
+        // fetchEventSource threw — already handled in onerror/fallback
       }
-    };
+    })();
 
     return () => {
-      closed = true;
       window.clearTimeout(connectGuard);
-      eventSource.close();
+      sseFallbackTriggered = true;
+      sseCtrl.abort();
     };
   }, [isAnalyzing, activeTaskId]);
 

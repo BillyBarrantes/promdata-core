@@ -51,10 +51,26 @@ class TestSSEEndpointRedisOffline:
     """Valida que el endpoint SSE retorna 503 si Redis está offline."""
 
     @patch("app.api.sse_progress.get_pubsub_client", return_value=None)
-    def test_sse_returns_503_when_redis_unavailable(self, _mock):
+    @patch("app.api.sse_progress.get_supabase_service_client")
+    @patch("app.api.sse_progress.get_supabase_user_client")
+    def test_sse_returns_503_when_redis_unavailable(self, mock_supabase_user, mock_supabase_svc, _mock_pubsub):
         from fastapi.testclient import TestClient
         from app.main import app
 
+        fake_user_response = MagicMock()
+        fake_user_response.user = MagicMock()
+        fake_user_response.user.id = "test-user-id"
+        fake_client = MagicMock()
+        fake_client.auth.get_user.return_value = fake_user_response
+        mock_supabase_user.return_value = fake_client
+
+        mock_svc_table = MagicMock()
+        mock_svc_table.execute.return_value.data = {"id": "task-123"}
+        mock_supabase_svc.return_value.table.return_value.select.return_value.eq.return_value.eq.return_value.single.return_value = mock_svc_table
+
         client = TestClient(app)
-        response = client.get("/api/v1/tasks/task-123/stream")
+        response = client.get(
+            "/api/v1/tasks/task-123/stream",
+            headers={"Authorization": "Bearer fake-test-token"},
+        )
         assert response.status_code == 503

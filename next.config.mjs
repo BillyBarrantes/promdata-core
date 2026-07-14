@@ -29,6 +29,11 @@ const nextConfig = {
     return config;
   },
   async headers() {
+    const apiOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '').replace(/^https?:\/\//, '');
+    const wssAllowed = process.env.NODE_ENV === 'development'
+      ? `ws://localhost:3000 ws://${apiOrigin} http://${apiOrigin}`
+      : `https://${apiOrigin}`;
+
     return [
       {
         source: '/:path*',
@@ -37,22 +42,34 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // CORRECCIÓN: Añadido *.vercel-insights.com para permitir los scripts de analíticas de Vercel
-              // blob: necesario como fallback para navegadores que usan script-src cuando worker-src no está soportado
-              // *.sentry.io necesario para que Sentry pueda enviar eventos y el SDK cargue correctamente
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: *.vercel-insights.com *.sentry.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src * blob: data:",
               "media-src 'none'",
-              "connect-src *",
+              `connect-src 'self' https://*.supabase.co https://*.sentry.io https://o*.ingest.sentry.io wss://*.sentry.io ${wssAllowed}`,
               "font-src 'self'",
               "object-src 'none'",
               "frame-src 'self'",
-              // 🦆 [DuckDB-WASM] Worker desde Blob URL (fetch CDN → Blob → createObjectURL)
               "worker-src 'self' blob:",
               "base-uri 'self'",
               "form-action 'self'",
             ].join('; '),
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
         ],
       },

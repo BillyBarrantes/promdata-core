@@ -216,6 +216,26 @@ def _check_redis(url: str) -> tuple[bool, str | None]:
         return False, str(error)[:180]
 
 
+def _redact_redis_url(url: str | None) -> str | None:
+    """Redacta la contraseña de una URL de Redis para no exponerla en health checks."""
+    if not url:
+        return url
+    try:
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        if parsed.password:
+            netloc = parsed.hostname or ""
+            if parsed.port:
+                netloc = f"{parsed.hostname}:{parsed.port}"
+            if parsed.username:
+                netloc = f"{parsed.username}:****@{netloc}"
+            parsed = parsed._replace(netloc=netloc)
+            return urlunparse(parsed)
+        return url
+    except Exception:
+        return "<url_invalida>"
+
+
 @app.get("/health/live", summary="Liveness Probe")
 def health_live():
     return {"status": "ok", "probe": "liveness"}
@@ -234,12 +254,12 @@ def health_ready():
     checks = {
         "celery_broker": {
             "ok": broker_ok,
-            "target": settings.CELERY_BROKER_URL,
+            "target": _redact_redis_url(settings.CELERY_BROKER_URL),
             "error": broker_error,
         },
         "celery_result_backend": {
             "ok": backend_ok,
-            "target": settings.CELERY_RESULT_BACKEND,
+            "target": _redact_redis_url(settings.CELERY_RESULT_BACKEND),
             "error": backend_error,
         },
         "canonical_tabular_canary": {
