@@ -578,6 +578,8 @@ def start_analysis(
 
         return AnalysisTaskResponse(task_id=str(new_task_id))
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error al iniciar el análisis: {e}")
         emit_structured_log(
@@ -652,6 +654,8 @@ def get_task_status(task_id: str, token: str = Depends(oauth2_scheme)):
         else:
             raise HTTPException(status_code=404, detail="Task not found")
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error al obtener estado de la tarea {task_id}: {e}")
         emit_structured_log(
@@ -737,6 +741,8 @@ def cancel_task(task_id: str, token: str = Depends(oauth2_scheme)):
         
         return {"status": "cancelled", "message": f"Tarea {task_id} detenida permanentemente."}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error cancelando tarea {task_id}: {e}")
         emit_structured_log(
@@ -1253,6 +1259,8 @@ def save_report(
             "presentation_id": presentation_id,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error guardando reporte: {e}")
         emit_structured_log(
@@ -1319,6 +1327,8 @@ def get_user_reports(presentation_id: Optional[str] = None, token: str = Depends
         )
             
         return hydrated_reports
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error obteniendo reportes: {e}")
         emit_structured_log(
@@ -1479,6 +1489,8 @@ def delete_report(
         # but 204 No Content is standard for "it's gone (or was never there)".
         return 
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error borrando reporte: {e}")
         emit_structured_log(
@@ -1510,6 +1522,8 @@ def get_presentations(token: str = Depends(oauth2_scheme)):
         )
             
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error obteniendo presentaciones: {e}")
         emit_structured_log(
@@ -1554,6 +1568,8 @@ def create_presentation(
             name=_preview_text(request_body.name, limit=80),
         )
         return response.data[0] if response.data else None
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error creando presentacion: {e}")
         emit_structured_log(
@@ -1598,6 +1614,8 @@ def update_presentation(
         )
 
         return response.data[0] if response.data else None
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error actualizando presentacion: {e}")
         emit_structured_log(
@@ -1646,6 +1664,8 @@ def delete_presentation(
         )
 
         return
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error eliminando presentacion: {e}")
         emit_structured_log(
@@ -1754,6 +1774,8 @@ def get_chat_history(
         )
             
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error obteniendo chat history: {e}")
         emit_structured_log(
@@ -1824,6 +1846,8 @@ def save_chat_message(
         )
         return {"status": "success", "data": response.data}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error guardando mensaje: {e}")
         emit_structured_log(
@@ -1855,6 +1879,8 @@ def delete_chat_message(
         supabase.table('chat_messages').delete().eq('id', message_id).execute()
         emit_structured_log("api_chat_message_deleted", message_id=message_id)
         return
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error borrando mensaje chat: {e}")
         emit_structured_log(
@@ -1879,6 +1905,8 @@ def get_cloud_connectors(token: str = Depends(oauth2_scheme)):
             connected_count=sum(1 for provider in providers if provider["connected"]),
         )
         return providers
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error obteniendo conectores cloud: {e}")
         emit_structured_log(
@@ -1911,6 +1939,8 @@ def get_connectors_watchdog_status(token: str = Depends(oauth2_scheme)):
             operational_state=status_payload.get("operational_state"),
         )
         return status_payload
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error obteniendo estado de watchdog cloud: {e}")
         emit_structured_log(
