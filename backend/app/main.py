@@ -157,13 +157,13 @@ async def _sanitize_http_errors(request: FastAPIRequest, exc: StarletteHTTPExcep
             status_code=exc.status_code,
             internal_detail=str(exc.detail)[:500],
         )
-        from app.services.slack_alert import send_alert
+        from app.services.alert_dispatcher import dispatch_500
         try:
-            await send_alert("CRITICAL", "Backend 500 error", {
-                "path": str(request.url.path),
-                "method": request.method,
-                "status_code": exc.status_code,
-            })
+            await dispatch_500(
+                path=str(request.url.path),
+                method=request.method,
+                status_code=exc.status_code,
+            )
         except Exception:
             pass
         return JSONResponse(

@@ -335,4 +335,10 @@ class Settings:
     # ------------------------------------------------------------------ #
     SLACK_ALERT_WEBHOOK_URL: str = os.getenv("SLACK_ALERT_WEBHOOK_URL", "")
 
+    # ------------------------------------------------------------------ #
+    # Fase 3.6: Telegram alerting
+    # ------------------------------------------------------------------ #
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
+
 settings = Settings()

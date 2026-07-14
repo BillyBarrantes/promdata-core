@@ -228,16 +228,12 @@ class GeminiCircuitBreaker:
 
     def _alert_slack_open(self, error: BaseException) -> None:
         try:
-            from app.services.slack_alert import send_alert_background
-            send_alert_background(
-                "CRITICAL",
-                "Gemini circuit breaker OPEN",
-                {
-                    "consecutive_failures": self._consecutive_failures,
-                    "failure_threshold": self.failure_threshold,
-                    "recovery_timeout_seconds": self.recovery_timeout_seconds,
-                    "error": str(error)[:300],
-                },
+            from app.services.alert_dispatcher import dispatch_circuit_open
+            dispatch_circuit_open(
+                failures=self._consecutive_failures,
+                threshold=self.failure_threshold,
+                recovery=self.recovery_timeout_seconds,
+                error=str(error)[:300],
             )
         except Exception:
             pass
