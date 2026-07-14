@@ -11,7 +11,7 @@ import requests
 
 from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
-from app.services.cloud_oauth import get_provider_remote_file, refresh_oauth_connection_tokens
+from app.services.cloud_oauth import decrypt_oauth_connection_row, get_provider_remote_file, refresh_oauth_connection_tokens
 
 GOOGLE_DRIVE_CHANGES_URL = "https://www.googleapis.com/drive/v3/changes"
 GOOGLE_DRIVE_START_PAGE_TOKEN_URL = "https://www.googleapis.com/drive/v3/changes/startPageToken"
@@ -798,7 +798,7 @@ def poll_user_watch_targets(
             .limit(1) \
             .execute()
         if connection_response.data:
-            connection_index[candidate_provider] = connection_response.data[0]
+            connection_index[candidate_provider] = decrypt_oauth_connection_row(connection_response.data[0])
 
     checked_count = 0
     new_change_count = 0

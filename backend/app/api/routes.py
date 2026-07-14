@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.core.rate_limit import enforce_rate_limit, enforce_burst_limit, acquire_concurrency_slot
 from app.core.structured_logging import emit_structured_log
 from app.services.cloud_connectors import get_cloud_connector_catalog, get_watchdog_runtime_status
+from app.services.prompt_sanitizer import detect_prompt_injection
 from app.services.cloud_oauth import (
     build_frontend_oauth_redirect_url,
     create_oauth_authorization_request,
@@ -505,6 +506,17 @@ def start_analysis(
 
         # Sanitizar prompt
         safe_prompt = request_body.prompt.replace('\x00', '') if request_body.prompt else request_body.prompt
+
+        injection_reason = detect_prompt_injection(safe_prompt)
+        if injection_reason:
+            emit_structured_log(
+                "api_prompt_injection_detected",
+                level="warning",
+                user_id=current_user_id,
+                file_id=request_body.file_id,
+                reason=injection_reason,
+            )
+            raise HTTPException(status_code=400, detail=injection_reason)
 
         new_task_id = uuid.uuid4()
         canary_health = build_canonical_tabular_canary_health()
@@ -1095,6 +1107,18 @@ def ask_knowledge_documents(
         )
 
         _, user = _get_authenticated_user(token)
+
+        injection_reason = detect_prompt_injection(request_body.question)
+        if injection_reason:
+            emit_structured_log(
+                "api_prompt_injection_detected",
+                level="warning",
+                user_id=user.id,
+                reason=injection_reason,
+                endpoint="knowledge_ask",
+            )
+            raise HTTPException(status_code=400, detail=injection_reason)
+
         service_client = get_supabase_service_client()
         team_id = resolve_user_team_id(user_id=user.id, service_client=service_client)
         snippets = search_knowledge_documents(

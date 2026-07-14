@@ -11,6 +11,7 @@ from urllib.parse import urlencode, urlparse
 import requests
 
 from app.core.config import settings
+from app.core.oauth_encryption import decrypt_token, encrypt_token
 from app.core.structured_logging import emit_structured_log
 
 
@@ -426,8 +427,8 @@ def _build_connection_payload(
         "external_account_id": profile_payload.get("external_account_id"),
         "external_account_email": profile_payload.get("external_account_email"),
         "external_account_name": profile_payload.get("external_account_name"),
-        "access_token": token_payload.get("access_token"),
-        "refresh_token": refresh_token,
+        "access_token": encrypt_token(token_payload.get("access_token") or ""),
+        "refresh_token": encrypt_token(refresh_token or ""),
         "token_type": token_payload.get("token_type"),
         "scopes": _normalize_token_scope_payload(token_payload, provider_id),
         "expires_at": expires_at.isoformat() if expires_at else None,
@@ -448,6 +449,15 @@ def get_user_oauth_connections(user_id: str, service_client: Any) -> list[dict[s
     return response.data or []
 
 
+def decrypt_oauth_connection_row(row: dict[str, Any]) -> dict[str, Any]:
+    row = dict(row)
+    if row.get("access_token"):
+        row["access_token"] = decrypt_token(row["access_token"]) or row["access_token"]
+    if row.get("refresh_token"):
+        row["refresh_token"] = decrypt_token(row["refresh_token"]) or row["refresh_token"]
+    return row
+
+
 def get_user_oauth_connection(user_id: str, provider_id: str, service_client: Any) -> dict[str, Any] | None:
     response = service_client.table("cloud_oauth_connections") \
         .select("*") \
@@ -456,7 +466,7 @@ def get_user_oauth_connection(user_id: str, provider_id: str, service_client: An
         .limit(1) \
         .execute()
     if response.data:
-        return response.data[0]
+        return decrypt_oauth_connection_row(response.data[0])
     return None
 
 
@@ -1062,8 +1072,8 @@ def refresh_oauth_connection_tokens(connection_row: dict[str, Any], service_clie
 
     token_payload = response.json()
     updated_payload = {
-        "access_token": token_payload.get("access_token"),
-        "refresh_token": token_payload.get("refresh_token") or connection_row.get("refresh_token"),
+        "access_token": encrypt_token(token_payload.get("access_token") or ""),
+        "refresh_token": encrypt_token(token_payload.get("refresh_token") or connection_row.get("refresh_token") or ""),
         "token_type": token_payload.get("token_type") or connection_row.get("token_type"),
         "scopes": _normalize_token_scope_payload(token_payload, provider_id),
         "expires_at": (

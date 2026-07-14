@@ -29,7 +29,11 @@ def _extract_user_id_from_token(token: str) -> str | None:
     if not raw_token:
         return None
     try:
-        claims = jwt.get_unverified_claims(raw_token)
+        secret = settings.SUPABASE_JWT_SECRET
+        if secret:
+            claims = jwt.decode(raw_token, secret, algorithms=["HS256"])
+        else:
+            claims = jwt.get_unverified_claims(raw_token)
     except Exception:
         return None
     subject = str(claims.get("sub") or "").strip()
