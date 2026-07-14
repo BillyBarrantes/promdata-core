@@ -430,7 +430,30 @@ curl https://promdata-backend-698138140658.us-east4.run.app/api/v1/chat/<file_id
 
 ---
 
-## 9. Versioning
+## 9. VPC Peering + IP Restriction (Fase 3.2)
+
+### 9.1 IP Restriction Middleware
+- `backend/app/services/ip_restriction.py`: FastAPI middleware que bloquea
+  requests desde IPs fuera de `ALLOWED_CIDRS` (comma-separated CIDR blocks).
+- **No-op** si `ALLOWED_CIDRS` no está configurado (100% transparente en dev).
+- Uso: en Cloud Run, set `ALLOWED_CIDRS=10.0.0.0/8,172.16.0.0/12` para
+  restringir a tráfico interno de GCP VPC.
+
+### 9.2 VPC Peering with Redis Cloud
+Para reducir latencia y eliminar tráfico por Internet entre Cloud Run y Redis:
+1. Crear VPC nativa de GCP en `us-east4`.
+2. Configurar Serverless VPC Access connector para Cloud Run.
+3. En Redis Cloud console → Database → Connectivity → VPC Peering:
+   - Project ID: `promdata-enterprise`
+   - VPC network name de GCP.
+4. Actualizar `REDIS_URL` en Cloud Run a la IP privada del endpoint Redis.
+
+**Importante:** VPC peering requiere Redis Cloud Pro plan — no funciona con
+Essentials. Ver §12.3 Fase B para detalles de migración.
+
+---
+
+## 10. Versioning
 
 - Cache schema: `_CACHE_KEY_SCHEMA_VERSION` in `ai_response_cache.py`.
 - Semantic translator: see version comments in `semantic_translator.py`.

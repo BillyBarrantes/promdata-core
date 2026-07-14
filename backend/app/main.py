@@ -14,7 +14,9 @@ from app.core.config import settings
 from app.core.redis_client import get_redis_client
 from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
+from app.services.audit_middleware import audit_middleware
 from app.services.canonical_canary_health import build_canonical_tabular_canary_health
+from app.services.ip_restriction import ip_restriction_middleware
 from app.services.runtime_governance import get_runtime_governance_payload
 
 # ---------------------------------------------------------------------------
@@ -33,6 +35,13 @@ print(
     f"write={settings.SUPABASE_WRITE_TIMEOUT_SECONDS}s "
     f"pool={settings.SUPABASE_POOL_TIMEOUT_SECONDS}s"
 )
+
+if settings.AUDIT_LOG_ENABLED:
+    print(
+        f"[STARTUP] audit_logger=enabled | skip_paths={settings.AUDIT_LOG_SKIP_PATHS}"
+    )
+else:
+    print("[STARTUP] audit_logger=disabled (AUDIT_LOG_ENABLED=false)")
 
 # [TRIGGER VALIDATION 2026-06-10] Health check log marker.
 # Este print se usa para validar que el trigger promdata-backend-auto-deploy
@@ -107,6 +116,20 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
+# [Fase 3.1] Enterprise audit logging middleware — registra cada request
+# autenticado en la tabla audit_logs (asíncrono, no bloqueante).
+# ---------------------------------------------------------------------------
+app.middleware("http")(audit_middleware)
+
+
+# ---------------------------------------------------------------------------
+# [Fase 3.2] IP restriction middleware — bloquea IPs fuera de ALLOWED_CIDRS.
+# Middleware es no-op si ALLOWED_CIDRS no está configurado.
+# ---------------------------------------------------------------------------
+app.middleware("http")(ip_restriction_middleware)
+
+
+# ---------------------------------------------------------------------------
 # [ENTERPRISE v1] Sanitización global de errores HTTP
 # IMPORTANTE: Registrar ANTES de include_router para que no interfiera
 # con las respuestas internas de preflight OPTIONS del CORSMiddleware.
@@ -134,6 +157,15 @@ async def _sanitize_http_errors(request: FastAPIRequest, exc: StarletteHTTPExcep
             status_code=exc.status_code,
             internal_detail=str(exc.detail)[:500],
         )
+        from app.services.slack_alert import send_alert
+        try:
+            await send_alert("CRITICAL", "Backend 500 error", {
+                "path": str(request.url.path),
+                "method": request.method,
+                "status_code": exc.status_code,
+            })
+        except Exception:
+            pass
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": "Error interno del servidor. Por favor, inténtelo de nuevo."},

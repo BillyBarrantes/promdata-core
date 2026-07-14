@@ -321,4 +321,18 @@ class Settings:
         os.getenv("SUPABASE_POOL_TIMEOUT_SECONDS", "3.0")
     )
 
+    # ------------------------------------------------------------------ #
+    # Fase 3.1: Audit logging
+    # ------------------------------------------------------------------ #
+    AUDIT_LOG_ENABLED: bool = _env_bool("AUDIT_LOG_ENABLED", True)
+    AUDIT_LOG_BODY_MAX_BYTES: int = int(os.getenv("AUDIT_LOG_BODY_MAX_BYTES", "1024"))
+    AUDIT_LOG_SKIP_PATHS: str = os.getenv(
+        "AUDIT_LOG_SKIP_PATHS", "/health,/health/live,/health/ready,/health/observability"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Fase 3.5: Slack alerting
+    # ------------------------------------------------------------------ #
+    SLACK_ALERT_WEBHOOK_URL: str = os.getenv("SLACK_ALERT_WEBHOOK_URL", "")
+
 settings = Settings()

@@ -516,6 +516,12 @@ def start_analysis(
                 file_id=request_body.file_id,
                 reason=injection_reason,
             )
+            from app.services.slack_alert import send_alert_background
+            send_alert_background("WARNING", "Prompt injection detected", {
+                "user_id": current_user_id,
+                "file_id": request_body.file_id,
+                "reason": injection_reason,
+            })
             raise HTTPException(status_code=400, detail=injection_reason)
 
         new_task_id = uuid.uuid4()
@@ -1117,6 +1123,12 @@ def ask_knowledge_documents(
                 reason=injection_reason,
                 endpoint="knowledge_ask",
             )
+            from app.services.slack_alert import send_alert_background
+            send_alert_background("WARNING", "Prompt injection detected", {
+                "user_id": user.id,
+                "reason": injection_reason,
+                "endpoint": "knowledge_ask",
+            })
             raise HTTPException(status_code=400, detail=injection_reason)
 
         service_client = get_supabase_service_client()
