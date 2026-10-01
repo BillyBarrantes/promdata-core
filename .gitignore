@@ -18,6 +18,11 @@ yarn-error.log*
 
 # env files
 .env*
+# [P0-4 FIX 2026-07-25] Los archivos .env*.example SÍ se versionan:
+# test_phase6_platform_env_contract.py los exige en repo como contrato
+# de configuración de plataforma. Contienen placeholders, nunca secretos.
+!.env.example
+!.env.*.example
 
 # vercel
 .vercel
@@ -31,5 +36,31 @@ backend/venv/
 .venv/
 venv/backend/google-credentials.json
 backend/.tmp/
+/backups/
 __pycache__/
 *.pyc
+
+# OS metadata
+.DS_Store
+*/.DS_Store
+
+# local tooling / working artifacts (no son parte del producto)
+.opencode/
+opencode.jsonc
+.opencodeignore
+scratch/
+ref_analisis/
+test-video/
+implementation_plan.md
+handoff-modo-nocturno.md
+.agents/skills/captions-overlay/
+
+# test artifacts
+test-results/
+e2e/results/
+e2e/.auth/
+backend/test_output.txt
+
+# supabase CLI local state
+supabase/.temp/
+supabase/.branches/
