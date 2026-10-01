@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "ground_truth_version": "1.0",
+    "seed": 42,
+    "engine": "DuckDB-Ibis-canonical"
+  },
+  "ventas_retail": {
+    "total_filas": 1000,
+    "total_ingresos": 1561828.66,
+    "total_costo": 948816.41,
+    "total_margen": 613012.25,
+    "total_unidades": 11117,
+    "margen_por_canal": {
+      "Distribuidores": {
+        "margen_promedio": 847.62,
+        "total_ingresos": 594716.83,
+        "unidades": 4426
+      },
+      "E-commerce": {
+        "margen_promedio": 314.74,
+        "total_ingresos": 176870.13,
+        "unidades": 1074
+      },
+      "Tienda Fisica": {
+        "margen_promedio": 275.91,
+        "total_ingresos": 160442.32,
+        "unidades": 1094
+      },
+      "Ventas B2B": {
+        "margen_promedio": 979.4,
+        "total_ingresos": 629799.38,
+        "unidades": 4523
+      }
+    },
+    "top_5_productos": [
+      {
+        "producto": "Laptop Pro 15",
+        "total_ingresos": 603836.61,
+        "unidades": 856
+      },
+      {
+        "producto": "Monitor 4K 27",
+        "total_ingresos": 349454.86,
+        "unidades": 1239
+      },
+      {
+        "producto": "Impresora Laser Multifuncion",
+        "total_ingresos": 188677.23,
+        "unidades": 1002
+      },
+      {
+        "producto": "Teclado Mecanico RGB",
+        "total_ingresos": 83822.33,
+        "unidades": 1271
+      },
+      {
+        "producto": "Disco SSD 1TB NVMe",
+        "total_ingresos": 83200.03,
+        "unidades": 995
+      }
+    ],
+    "ventas_mensuales_2024": [
+      {
+        "mes": "2024-01",
+        "total_ingresos": 105272.37,
+        "unidades": 842
+      },
+      {
+        "mes": "2024-02",
+        "total_ingresos": 103927.81,
+        "unidades": 850
+      },
+      {
+        "mes": "2024-03",
+        "total_ingresos": 152888.02,
+        "unidades": 1039
+      },
+      {
+        "mes": "2024-04",
+        "total_ingresos": 91424.8,
+        "unidades": 667
+      },
+      {
+        "mes": "2024-05",
+        "total_ingresos": 177661.61,
+        "unidades": 1206
+      },
+      {
+        "mes": "2024-06",
+        "total_ingresos": 97641.44,
+        "unidades": 850
+      },
+      {
+        "mes": "2024-07",
+        "total_ingresos": 160468.36,
+        "unidades": 976
+      },
+      {
+        "mes": "2024-08",
+        "total_ingresos": 106287.19,
+        "unidades": 820
+      },
+      {
+        "mes": "2024-09",
+        "total_ingresos": 127156.26,
+        "unidades": 1034
+      },
+      {
+        "mes": "2024-10",
+        "total_ingresos": 150534.14,
+        "unidades": 969
+      },
+      {
+        "mes": "2024-11",
+        "total_ingresos": 131893.68,
+        "unidades": 864
+      },
+      {
+        "mes": "2024-12",
+        "total_ingresos": 156672.98,
+        "unidades": 1000
+      }
+    ]
+  },
+  "inventario_snapshots": {
+    "total_filas": 1200,
+    "suma_historica_erronea_stock": 131914,
+    "max_fecha_corte": "2024-04-30",
+    "num_cortes": 4,
+    "stock_actual_corte_max": 34395,
+    "valor_inventario_actual": 6282584.41,
+    "stock_por_almacen_actual": {
+      "ALM-CENTRO": 10532,
+      "ALM-NORTE": 12431,
+      "ALM-SUR": 11432
+    },
+    "skus_criticos_count": 33
+  },
+  "finanzas_flujo": {
+    "total_filas": 800,
+    "total_ingresos": 2519853.93,
+    "total_egresos": 1984124.65,
+    "flujo_neto_total": 535729.28,
+    "flujo_por_trimestre": {
+      "2024-Q1": {
+        "ingresos": 592314.02,
+        "egresos": 448479.22,
+        "flujo_neto": 143834.8
+      },
+      "2024-Q2": {
+        "ingresos": 599074.26,
+        "egresos": 495343.68,
+        "flujo_neto": 103730.58
+      },
+      "2024-Q3": {
+        "ingresos": 605142.41,
+        "egresos": 451206.88,
+        "flujo_neto": 153935.53
+      },
+      "2024-Q4": {
+        "ingresos": 723323.24,
+        "egresos": 589094.87,
+        "flujo_neto": 134228.37
+      }
+    },
+    "gasto_por_centro_costo": {
+      "Administracion": 551494.92,
+      "Tecnologia": 505080.28,
+      "Ventas": 465610.32,
+      "Operaciones": 461939.13
+    }
+  }
+}

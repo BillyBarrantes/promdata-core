@@ -1,0 +1,1001 @@
+fecha,region,producto,canal,unidades,costo_unitario,precio_venta,ingreso_total,margen
+2024-01-01,Occidente,Impresora Laser Multifuncion,E-commerce,7,118.5,201.01,1407.07,577.57
+2024-01-01,Norte,Hub USB-C 7 en 1,Distribuidores,21,15.04,29.52,619.92,304.08
+2024-01-01,Occidente,Teclado Mecanico RGB,Distribuidores,14,34.96,61.05,854.7,365.26
+2024-01-02,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,14,37.29,67.53,945.42,423.36
+2024-01-04,Sur,Disco SSD 1TB NVMe,Distribuidores,13,44.38,82.3,1069.9,492.96
+2024-01-04,Occidente,Monitor 4K 27,Tienda Fisica,2,178.98,299.05,598.1,240.14
+2024-01-04,Occidente,Camara Web 1080p,Tienda Fisica,1,21.89,44.2,44.2,22.31
+2024-01-04,Occidente,Impresora Laser Multifuncion,E-commerce,7,121.83,198.25,1387.75,534.94
+2024-01-05,Sur,Teclado Mecanico RGB,Distribuidores,16,35.55,64.63,1034.08,465.28
+2024-01-06,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,23,38.36,68.08,1565.84,683.56
+2024-01-07,Norte,Camara Web 1080p,Distribuidores,22,22.42,39.33,865.26,372.02
+2024-01-07,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,22,38.47,68.84,1514.48,668.14
+2024-01-08,Norte,Mouse Inalambrico Ergo,E-commerce,7,17.99,38.82,271.74,145.81
+2024-01-08,Centro,Mouse Inalambrico Ergo,Distribuidores,5,17.77,34.6,173.0,84.15
+2024-01-08,Centro,Disco SSD 1TB NVMe,E-commerce,4,45.46,86.68,346.72,164.88
+2024-01-09,Norte,Auriculares USB-C,E-commerce,7,25.19,49.41,345.87,169.54
+2024-01-09,Sur,Mouse Inalambrico Ergo,Tienda Fisica,2,18.07,39.37,78.74,42.6
+2024-01-09,Norte,Teclado Mecanico RGB,Ventas B2B,19,34.3,68.23,1296.37,644.67
+2024-01-09,Occidente,Monitor 4K 27,Tienda Fisica,5,177.95,306.58,1532.9,643.15
+2024-01-09,Sur,Camara Web 1080p,Ventas B2B,9,22.09,41.92,377.28,178.47
+2024-01-10,Sur,Laptop Pro 15,Tienda Fisica,3,458.5,740.2,2220.6,845.1
+2024-01-11,Occidente,Teclado Mecanico RGB,E-commerce,3,34.96,68.28,204.84,99.96
+2024-01-11,Norte,Monitor 4K 27,Ventas B2B,19,179.14,284.86,5412.34,2008.68
+2024-01-15,Norte,Auriculares USB-C,E-commerce,5,24.54,50.28,251.4,128.7
+2024-01-15,Oriente,Impresora Laser Multifuncion,Ventas B2B,28,118.39,188.68,5283.04,1968.12
+2024-01-15,Oriente,Monitor 4K 27,Distribuidores,7,179.16,273.76,1916.32,662.2
+2024-01-16,Sur,Hub USB-C 7 en 1,Ventas B2B,6,14.78,30.39,182.34,93.66
+2024-01-17,Centro,Disco SSD 1TB NVMe,Distribuidores,7,44.48,82.23,575.61,264.25
+2024-01-17,Centro,Mouse Inalambrico Ergo,Distribuidores,10,18.2,35.69,356.9,174.9
+2024-01-17,Occidente,Hub USB-C 7 en 1,Distribuidores,15,15.25,28.46,426.9,198.15
+2024-01-18,Norte,Hub USB-C 7 en 1,Ventas B2B,27,14.92,31.02,837.54,434.7
+2024-01-19,Oriente,Memoria RAM 16GB DDR5,E-commerce,5,38.57,69.88,349.4,156.55
+2024-01-19,Occidente,Disco SSD 1TB NVMe,E-commerce,6,44.55,91.22,547.32,280.02
+2024-01-19,Occidente,Auriculares USB-C,Ventas B2B,25,25.28,47.11,1177.75,545.75
+2024-01-20,Sur,Auriculares USB-C,Ventas B2B,9,25.12,48.01,432.09,206.01
+2024-01-20,Sur,Monitor 4K 27,Ventas B2B,21,176.58,283.75,5958.75,2250.57
+2024-01-21,Sur,Memoria RAM 16GB DDR5,Ventas B2B,21,38.03,67.0,1407.0,608.37
+2024-01-21,Norte,Laptop Pro 15,E-commerce,6,455.47,750.87,4505.22,1772.4
+2024-01-21,Sur,Camara Web 1080p,Tienda Fisica,5,21.58,45.32,226.6,118.7
+2024-01-22,Oriente,Hub USB-C 7 en 1,E-commerce,6,15.06,32.5,195.0,104.64
+2024-01-22,Centro,Hub USB-C 7 en 1,Ventas B2B,13,15.08,31.41,408.33,212.29
+2024-01-22,Oriente,Impresora Laser Multifuncion,Distribuidores,20,121.91,183.19,3663.8,1225.6
+2024-01-22,Occidente,Memoria RAM 16GB DDR5,E-commerce,6,38.41,70.91,425.46,195.0
+2024-01-22,Occidente,Disco SSD 1TB NVMe,Distribuidores,17,45.2,81.27,1381.59,613.19
+2024-01-22,Sur,Camara Web 1080p,Ventas B2B,28,21.59,42.46,1188.88,584.36
+2024-01-22,Sur,Monitor 4K 27,Tienda Fisica,1,179.78,306.33,306.33,126.55
+2024-01-23,Oriente,Laptop Pro 15,E-commerce,6,448.76,770.2,4621.2,1928.64
+2024-01-23,Norte,Laptop Pro 15,E-commerce,3,455.14,749.33,2247.99,882.57
+2024-01-23,Norte,Auriculares USB-C,Tienda Fisica,2,25.28,51.25,102.5,51.94
+2024-01-24,Sur,Memoria RAM 16GB DDR5,Tienda Fisica,8,37.87,72.56,580.48,277.52
+2024-01-24,Oriente,Impresora Laser Multifuncion,Ventas B2B,9,118.46,194.27,1748.43,682.29
+2024-01-25,Sur,Impresora Laser Multifuncion,Distribuidores,19,122.19,180.37,3427.03,1105.42
+2024-01-26,Occidente,Memoria RAM 16GB DDR5,Distribuidores,29,38.45,65.22,1891.38,776.33
+2024-01-26,Sur,Hub USB-C 7 en 1,Ventas B2B,28,14.94,30.0,840.0,421.68
+2024-01-26,Oriente,Hub USB-C 7 en 1,Ventas B2B,9,14.73,29.96,269.64,137.07
+2024-01-26,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,4,37.9,73.24,292.96,141.36
+2024-01-26,Norte,Disco SSD 1TB NVMe,Tienda Fisica,2,44.87,87.29,174.58,84.84
+2024-01-28,Norte,Laptop Pro 15,Ventas B2B,28,447.11,727.96,20382.88,7863.8
+2024-01-28,Sur,Teclado Mecanico RGB,Distribuidores,7,35.69,61.47,430.29,180.46
+2024-01-28,Sur,Auriculares USB-C,Tienda Fisica,4,25.41,49.71,198.84,97.2
+2024-01-28,Norte,Camara Web 1080p,Distribuidores,8,22.32,41.39,331.12,152.56
+2024-01-29,Norte,Mouse Inalambrico Ergo,Distribuidores,11,18.19,36.11,397.21,197.12
+2024-01-29,Oriente,Teclado Mecanico RGB,Ventas B2B,19,35.09,66.64,1266.16,599.45
+2024-01-29,Sur,Camara Web 1080p,Distribuidores,12,22.28,41.06,492.72,225.36
+2024-01-29,Sur,Auriculares USB-C,E-commerce,5,25.18,48.93,244.65,118.75
+2024-01-30,Occidente,Camara Web 1080p,Tienda Fisica,6,21.61,45.23,271.38,141.72
+2024-01-30,Norte,Disco SSD 1TB NVMe,Distribuidores,21,45.54,80.96,1700.16,743.82
+2024-01-30,Occidente,Disco SSD 1TB NVMe,Distribuidores,26,44.35,77.82,2023.32,870.22
+2024-01-31,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,5,37.86,73.16,365.8,176.5
+2024-01-31,Occidente,Impresora Laser Multifuncion,Distribuidores,24,120.19,177.2,4252.8,1368.24
+2024-01-31,Centro,Teclado Mecanico RGB,Tienda Fisica,8,34.94,68.52,548.16,268.64
+2024-02-01,Sur,Disco SSD 1TB NVMe,Ventas B2B,29,45.15,85.54,2480.66,1171.31
+2024-02-01,Oriente,Auriculares USB-C,E-commerce,2,25.45,50.96,101.92,51.02
+2024-02-01,Oriente,Monitor 4K 27,Distribuidores,27,177.01,271.46,7329.42,2550.15
+2024-02-01,Centro,Mouse Inalambrico Ergo,Tienda Fisica,6,18.23,38.56,231.36,121.98
+2024-02-01,Oriente,Hub USB-C 7 en 1,E-commerce,1,15.09,32.09,32.09,17.0
+2024-02-02,Centro,Impresora Laser Multifuncion,Tienda Fisica,4,122.29,201.03,804.12,314.96
+2024-02-02,Oriente,Camara Web 1080p,Tienda Fisica,1,22.24,45.06,45.06,22.82
+2024-02-03,Sur,Memoria RAM 16GB DDR5,Tienda Fisica,2,37.83,70.61,141.22,65.56
+2024-02-04,Sur,Disco SSD 1TB NVMe,Tienda Fisica,4,45.14,86.54,346.16,165.6
+2024-02-04,Norte,Disco SSD 1TB NVMe,Ventas B2B,22,44.69,83.41,1835.02,851.84
+2024-02-05,Occidente,Impresora Laser Multifuncion,Tienda Fisica,7,121.55,194.29,1360.03,509.18
+2024-02-05,Occidente,Mouse Inalambrico Ergo,Tienda Fisica,7,18.33,40.25,281.75,153.44
+2024-02-06,Norte,Teclado Mecanico RGB,Distribuidores,12,34.74,63.49,761.88,345.0
+2024-02-06,Norte,Mouse Inalambrico Ergo,Ventas B2B,7,17.98,37.84,264.88,139.02
+2024-02-07,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,2,38.06,72.03,144.06,67.94
+2024-02-07,Norte,Hub USB-C 7 en 1,Distribuidores,29,14.97,29.95,868.55,434.42
+2024-02-08,Norte,Laptop Pro 15,Ventas B2B,9,456.17,701.02,6309.18,2203.65
+2024-02-08,Centro,Hub USB-C 7 en 1,Ventas B2B,29,14.9,31.12,902.48,470.38
+2024-02-08,Norte,Auriculares USB-C,E-commerce,8,25.49,49.38,395.04,191.12
+2024-02-08,Norte,Camara Web 1080p,Tienda Fisica,7,22.24,44.22,309.54,153.86
+2024-02-08,Occidente,Teclado Mecanico RGB,Ventas B2B,15,34.79,67.98,1019.7,497.85
+2024-02-09,Occidente,Hub USB-C 7 en 1,Distribuidores,24,14.73,28.98,695.52,342.0
+2024-02-09,Norte,Teclado Mecanico RGB,Distribuidores,8,35.28,62.9,503.2,220.96
+2024-02-10,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,3,37.44,71.89,215.67,103.35
+2024-02-10,Centro,Memoria RAM 16GB DDR5,Distribuidores,28,37.97,63.64,1781.92,718.76
+2024-02-10,Occidente,Laptop Pro 15,Ventas B2B,17,452.05,713.4,12127.8,4442.95
+2024-02-10,Oriente,Teclado Mecanico RGB,Ventas B2B,27,35.21,65.15,1759.05,808.38
+2024-02-10,Oriente,Monitor 4K 27,Tienda Fisica,1,181.98,303.62,303.62,121.64
+2024-02-11,Oriente,Hub USB-C 7 en 1,Distribuidores,13,14.82,29.63,385.19,192.53
+2024-02-11,Centro,Hub USB-C 7 en 1,E-commerce,2,14.78,32.74,65.48,35.92
+2024-02-11,Occidente,Memoria RAM 16GB DDR5,Distribuidores,7,38.63,63.29,443.03,172.62
+2024-02-11,Norte,Monitor 4K 27,Ventas B2B,17,179.12,283.64,4821.88,1776.84
+2024-02-11,Norte,Laptop Pro 15,E-commerce,2,453.72,754.22,1508.44,601.0
+2024-02-12,Oriente,Teclado Mecanico RGB,Ventas B2B,10,34.37,65.92,659.2,315.5
+2024-02-12,Centro,Teclado Mecanico RGB,Ventas B2B,27,35.4,65.03,1755.81,800.01
+2024-02-12,Centro,Teclado Mecanico RGB,Tienda Fisica,7,35.18,70.85,495.95,249.69
+2024-02-12,Centro,Hub USB-C 7 en 1,Ventas B2B,13,14.81,31.26,406.38,213.85
+2024-02-12,Norte,Auriculares USB-C,E-commerce,2,25.15,51.15,102.3,52.0
+2024-02-13,Occidente,Mouse Inalambrico Ergo,E-commerce,7,17.76,38.95,272.65,148.33
+2024-02-13,Occidente,Hub USB-C 7 en 1,Distribuidores,7,14.71,28.49,199.43,96.46
+2024-02-13,Occidente,Disco SSD 1TB NVMe,E-commerce,7,45.09,86.56,605.92,290.29
+2024-02-14,Centro,Impresora Laser Multifuncion,Tienda Fisica,5,121.88,203.2,1016.0,406.6
+2024-02-14,Oriente,Monitor 4K 27,E-commerce,4,182.24,300.58,1202.32,473.36
+2024-02-14,Centro,Hub USB-C 7 en 1,Ventas B2B,11,14.76,30.33,333.63,171.27
+2024-02-15,Occidente,Mouse Inalambrico Ergo,Tienda Fisica,3,17.94,40.3,120.9,67.08
+2024-02-15,Norte,Hub USB-C 7 en 1,Ventas B2B,9,15.27,31.39,282.51,145.08
+2024-02-15,Oriente,Auriculares USB-C,Distribuidores,18,24.76,44.46,800.28,354.6
+2024-02-15,Sur,Mouse Inalambrico Ergo,Ventas B2B,22,18.31,36.45,801.9,399.08
+2024-02-16,Sur,Hub USB-C 7 en 1,Tienda Fisica,1,15.17,32.0,32.0,16.83
+2024-02-16,Sur,Auriculares USB-C,Tienda Fisica,4,25.34,49.47,197.88,96.52
+2024-02-16,Sur,Impresora Laser Multifuncion,Ventas B2B,21,117.83,186.77,3922.17,1447.74
+2024-02-16,Norte,Memoria RAM 16GB DDR5,Distribuidores,10,38.31,66.19,661.9,278.8
+2024-02-17,Oriente,Auriculares USB-C,Tienda Fisica,1,24.83,48.88,48.88,24.05
+2024-02-17,Oriente,Monitor 4K 27,Distribuidores,30,177.34,262.0,7860.0,2539.8
+2024-02-17,Centro,Mouse Inalambrico Ergo,E-commerce,6,17.88,39.01,234.06,126.78
+2024-02-17,Centro,Impresora Laser Multifuncion,Distribuidores,17,121.54,181.88,3091.96,1025.78
+2024-02-18,Sur,Disco SSD 1TB NVMe,Tienda Fisica,5,45.66,87.01,435.05,206.75
+2024-02-21,Oriente,Teclado Mecanico RGB,Distribuidores,5,34.36,64.03,320.15,148.35
+2024-02-21,Centro,Hub USB-C 7 en 1,Tienda Fisica,4,14.89,32.4,129.6,70.04
+2024-02-22,Norte,Impresora Laser Multifuncion,Distribuidores,14,118.26,182.04,2548.56,892.92
+2024-02-22,Sur,Camara Web 1080p,Distribuidores,22,21.84,39.63,871.86,391.38
+2024-02-23,Oriente,Impresora Laser Multifuncion,E-commerce,5,118.81,193.44,967.2,373.15
+2024-02-24,Oriente,Mouse Inalambrico Ergo,E-commerce,8,17.68,38.91,311.28,169.84
+2024-02-24,Norte,Monitor 4K 27,Ventas B2B,24,176.45,290.14,6963.36,2728.56
+2024-02-24,Centro,Camara Web 1080p,Tienda Fisica,5,22.03,44.73,223.65,113.5
+2024-02-25,Sur,Monitor 4K 27,E-commerce,8,179.76,297.32,2378.56,940.48
+2024-02-26,Sur,Teclado Mecanico RGB,Ventas B2B,24,34.39,65.93,1582.32,756.96
+2024-02-26,Oriente,Hub USB-C 7 en 1,Tienda Fisica,4,15.13,32.09,128.36,67.84
+2024-02-27,Centro,Auriculares USB-C,E-commerce,1,24.74,50.19,50.19,25.45
+2024-02-27,Occidente,Teclado Mecanico RGB,E-commerce,8,34.82,68.54,548.32,269.76
+2024-02-28,Sur,Auriculares USB-C,Tienda Fisica,1,25.43,50.22,50.22,24.79
+2024-02-28,Oriente,Monitor 4K 27,E-commerce,8,183.12,295.27,2362.16,897.2
+2024-02-28,Centro,Impresora Laser Multifuncion,Ventas B2B,24,118.43,191.02,4584.48,1742.16
+2024-02-28,Oriente,Auriculares USB-C,Distribuidores,5,25.41,45.86,229.3,102.25
+2024-02-29,Sur,Hub USB-C 7 en 1,Ventas B2B,7,15.24,30.77,215.39,108.71
+2024-02-29,Sur,Impresora Laser Multifuncion,E-commerce,7,119.61,194.68,1362.76,525.49
+2024-02-29,Norte,Teclado Mecanico RGB,Ventas B2B,17,34.97,66.31,1127.27,532.78
+2024-02-29,Norte,Mouse Inalambrico Ergo,Ventas B2B,23,18.06,37.34,858.82,443.44
+2024-03-01,Oriente,Laptop Pro 15,Tienda Fisica,8,457.01,750.02,6000.16,2344.08
+2024-03-01,Oriente,Laptop Pro 15,Tienda Fisica,7,448.42,752.57,5267.99,2129.05
+2024-03-01,Sur,Disco SSD 1TB NVMe,Distribuidores,28,44.3,80.94,2266.32,1025.92
+2024-03-01,Sur,Impresora Laser Multifuncion,E-commerce,1,121.27,203.54,203.54,82.27
+2024-03-01,Occidente,Monitor 4K 27,Distribuidores,29,183.5,269.22,7807.38,2485.88
+2024-03-01,Sur,Teclado Mecanico RGB,E-commerce,4,34.73,68.68,274.72,135.8
+2024-03-02,Oriente,Teclado Mecanico RGB,Ventas B2B,7,34.62,64.77,453.39,211.05
+2024-03-02,Sur,Hub USB-C 7 en 1,Tienda Fisica,7,14.73,32.55,227.85,124.74
+2024-03-03,Oriente,Teclado Mecanico RGB,Ventas B2B,26,35.04,66.64,1732.64,821.6
+2024-03-03,Norte,Mouse Inalambrico Ergo,Ventas B2B,25,18.21,37.43,935.75,480.5
+2024-03-03,Sur,Monitor 4K 27,Ventas B2B,10,182.87,283.11,2831.1,1002.4
+2024-03-04,Occidente,Teclado Mecanico RGB,Distribuidores,10,34.53,64.55,645.5,300.2
+2024-03-04,Occidente,Disco SSD 1TB NVMe,Distribuidores,18,44.67,78.37,1410.66,606.6
+2024-03-05,Occidente,Mouse Inalambrico Ergo,Tienda Fisica,4,18.06,40.24,160.96,88.72
+2024-03-05,Sur,Auriculares USB-C,Tienda Fisica,4,24.67,48.8,195.2,96.52
+2024-03-05,Oriente,Laptop Pro 15,E-commerce,2,443.71,749.71,1499.42,612.0
+2024-03-05,Oriente,Auriculares USB-C,Distribuidores,10,24.71,45.55,455.5,208.4
+2024-03-06,Norte,Auriculares USB-C,Distribuidores,30,25.47,43.75,1312.5,548.4
+2024-03-06,Occidente,Camara Web 1080p,Tienda Fisica,7,22.08,45.44,318.08,163.52
+2024-03-06,Norte,Camara Web 1080p,Ventas B2B,20,22.39,41.55,831.0,383.2
+2024-03-07,Occidente,Auriculares USB-C,E-commerce,2,25.16,48.57,97.14,46.82
+2024-03-07,Centro,Teclado Mecanico RGB,Distribuidores,6,34.33,63.24,379.44,173.46
+2024-03-07,Sur,Laptop Pro 15,E-commerce,2,449.74,731.94,1463.88,564.4
+2024-03-08,Centro,Monitor 4K 27,E-commerce,6,178.45,297.89,1787.34,716.64
+2024-03-08,Occidente,Impresora Laser Multifuncion,Distribuidores,10,118.83,182.59,1825.9,637.6
+2024-03-08,Sur,Teclado Mecanico RGB,Distribuidores,12,35.37,63.58,762.96,338.52
+2024-03-08,Sur,Camara Web 1080p,Distribuidores,27,21.66,40.14,1083.78,498.96
+2024-03-08,Oriente,Impresora Laser Multifuncion,Ventas B2B,19,121.14,183.62,3488.78,1187.12
+2024-03-08,Norte,Memoria RAM 16GB DDR5,Distribuidores,14,38.29,63.4,887.6,351.54
+2024-03-09,Centro,Monitor 4K 27,Tienda Fisica,3,178.36,300.88,902.64,367.56
+2024-03-09,Oriente,Teclado Mecanico RGB,Ventas B2B,28,35.68,65.9,1845.2,846.16
+2024-03-09,Oriente,Mouse Inalambrico Ergo,Distribuidores,11,17.88,34.65,381.15,184.47
+2024-03-09,Sur,Monitor 4K 27,Tienda Fisica,3,179.57,302.99,908.97,370.26
+2024-03-09,Oriente,Laptop Pro 15,Tienda Fisica,7,456.1,749.23,5244.61,2051.91
+2024-03-09,Centro,Laptop Pro 15,Ventas B2B,27,448.88,703.72,19000.44,6880.68
+2024-03-09,Norte,Monitor 4K 27,Tienda Fisica,3,181.59,298.76,896.28,351.51
+2024-03-09,Norte,Hub USB-C 7 en 1,Ventas B2B,29,14.79,31.58,915.82,486.91
+2024-03-10,Oriente,Camara Web 1080p,E-commerce,8,21.91,45.19,361.52,186.24
+2024-03-10,Oriente,Teclado Mecanico RGB,E-commerce,6,34.39,70.04,420.24,213.9
+2024-03-10,Centro,Teclado Mecanico RGB,Tienda Fisica,5,34.81,70.47,352.35,178.3
+2024-03-11,Sur,Monitor 4K 27,Distribuidores,30,177.13,273.47,8204.1,2890.2
+2024-03-11,Sur,Impresora Laser Multifuncion,Ventas B2B,23,121.89,194.57,4475.11,1671.64
+2024-03-11,Centro,Impresora Laser Multifuncion,E-commerce,4,118.83,196.62,786.48,311.16
+2024-03-12,Occidente,Memoria RAM 16GB DDR5,E-commerce,1,38.04,73.46,73.46,35.42
+2024-03-13,Norte,Laptop Pro 15,E-commerce,5,451.71,764.59,3822.95,1564.4
+2024-03-13,Centro,Monitor 4K 27,Tienda Fisica,4,182.86,299.35,1197.4,465.96
+2024-03-13,Norte,Camara Web 1080p,Distribuidores,7,21.89,41.57,290.99,137.76
+2024-03-14,Oriente,Teclado Mecanico RGB,Tienda Fisica,8,35.39,68.91,551.28,268.16
+2024-03-14,Oriente,Monitor 4K 27,Distribuidores,10,180.46,270.18,2701.8,897.2
+2024-03-14,Centro,Teclado Mecanico RGB,Tienda Fisica,8,34.77,71.94,575.52,297.36
+2024-03-14,Sur,Auriculares USB-C,Ventas B2B,21,25.49,46.25,971.25,435.96
+2024-03-14,Norte,Teclado Mecanico RGB,Distribuidores,16,35.39,62.58,1001.28,435.04
+2024-03-15,Oriente,Hub USB-C 7 en 1,Ventas B2B,7,14.74,30.36,212.52,109.34
+2024-03-15,Sur,Impresora Laser Multifuncion,Ventas B2B,25,120.54,187.97,4699.25,1685.75
+2024-03-15,Occidente,Teclado Mecanico RGB,Ventas B2B,29,35.69,67.48,1956.92,921.91
+2024-03-16,Sur,Impresora Laser Multifuncion,Tienda Fisica,8,120.34,193.62,1548.96,586.24
+2024-03-17,Occidente,Camara Web 1080p,E-commerce,6,22.38,44.51,267.06,132.78
+2024-03-17,Sur,Auriculares USB-C,Tienda Fisica,1,25.46,50.17,50.17,24.71
+2024-03-17,Norte,Laptop Pro 15,Ventas B2B,13,443.73,705.23,9167.99,3399.5
+2024-03-19,Sur,Monitor 4K 27,Ventas B2B,18,178.78,283.47,5102.46,1884.42
+2024-03-20,Oriente,Mouse Inalambrico Ergo,Tienda Fisica,6,18.25,39.19,235.14,125.64
+2024-03-20,Norte,Teclado Mecanico RGB,Distribuidores,24,34.37,64.54,1548.96,724.08
+2024-03-21,Norte,Auriculares USB-C,Ventas B2B,16,25.17,47.22,755.52,352.8
+2024-03-22,Sur,Hub USB-C 7 en 1,E-commerce,8,15.26,31.6,252.8,130.72
+2024-03-23,Centro,Disco SSD 1TB NVMe,Ventas B2B,14,45.29,84.04,1176.56,542.5
+2024-03-23,Occidente,Auriculares USB-C,E-commerce,3,25.34,50.57,151.71,75.69
+2024-03-24,Oriente,Auriculares USB-C,E-commerce,1,25.24,50.86,50.86,25.62
+2024-03-24,Norte,Mouse Inalambrico Ergo,E-commerce,4,18.24,40.2,160.8,87.84
+2024-03-26,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,16,38.07,66.76,1068.16,459.04
+2024-03-26,Sur,Mouse Inalambrico Ergo,E-commerce,1,17.94,40.66,40.66,22.72
+2024-03-26,Norte,Teclado Mecanico RGB,Tienda Fisica,3,34.45,71.62,214.86,111.51
+2024-03-26,Centro,Teclado Mecanico RGB,Ventas B2B,24,35.66,66.95,1606.8,750.96
+2024-03-26,Centro,Hub USB-C 7 en 1,Tienda Fisica,7,15.17,31.54,220.78,114.59
+2024-03-27,Occidente,Hub USB-C 7 en 1,E-commerce,3,15.1,32.93,98.79,53.49
+2024-03-27,Norte,Impresora Laser Multifuncion,E-commerce,4,121.02,200.68,802.72,318.64
+2024-03-28,Norte,Laptop Pro 15,Distribuidores,15,456.56,673.67,10105.05,3256.65
+2024-03-28,Centro,Hub USB-C 7 en 1,E-commerce,3,15.22,31.87,95.61,49.95
+2024-03-28,Centro,Impresora Laser Multifuncion,E-commerce,2,119.55,201.56,403.12,164.02
+2024-03-29,Oriente,Camara Web 1080p,Distribuidores,22,21.87,41.16,905.52,424.38
+2024-03-29,Occidente,Teclado Mecanico RGB,Ventas B2B,14,34.5,65.67,919.38,436.38
+2024-03-29,Sur,Mouse Inalambrico Ergo,Distribuidores,30,18.17,35.25,1057.5,512.4
+2024-03-29,Oriente,Hub USB-C 7 en 1,Tienda Fisica,5,14.72,33.1,165.5,91.9
+2024-03-30,Norte,Disco SSD 1TB NVMe,Ventas B2B,22,45.45,83.28,1832.16,832.26
+2024-03-30,Oriente,Auriculares USB-C,Distribuidores,9,24.68,43.65,392.85,170.73
+2024-03-30,Oriente,Disco SSD 1TB NVMe,Distribuidores,23,45.28,81.71,1879.33,837.89
+2024-03-30,Occidente,Memoria RAM 16GB DDR5,E-commerce,4,37.52,71.49,285.96,135.88
+2024-03-31,Occidente,Hub USB-C 7 en 1,Ventas B2B,25,15.15,31.57,789.25,410.5
+2024-03-31,Centro,Disco SSD 1TB NVMe,Tienda Fisica,2,45.33,89.51,179.02,88.36
+2024-04-01,Sur,Camara Web 1080p,Tienda Fisica,7,21.62,44.91,314.37,163.03
+2024-04-02,Occidente,Auriculares USB-C,Distribuidores,8,24.58,45.43,363.44,166.8
+2024-04-02,Centro,Monitor 4K 27,Ventas B2B,9,181.73,287.89,2591.01,955.44
+2024-04-02,Occidente,Mouse Inalambrico Ergo,Distribuidores,11,17.64,34.53,379.83,185.79
+2024-04-03,Oriente,Mouse Inalambrico Ergo,Distribuidores,30,17.83,35.08,1052.4,517.5
+2024-04-03,Occidente,Camara Web 1080p,Distribuidores,10,22.2,40.12,401.2,179.2
+2024-04-04,Centro,Memoria RAM 16GB DDR5,Tienda Fisica,2,37.83,72.82,145.64,69.98
+2024-04-05,Oriente,Camara Web 1080p,Ventas B2B,22,21.66,43.46,956.12,479.6
+2024-04-05,Oriente,Laptop Pro 15,Distribuidores,19,449.37,663.91,12614.29,4076.26
+2024-04-06,Norte,Laptop Pro 15,E-commerce,6,448.41,742.93,4457.58,1767.12
+2024-04-07,Norte,Memoria RAM 16GB DDR5,Distribuidores,18,37.47,65.54,1179.72,505.26
+2024-04-07,Sur,Laptop Pro 15,E-commerce,1,453.96,754.18,754.18,300.22
+2024-04-08,Centro,Camara Web 1080p,Tienda Fisica,2,21.71,46.23,92.46,49.04
+2024-04-08,Centro,Auriculares USB-C,Distribuidores,29,24.94,43.96,1274.84,551.58
+2024-04-09,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,12,37.46,69.17,830.04,380.52
+2024-04-09,Centro,Auriculares USB-C,E-commerce,6,24.63,50.57,303.42,155.64
+2024-04-09,Sur,Monitor 4K 27,E-commerce,6,182.68,304.86,1829.16,733.08
+2024-04-10,Occidente,Mouse Inalambrico Ergo,E-commerce,1,18.31,38.37,38.37,20.06
+2024-04-11,Sur,Impresora Laser Multifuncion,E-commerce,1,120.47,198.86,198.86,78.39
+2024-04-11,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,4,37.82,71.39,285.56,134.28
+2024-04-11,Centro,Impresora Laser Multifuncion,Ventas B2B,21,119.51,193.85,4070.85,1561.14
+2024-04-11,Occidente,Memoria RAM 16GB DDR5,Distribuidores,16,37.43,65.4,1046.4,447.52
+2024-04-12,Occidente,Teclado Mecanico RGB,Distribuidores,6,35.2,64.32,385.92,174.72
+2024-04-12,Norte,Mouse Inalambrico Ergo,Tienda Fisica,8,17.68,39.17,313.36,171.92
+2024-04-12,Occidente,Laptop Pro 15,Tienda Fisica,2,450.89,760.18,1520.36,618.58
+2024-04-12,Occidente,Disco SSD 1TB NVMe,E-commerce,8,44.3,89.22,713.76,359.36
+2024-04-13,Sur,Auriculares USB-C,E-commerce,5,24.59,49.57,247.85,124.9
+2024-04-14,Sur,Camara Web 1080p,Distribuidores,17,22.08,41.14,699.38,324.02
+2024-04-14,Oriente,Camara Web 1080p,Ventas B2B,10,21.89,42.89,428.9,210.0
+2024-04-14,Occidente,Laptop Pro 15,Distribuidores,18,458.45,676.68,12180.24,3928.14
+2024-04-15,Occidente,Memoria RAM 16GB DDR5,Distribuidores,20,37.39,65.66,1313.2,565.4
+2024-04-15,Sur,Disco SSD 1TB NVMe,Distribuidores,26,44.61,78.84,2049.84,889.98
+2024-04-15,Occidente,Mouse Inalambrico Ergo,E-commerce,6,17.66,38.66,231.96,126.0
+2024-04-16,Norte,Teclado Mecanico RGB,E-commerce,1,35.21,67.96,67.96,32.75
+2024-04-17,Oriente,Auriculares USB-C,Distribuidores,24,25.31,45.69,1096.56,489.12
+2024-04-18,Oriente,Impresora Laser Multifuncion,Distribuidores,29,121.82,176.72,5124.88,1592.1
+2024-04-18,Centro,Monitor 4K 27,E-commerce,4,177.65,291.38,1165.52,454.92
+2024-04-19,Sur,Mouse Inalambrico Ergo,E-commerce,5,18.11,39.53,197.65,107.1
+2024-04-19,Occidente,Disco SSD 1TB NVMe,Distribuidores,30,45.09,81.05,2431.5,1078.8
+2024-04-19,Norte,Hub USB-C 7 en 1,E-commerce,6,14.74,32.06,192.36,103.92
+2024-04-21,Oriente,Auriculares USB-C,Distribuidores,10,25.11,46.24,462.4,211.3
+2024-04-22,Sur,Camara Web 1080p,Tienda Fisica,3,21.93,45.1,135.3,69.51
+2024-04-22,Sur,Impresora Laser Multifuncion,Ventas B2B,16,120.08,183.49,2935.84,1014.56
+2024-04-22,Oriente,Impresora Laser Multifuncion,Tienda Fisica,6,117.86,200.69,1204.14,496.98
+2024-04-23,Sur,Memoria RAM 16GB DDR5,Distribuidores,14,38.49,66.24,927.36,388.5
+2024-04-23,Centro,Teclado Mecanico RGB,Tienda Fisica,2,35.04,68.62,137.24,67.16
+2024-04-23,Sur,Mouse Inalambrico Ergo,Ventas B2B,16,18.13,38.51,616.16,326.08
+2024-04-24,Norte,Mouse Inalambrico Ergo,Ventas B2B,15,17.84,36.56,548.4,280.8
+2024-04-24,Occidente,Auriculares USB-C,E-commerce,8,25.0,48.76,390.08,190.08
+2024-04-25,Oriente,Camara Web 1080p,Distribuidores,7,22.26,39.32,275.24,119.42
+2024-04-25,Centro,Camara Web 1080p,Distribuidores,7,21.78,40.83,285.81,133.35
+2024-04-25,Sur,Impresora Laser Multifuncion,Ventas B2B,26,118.26,191.66,4983.16,1908.4
+2024-04-27,Norte,Laptop Pro 15,Distribuidores,7,450.25,666.03,4662.21,1510.46
+2024-04-27,Norte,Disco SSD 1TB NVMe,Ventas B2B,11,45.16,86.26,948.86,452.1
+2024-04-29,Centro,Teclado Mecanico RGB,Tienda Fisica,5,35.5,68.41,342.05,164.55
+2024-04-29,Oriente,Monitor 4K 27,Tienda Fisica,1,177.94,291.43,291.43,113.49
+2024-04-30,Centro,Monitor 4K 27,Distribuidores,22,182.89,271.44,5971.68,1948.1
+2024-04-30,Oriente,Hub USB-C 7 en 1,Ventas B2B,25,14.89,30.66,766.5,394.25
+2024-05-01,Oriente,Hub USB-C 7 en 1,Distribuidores,29,15.15,29.16,845.64,406.29
+2024-05-01,Oriente,Laptop Pro 15,Distribuidores,22,451.3,673.68,14820.96,4892.36
+2024-05-01,Centro,Impresora Laser Multifuncion,E-commerce,2,121.54,201.03,402.06,158.98
+2024-05-01,Oriente,Teclado Mecanico RGB,E-commerce,6,34.38,68.91,413.46,207.18
+2024-05-02,Centro,Disco SSD 1TB NVMe,E-commerce,5,44.92,91.29,456.45,231.85
+2024-05-02,Sur,Auriculares USB-C,Tienda Fisica,7,24.59,51.47,360.29,188.16
+2024-05-02,Occidente,Disco SSD 1TB NVMe,E-commerce,7,44.18,90.31,632.17,322.91
+2024-05-02,Sur,Laptop Pro 15,E-commerce,4,441.94,746.1,2984.4,1216.64
+2024-05-02,Oriente,Disco SSD 1TB NVMe,Tienda Fisica,4,45.0,89.5,358.0,178.0
+2024-05-02,Occidente,Hub USB-C 7 en 1,Distribuidores,14,15.09,29.31,410.34,199.08
+2024-05-05,Norte,Disco SSD 1TB NVMe,Tienda Fisica,8,45.2,86.62,692.96,331.36
+2024-05-06,Occidente,Camara Web 1080p,Distribuidores,28,22.07,41.47,1161.16,543.2
+2024-05-06,Occidente,Auriculares USB-C,Distribuidores,20,24.89,44.07,881.4,383.6
+2024-05-07,Sur,Mouse Inalambrico Ergo,Ventas B2B,9,17.94,37.03,333.27,171.81
+2024-05-07,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,1,38.23,72.18,72.18,33.95
+2024-05-07,Centro,Teclado Mecanico RGB,Tienda Fisica,7,35.52,71.4,499.8,251.16
+2024-05-07,Sur,Impresora Laser Multifuncion,Distribuidores,9,118.09,179.14,1612.26,549.45
+2024-05-07,Centro,Disco SSD 1TB NVMe,Distribuidores,14,44.92,78.34,1096.76,467.88
+2024-05-07,Sur,Disco SSD 1TB NVMe,Ventas B2B,12,44.57,84.16,1009.92,475.08
+2024-05-07,Occidente,Teclado Mecanico RGB,Ventas B2B,28,34.45,66.96,1874.88,910.28
+2024-05-09,Occidente,Teclado Mecanico RGB,Distribuidores,7,35.12,61.56,430.92,185.08
+2024-05-09,Occidente,Auriculares USB-C,Distribuidores,18,25.4,45.94,826.92,369.72
+2024-05-09,Sur,Monitor 4K 27,E-commerce,1,182.53,306.76,306.76,124.23
+2024-05-09,Centro,Hub USB-C 7 en 1,Distribuidores,29,15.12,29.66,860.14,421.66
+2024-05-10,Norte,Memoria RAM 16GB DDR5,Distribuidores,26,38.07,63.14,1641.64,651.82
+2024-05-11,Sur,Teclado Mecanico RGB,Ventas B2B,8,35.39,65.36,522.88,239.76
+2024-05-11,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,10,38.35,67.79,677.9,294.4
+2024-05-11,Norte,Laptop Pro 15,Tienda Fisica,7,448.89,746.38,5224.66,2082.43
+2024-05-11,Occidente,Hub USB-C 7 en 1,Distribuidores,27,14.97,29.03,783.81,379.62
+2024-05-11,Centro,Laptop Pro 15,Ventas B2B,8,447.32,720.18,5761.44,2182.88
+2024-05-12,Sur,Hub USB-C 7 en 1,Tienda Fisica,3,14.89,33.24,99.72,55.05
+2024-05-13,Oriente,Mouse Inalambrico Ergo,Ventas B2B,29,17.83,37.14,1077.06,559.99
+2024-05-13,Occidente,Disco SSD 1TB NVMe,Distribuidores,24,44.6,80.97,1943.28,872.88
+2024-05-14,Occidente,Teclado Mecanico RGB,Tienda Fisica,5,35.48,69.93,349.65,172.25
+2024-05-14,Sur,Memoria RAM 16GB DDR5,Ventas B2B,22,37.25,66.66,1466.52,647.02
+2024-05-14,Oriente,Camara Web 1080p,Distribuidores,24,21.9,40.24,965.76,440.16
+2024-05-14,Occidente,Monitor 4K 27,Ventas B2B,19,180.08,276.47,5252.93,1831.41
+2024-05-14,Occidente,Mouse Inalambrico Ergo,Distribuidores,27,17.94,34.83,940.41,456.03
+2024-05-14,Sur,Auriculares USB-C,Tienda Fisica,7,25.17,50.95,356.65,180.46
+2024-05-15,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,7,37.36,71.11,497.77,236.25
+2024-05-15,Sur,Mouse Inalambrico Ergo,E-commerce,4,18.24,39.16,156.64,83.68
+2024-05-16,Centro,Monitor 4K 27,Distribuidores,18,177.54,261.08,4699.44,1503.72
+2024-05-16,Occidente,Laptop Pro 15,Tienda Fisica,5,442.4,737.22,3686.1,1474.1
+2024-05-17,Centro,Mouse Inalambrico Ergo,Tienda Fisica,5,18.27,38.89,194.45,103.1
+2024-05-17,Oriente,Teclado Mecanico RGB,Tienda Fisica,3,34.91,69.57,208.71,103.98
+2024-05-17,Norte,Laptop Pro 15,Distribuidores,30,448.73,675.97,20279.1,6817.2
+2024-05-17,Occidente,Laptop Pro 15,E-commerce,2,442.54,742.97,1485.94,600.86
+2024-05-17,Centro,Laptop Pro 15,Distribuidores,30,446.45,666.1,19983.0,6589.5
+2024-05-17,Norte,Impresora Laser Multifuncion,Distribuidores,10,118.15,178.03,1780.3,598.8
+2024-05-17,Sur,Mouse Inalambrico Ergo,Ventas B2B,28,17.78,38.06,1065.68,567.84
+2024-05-17,Oriente,Mouse Inalambrico Ergo,Tienda Fisica,3,17.74,38.58,115.74,62.52
+2024-05-18,Occidente,Camara Web 1080p,Ventas B2B,19,21.94,43.34,823.46,406.6
+2024-05-19,Occidente,Camara Web 1080p,Ventas B2B,19,21.63,41.57,789.83,378.86
+2024-05-19,Norte,Impresora Laser Multifuncion,Ventas B2B,17,121.17,193.53,3290.01,1230.12
+2024-05-19,Centro,Auriculares USB-C,Distribuidores,30,24.6,45.41,1362.3,624.3
+2024-05-20,Sur,Mouse Inalambrico Ergo,Tienda Fisica,3,17.77,40.12,120.36,67.05
+2024-05-21,Sur,Monitor 4K 27,Tienda Fisica,7,180.83,306.83,2147.81,882.0
+2024-05-21,Norte,Mouse Inalambrico Ergo,Distribuidores,29,18.32,34.54,1001.66,470.38
+2024-05-21,Centro,Teclado Mecanico RGB,Distribuidores,20,34.95,62.38,1247.6,548.6
+2024-05-21,Norte,Auriculares USB-C,Ventas B2B,5,25.44,48.77,243.85,116.65
+2024-05-22,Centro,Camara Web 1080p,Ventas B2B,26,22.42,42.84,1113.84,530.92
+2024-05-22,Occidente,Mouse Inalambrico Ergo,Ventas B2B,22,18.34,38.24,841.28,437.8
+2024-05-22,Norte,Camara Web 1080p,E-commerce,7,21.91,44.28,309.96,156.59
+2024-05-22,Centro,Teclado Mecanico RGB,Distribuidores,13,35.5,61.08,794.04,332.54
+2024-05-22,Norte,Disco SSD 1TB NVMe,E-commerce,4,44.69,89.42,357.68,178.92
+2024-05-22,Occidente,Impresora Laser Multifuncion,Distribuidores,10,121.7,182.12,1821.2,604.2
+2024-05-23,Occidente,Hub USB-C 7 en 1,Tienda Fisica,3,15.29,32.29,96.87,51.0
+2024-05-23,Sur,Camara Web 1080p,E-commerce,5,22.21,45.34,226.7,115.65
+2024-05-24,Oriente,Monitor 4K 27,E-commerce,5,182.07,301.24,1506.2,595.85
+2024-05-24,Oriente,Memoria RAM 16GB DDR5,Distribuidores,14,37.64,64.85,907.9,380.94
+2024-05-24,Centro,Impresora Laser Multifuncion,Tienda Fisica,8,117.64,195.43,1563.44,622.32
+2024-05-24,Centro,Monitor 4K 27,Ventas B2B,7,178.82,280.24,1961.68,709.94
+2024-05-25,Oriente,Memoria RAM 16GB DDR5,E-commerce,4,37.46,71.01,284.04,134.2
+2024-05-26,Sur,Disco SSD 1TB NVMe,Distribuidores,19,44.9,80.94,1537.86,684.76
+2024-05-26,Oriente,Laptop Pro 15,Tienda Fisica,1,447.86,729.89,729.89,282.03
+2024-05-26,Oriente,Teclado Mecanico RGB,Ventas B2B,14,35.16,64.63,904.82,412.58
+2024-05-27,Oriente,Monitor 4K 27,Ventas B2B,27,178.59,282.39,7624.53,2802.6
+2024-05-27,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,1,38.72,72.47,72.47,33.75
+2024-05-27,Sur,Monitor 4K 27,Ventas B2B,8,181.87,287.52,2300.16,845.2
+2024-05-27,Sur,Monitor 4K 27,E-commerce,4,176.43,303.76,1215.04,509.32
+2024-05-27,Sur,Disco SSD 1TB NVMe,Ventas B2B,9,45.6,85.05,765.45,355.05
+2024-05-28,Norte,Mouse Inalambrico Ergo,Tienda Fisica,7,17.84,39.82,278.74,153.86
+2024-05-28,Centro,Monitor 4K 27,Tienda Fisica,8,181.78,293.18,2345.44,891.2
+2024-05-28,Centro,Hub USB-C 7 en 1,Tienda Fisica,5,15.16,32.38,161.9,86.1
+2024-05-28,Sur,Teclado Mecanico RGB,Tienda Fisica,7,35.23,69.06,483.42,236.81
+2024-05-28,Occidente,Teclado Mecanico RGB,Ventas B2B,15,35.26,67.33,1009.95,481.05
+2024-05-29,Centro,Impresora Laser Multifuncion,Ventas B2B,27,121.59,187.08,5051.16,1768.23
+2024-05-29,Occidente,Camara Web 1080p,Distribuidores,27,21.65,41.46,1119.42,534.87
+2024-05-29,Oriente,Hub USB-C 7 en 1,Distribuidores,30,15.1,29.59,887.7,434.7
+2024-05-30,Centro,Impresora Laser Multifuncion,Ventas B2B,9,118.77,188.05,1692.45,623.52
+2024-05-30,Norte,Impresora Laser Multifuncion,Distribuidores,8,117.96,175.55,1404.4,460.72
+2024-05-30,Centro,Teclado Mecanico RGB,Tienda Fisica,5,35.32,70.17,350.85,174.25
+2024-05-31,Centro,Laptop Pro 15,Ventas B2B,13,441.15,728.11,9465.43,3730.48
+2024-05-31,Oriente,Monitor 4K 27,Tienda Fisica,3,178.91,296.18,888.54,351.81
+2024-06-01,Sur,Auriculares USB-C,Distribuidores,27,24.71,45.54,1229.58,562.41
+2024-06-01,Occidente,Hub USB-C 7 en 1,Tienda Fisica,3,14.89,31.99,95.97,51.3
+2024-06-02,Occidente,Camara Web 1080p,Distribuidores,29,21.57,40.95,1187.55,562.02
+2024-06-03,Norte,Auriculares USB-C,E-commerce,4,25.36,48.56,194.24,92.8
+2024-06-05,Oriente,Hub USB-C 7 en 1,Ventas B2B,10,15.11,30.6,306.0,154.9
+2024-06-05,Sur,Monitor 4K 27,Tienda Fisica,5,183.23,298.21,1491.05,574.9
+2024-06-05,Oriente,Camara Web 1080p,Tienda Fisica,3,22.13,43.87,131.61,65.22
+2024-06-05,Sur,Auriculares USB-C,E-commerce,8,24.87,49.35,394.8,195.84
+2024-06-06,Norte,Mouse Inalambrico Ergo,E-commerce,7,17.99,38.46,269.22,143.29
+2024-06-06,Oriente,Impresora Laser Multifuncion,Distribuidores,13,120.41,178.71,2323.23,757.9
+2024-06-06,Centro,Laptop Pro 15,Distribuidores,18,442.56,690.27,12424.86,4458.78
+2024-06-06,Norte,Memoria RAM 16GB DDR5,E-commerce,2,38.48,70.3,140.6,63.64
+2024-06-07,Centro,Impresora Laser Multifuncion,Tienda Fisica,3,121.78,199.79,599.37,234.03
+2024-06-07,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,1,37.8,71.08,71.08,33.28
+2024-06-07,Sur,Mouse Inalambrico Ergo,Distribuidores,29,17.99,34.97,1014.13,492.42
+2024-06-07,Sur,Mouse Inalambrico Ergo,Distribuidores,19,18.09,34.76,660.44,316.73
+2024-06-08,Occidente,Disco SSD 1TB NVMe,E-commerce,1,44.41,91.0,91.0,46.59
+2024-06-08,Occidente,Impresora Laser Multifuncion,Ventas B2B,22,118.23,190.78,4197.16,1596.1
+2024-06-08,Norte,Hub USB-C 7 en 1,Distribuidores,25,15.24,28.94,723.5,342.5
+2024-06-09,Centro,Impresora Laser Multifuncion,E-commerce,8,117.92,202.96,1623.68,680.32
+2024-06-09,Sur,Teclado Mecanico RGB,Ventas B2B,21,34.95,67.92,1426.32,692.37
+2024-06-09,Norte,Laptop Pro 15,Ventas B2B,13,444.77,724.19,9414.47,3632.46
+2024-06-09,Occidente,Laptop Pro 15,Tienda Fisica,2,441.22,731.9,1463.8,581.36
+2024-06-10,Sur,Memoria RAM 16GB DDR5,Ventas B2B,25,37.94,67.44,1686.0,737.5
+2024-06-10,Norte,Camara Web 1080p,E-commerce,4,21.75,44.96,179.84,92.84
+2024-06-10,Centro,Camara Web 1080p,Ventas B2B,22,21.98,41.56,914.32,430.76
+2024-06-10,Oriente,Impresora Laser Multifuncion,Tienda Fisica,3,119.65,200.02,600.06,241.11
+2024-06-11,Oriente,Hub USB-C 7 en 1,Ventas B2B,22,14.97,30.24,665.28,335.94
+2024-06-11,Oriente,Camara Web 1080p,Tienda Fisica,2,21.77,45.5,91.0,47.46
+2024-06-11,Oriente,Impresora Laser Multifuncion,Distribuidores,14,118.18,181.0,2534.0,879.48
+2024-06-12,Occidente,Hub USB-C 7 en 1,Distribuidores,12,14.88,28.62,343.44,164.88
+2024-06-12,Centro,Monitor 4K 27,Distribuidores,8,180.01,275.59,2204.72,764.64
+2024-06-12,Occidente,Hub USB-C 7 en 1,E-commerce,6,15.0,31.96,191.76,101.76
+2024-06-13,Centro,Disco SSD 1TB NVMe,Tienda Fisica,4,44.9,91.21,364.84,185.24
+2024-06-13,Centro,Hub USB-C 7 en 1,Tienda Fisica,5,14.8,32.21,161.05,87.05
+2024-06-14,Sur,Laptop Pro 15,Tienda Fisica,5,449.66,740.95,3704.75,1456.45
+2024-06-14,Oriente,Impresora Laser Multifuncion,Tienda Fisica,2,120.11,193.83,387.66,147.44
+2024-06-14,Occidente,Monitor 4K 27,Tienda Fisica,7,179.45,296.28,2073.96,817.81
+2024-06-14,Centro,Teclado Mecanico RGB,Tienda Fisica,5,35.39,69.41,347.05,170.1
+2024-06-15,Centro,Auriculares USB-C,Distribuidores,11,24.65,45.71,502.81,231.66
+2024-06-15,Centro,Disco SSD 1TB NVMe,Ventas B2B,28,44.68,83.23,2330.44,1079.4
+2024-06-16,Oriente,Auriculares USB-C,E-commerce,4,24.92,51.31,205.24,105.56
+2024-06-16,Sur,Monitor 4K 27,E-commerce,4,181.62,298.27,1193.08,466.6
+2024-06-17,Sur,Camara Web 1080p,Tienda Fisica,7,22.01,43.7,305.9,151.83
+2024-06-17,Occidente,Disco SSD 1TB NVMe,E-commerce,4,45.2,86.91,347.64,166.84
+2024-06-18,Occidente,Impresora Laser Multifuncion,Tienda Fisica,5,120.03,200.99,1004.95,404.8
+2024-06-18,Occidente,Monitor 4K 27,Tienda Fisica,4,177.92,305.6,1222.4,510.72
+2024-06-18,Norte,Teclado Mecanico RGB,Tienda Fisica,5,35.39,68.1,340.5,163.55
+2024-06-19,Centro,Laptop Pro 15,E-commerce,4,458.32,732.78,2931.12,1097.84
+2024-06-19,Occidente,Disco SSD 1TB NVMe,Distribuidores,19,44.7,81.62,1550.78,701.48
+2024-06-19,Norte,Auriculares USB-C,Distribuidores,10,24.94,44.97,449.7,200.3
+2024-06-20,Norte,Mouse Inalambrico Ergo,Distribuidores,12,18.22,34.8,417.6,198.96
+2024-06-20,Centro,Camara Web 1080p,Tienda Fisica,3,21.69,44.68,134.04,68.97
+2024-06-20,Oriente,Laptop Pro 15,Distribuidores,11,445.49,657.5,7232.5,2332.11
+2024-06-21,Norte,Monitor 4K 27,Ventas B2B,8,178.98,281.39,2251.12,819.28
+2024-06-22,Occidente,Impresora Laser Multifuncion,E-commerce,4,120.49,197.82,791.28,309.32
+2024-06-22,Occidente,Camara Web 1080p,Tienda Fisica,7,22.14,44.32,310.24,155.26
+2024-06-22,Occidente,Memoria RAM 16GB DDR5,Tienda Fisica,3,37.28,73.74,221.22,109.38
+2024-06-23,Oriente,Hub USB-C 7 en 1,Tienda Fisica,3,14.82,33.15,99.45,54.99
+2024-06-23,Sur,Hub USB-C 7 en 1,Ventas B2B,30,15.29,31.0,930.0,471.3
+2024-06-24,Sur,Auriculares USB-C,Ventas B2B,13,25.41,48.48,630.24,299.91
+2024-06-24,Norte,Teclado Mecanico RGB,E-commerce,3,35.07,69.19,207.57,102.36
+2024-06-24,Oriente,Impresora Laser Multifuncion,E-commerce,3,122.15,203.99,611.97,245.52
+2024-06-24,Centro,Teclado Mecanico RGB,Ventas B2B,18,34.59,67.2,1209.6,586.98
+2024-06-24,Oriente,Auriculares USB-C,Ventas B2B,16,24.96,48.32,773.12,373.76
+2024-06-24,Occidente,Mouse Inalambrico Ergo,E-commerce,2,18.17,40.0,80.0,43.66
+2024-06-24,Sur,Auriculares USB-C,E-commerce,3,25.08,50.15,150.45,75.21
+2024-06-25,Centro,Disco SSD 1TB NVMe,Tienda Fisica,7,45.72,87.35,611.45,291.41
+2024-06-25,Occidente,Auriculares USB-C,Ventas B2B,27,24.75,48.47,1308.69,640.44
+2024-06-25,Oriente,Teclado Mecanico RGB,Distribuidores,21,35.09,62.23,1306.83,569.94
+2024-06-25,Oriente,Auriculares USB-C,Ventas B2B,25,24.99,47.8,1195.0,570.25
+2024-06-25,Sur,Disco SSD 1TB NVMe,E-commerce,3,44.43,89.62,268.86,135.57
+2024-06-26,Occidente,Camara Web 1080p,Distribuidores,10,21.89,41.11,411.1,192.2
+2024-06-26,Oriente,Teclado Mecanico RGB,Tienda Fisica,1,35.2,68.46,68.46,33.26
+2024-06-26,Oriente,Teclado Mecanico RGB,Ventas B2B,8,35.28,66.25,530.0,247.76
+2024-06-26,Centro,Impresora Laser Multifuncion,Distribuidores,12,122.38,184.24,2210.88,742.32
+2024-06-27,Centro,Teclado Mecanico RGB,E-commerce,2,34.51,68.63,137.26,68.24
+2024-06-28,Sur,Monitor 4K 27,Tienda Fisica,1,183.24,293.61,293.61,110.37
+2024-06-28,Centro,Disco SSD 1TB NVMe,E-commerce,2,44.66,88.34,176.68,87.36
+2024-06-28,Occidente,Disco SSD 1TB NVMe,E-commerce,3,45.51,90.67,272.01,135.48
+2024-06-29,Oriente,Auriculares USB-C,Distribuidores,13,24.73,45.59,592.67,271.18
+2024-06-29,Sur,Mouse Inalambrico Ergo,Distribuidores,26,18.18,36.12,939.12,466.44
+2024-06-30,Sur,Hub USB-C 7 en 1,Ventas B2B,21,15.14,30.87,648.27,330.33
+2024-06-30,Norte,Teclado Mecanico RGB,Distribuidores,5,34.77,62.44,312.2,138.35
+2024-07-01,Norte,Auriculares USB-C,Distribuidores,21,25.14,43.85,920.85,392.91
+2024-07-02,Sur,Mouse Inalambrico Ergo,Tienda Fisica,6,18.2,40.41,242.46,133.26
+2024-07-02,Occidente,Mouse Inalambrico Ergo,E-commerce,2,17.82,38.89,77.78,42.14
+2024-07-02,Oriente,Disco SSD 1TB NVMe,Tienda Fisica,3,45.53,89.27,267.81,131.22
+2024-07-03,Sur,Auriculares USB-C,Tienda Fisica,3,24.77,51.41,154.23,79.92
+2024-07-03,Centro,Monitor 4K 27,E-commerce,2,177.75,298.08,596.16,240.66
+2024-07-03,Norte,Mouse Inalambrico Ergo,Tienda Fisica,4,18.1,39.08,156.32,83.92
+2024-07-03,Occidente,Disco SSD 1TB NVMe,Distribuidores,30,45.38,81.66,2449.8,1088.4
+2024-07-04,Oriente,Teclado Mecanico RGB,Ventas B2B,10,35.33,68.26,682.6,329.3
+2024-07-04,Occidente,Auriculares USB-C,Tienda Fisica,7,25.0,50.78,355.46,180.46
+2024-07-04,Occidente,Camara Web 1080p,Ventas B2B,18,21.71,43.66,785.88,395.1
+2024-07-05,Sur,Impresora Laser Multifuncion,Distribuidores,11,120.82,181.27,1993.97,664.95
+2024-07-05,Sur,Monitor 4K 27,Distribuidores,15,181.78,263.86,3957.9,1231.2
+2024-07-05,Norte,Hub USB-C 7 en 1,E-commerce,3,15.11,32.6,97.8,52.47
+2024-07-05,Occidente,Laptop Pro 15,E-commerce,3,454.63,733.82,2201.46,837.57
+2024-07-05,Oriente,Teclado Mecanico RGB,Distribuidores,30,35.51,62.25,1867.5,802.2
+2024-07-06,Oriente,Impresora Laser Multifuncion,Distribuidores,12,122.21,174.01,2088.12,621.6
+2024-07-06,Oriente,Impresora Laser Multifuncion,Tienda Fisica,7,117.85,199.74,1398.18,573.23
+2024-07-06,Occidente,Laptop Pro 15,Ventas B2B,22,444.93,709.3,15604.6,5816.14
+2024-07-06,Centro,Teclado Mecanico RGB,Tienda Fisica,4,34.49,69.21,276.84,138.88
+2024-07-08,Centro,Disco SSD 1TB NVMe,Tienda Fisica,4,45.43,86.42,345.68,163.96
+2024-07-09,Centro,Disco SSD 1TB NVMe,Ventas B2B,29,44.71,85.05,2466.45,1169.86
+2024-07-09,Centro,Disco SSD 1TB NVMe,Distribuidores,19,44.42,78.33,1488.27,644.29
+2024-07-09,Oriente,Auriculares USB-C,E-commerce,5,24.68,49.61,248.05,124.65
+2024-07-10,Norte,Impresora Laser Multifuncion,E-commerce,1,120.85,200.51,200.51,79.66
+2024-07-10,Occidente,Camara Web 1080p,Ventas B2B,20,21.6,43.77,875.4,443.4
+2024-07-11,Oriente,Mouse Inalambrico Ergo,Tienda Fisica,4,17.71,40.15,160.6,89.76
+2024-07-11,Norte,Camara Web 1080p,E-commerce,6,21.66,46.33,277.98,148.02
+2024-07-11,Sur,Camara Web 1080p,Ventas B2B,12,22.31,42.24,506.88,239.16
+2024-07-11,Sur,Monitor 4K 27,Tienda Fisica,6,180.68,301.04,1806.24,722.16
+2024-07-13,Occidente,Mouse Inalambrico Ergo,Distribuidores,7,17.93,36.07,252.49,126.98
+2024-07-13,Oriente,Impresora Laser Multifuncion,E-commerce,5,117.8,204.44,1022.2,433.2
+2024-07-13,Occidente,Mouse Inalambrico Ergo,Ventas B2B,22,18.11,37.94,834.68,436.26
+2024-07-13,Centro,Memoria RAM 16GB DDR5,Tienda Fisica,2,37.57,70.44,140.88,65.74
+2024-07-14,Centro,Monitor 4K 27,E-commerce,8,176.58,305.89,2447.12,1034.48
+2024-07-14,Sur,Teclado Mecanico RGB,E-commerce,8,35.43,68.54,548.32,264.88
+2024-07-14,Norte,Laptop Pro 15,Distribuidores,16,456.84,672.34,10757.44,3448.0
+2024-07-14,Oriente,Camara Web 1080p,E-commerce,3,21.98,44.16,132.48,66.54
+2024-07-15,Sur,Hub USB-C 7 en 1,E-commerce,2,14.87,33.07,66.14,36.4
+2024-07-15,Occidente,Disco SSD 1TB NVMe,E-commerce,3,45.56,91.32,273.96,137.28
+2024-07-15,Oriente,Teclado Mecanico RGB,Ventas B2B,25,35.05,68.08,1702.0,825.75
+2024-07-15,Occidente,Camara Web 1080p,Ventas B2B,18,22.16,42.53,765.54,366.66
+2024-07-15,Centro,Disco SSD 1TB NVMe,E-commerce,5,45.9,89.91,449.55,220.05
+2024-07-16,Norte,Impresora Laser Multifuncion,E-commerce,1,119.13,194.21,194.21,75.08
+2024-07-16,Centro,Teclado Mecanico RGB,Ventas B2B,27,35.0,68.1,1838.7,893.7
+2024-07-16,Sur,Disco SSD 1TB NVMe,Tienda Fisica,6,44.97,89.52,537.12,267.3
+2024-07-16,Centro,Laptop Pro 15,Distribuidores,16,447.32,694.34,11109.44,3952.32
+2024-07-17,Centro,Auriculares USB-C,Tienda Fisica,6,25.29,49.52,297.12,145.38
+2024-07-17,Centro,Impresora Laser Multifuncion,Tienda Fisica,1,119.0,203.58,203.58,84.58
+2024-07-17,Oriente,Memoria RAM 16GB DDR5,E-commerce,3,37.53,69.98,209.94,97.35
+2024-07-18,Occidente,Impresora Laser Multifuncion,Ventas B2B,29,121.15,192.35,5578.15,2064.8
+2024-07-18,Centro,Impresora Laser Multifuncion,Tienda Fisica,2,117.62,196.71,393.42,158.18
+2024-07-18,Norte,Impresora Laser Multifuncion,Ventas B2B,7,121.85,188.35,1318.45,465.5
+2024-07-19,Oriente,Mouse Inalambrico Ergo,E-commerce,6,18.13,40.67,244.02,135.24
+2024-07-19,Occidente,Laptop Pro 15,Ventas B2B,20,448.85,727.21,14544.2,5567.2
+2024-07-20,Occidente,Auriculares USB-C,Distribuidores,21,25.33,45.08,946.68,414.75
+2024-07-20,Occidente,Teclado Mecanico RGB,E-commerce,1,35.36,71.91,71.91,36.55
+2024-07-20,Norte,Hub USB-C 7 en 1,Tienda Fisica,7,15.1,31.78,222.46,116.76
+2024-07-20,Sur,Memoria RAM 16GB DDR5,E-commerce,6,37.4,71.63,429.78,205.38
+2024-07-20,Occidente,Camara Web 1080p,Tienda Fisica,5,21.74,45.65,228.25,119.55
+2024-07-21,Occidente,Monitor 4K 27,Distribuidores,14,178.72,276.78,3874.92,1372.84
+2024-07-21,Norte,Memoria RAM 16GB DDR5,E-commerce,4,37.45,71.53,286.12,136.32
+2024-07-22,Occidente,Auriculares USB-C,Ventas B2B,18,25.2,46.3,833.4,379.8
+2024-07-22,Occidente,Monitor 4K 27,Tienda Fisica,6,180.44,300.68,1804.08,721.44
+2024-07-22,Norte,Laptop Pro 15,Distribuidores,24,441.29,660.22,15845.28,5254.32
+2024-07-23,Centro,Mouse Inalambrico Ergo,E-commerce,8,17.71,38.43,307.44,165.76
+2024-07-23,Centro,Monitor 4K 27,Ventas B2B,21,179.53,287.42,6035.82,2265.69
+2024-07-24,Norte,Teclado Mecanico RGB,Ventas B2B,5,35.68,65.47,327.35,148.95
+2024-07-24,Norte,Teclado Mecanico RGB,Tienda Fisica,2,35.34,68.71,137.42,66.74
+2024-07-24,Norte,Disco SSD 1TB NVMe,Distribuidores,27,44.53,81.28,2194.56,992.25
+2024-07-25,Occidente,Laptop Pro 15,Ventas B2B,18,441.98,713.29,12839.22,4883.58
+2024-07-25,Oriente,Memoria RAM 16GB DDR5,Ventas B2B,5,37.3,67.17,335.85,149.35
+2024-07-25,Norte,Mouse Inalambrico Ergo,E-commerce,3,17.79,38.37,115.11,61.74
+2024-07-26,Centro,Memoria RAM 16GB DDR5,Tienda Fisica,1,37.48,71.64,71.64,34.16
+2024-07-26,Oriente,Hub USB-C 7 en 1,E-commerce,4,14.88,33.14,132.56,73.04
+2024-07-26,Norte,Mouse Inalambrico Ergo,Ventas B2B,26,18.27,37.61,977.86,502.84
+2024-07-27,Sur,Monitor 4K 27,Tienda Fisica,7,178.95,297.41,2081.87,829.22
+2024-07-27,Occidente,Teclado Mecanico RGB,E-commerce,3,35.67,71.2,213.6,106.59
+2024-07-27,Oriente,Camara Web 1080p,Distribuidores,6,22.01,39.67,238.02,105.96
+2024-07-28,Oriente,Teclado Mecanico RGB,Distribuidores,12,34.65,61.6,739.2,323.4
+2024-07-29,Occidente,Hub USB-C 7 en 1,Ventas B2B,28,15.14,31.26,875.28,451.36
+2024-07-30,Norte,Teclado Mecanico RGB,Distribuidores,30,35.6,64.05,1921.5,853.5
+2024-07-30,Centro,Memoria RAM 16GB DDR5,Ventas B2B,18,38.35,67.63,1217.34,527.04
+2024-07-30,Occidente,Camara Web 1080p,Distribuidores,27,22.04,40.05,1081.35,486.27
+2024-07-30,Oriente,Auriculares USB-C,Ventas B2B,28,25.43,48.61,1361.08,649.04
+2024-07-30,Sur,Hub USB-C 7 en 1,E-commerce,3,15.28,32.27,96.81,50.97
+2024-07-30,Sur,Disco SSD 1TB NVMe,E-commerce,2,44.95,88.92,177.84,87.94
+2024-07-31,Centro,Camara Web 1080p,Distribuidores,5,21.81,40.01,200.05,91.0
+2024-07-31,Centro,Mouse Inalambrico Ergo,Tienda Fisica,6,17.95,38.99,233.94,126.24
+2024-07-31,Sur,Impresora Laser Multifuncion,E-commerce,8,118.77,199.98,1599.84,649.68
+2024-08-01,Occidente,Hub USB-C 7 en 1,E-commerce,7,14.97,32.39,226.73,121.94
+2024-08-01,Occidente,Auriculares USB-C,Tienda Fisica,8,24.77,50.46,403.68,205.52
+2024-08-01,Sur,Teclado Mecanico RGB,Distribuidores,24,35.23,63.66,1527.84,682.32
+2024-08-02,Occidente,Camara Web 1080p,E-commerce,8,21.75,44.83,358.64,184.64
+2024-08-02,Oriente,Impresora Laser Multifuncion,E-commerce,6,119.1,196.9,1181.4,466.8
+2024-08-02,Occidente,Memoria RAM 16GB DDR5,E-commerce,8,37.69,71.55,572.4,270.88
+2024-08-03,Centro,Monitor 4K 27,Ventas B2B,5,181.79,276.42,1382.1,473.15
+2024-08-03,Occidente,Monitor 4K 27,Tienda Fisica,8,179.63,296.52,2372.16,935.12
+2024-08-03,Centro,Camara Web 1080p,E-commerce,8,22.4,45.73,365.84,186.64
+2024-08-04,Norte,Auriculares USB-C,Distribuidores,16,24.6,45.01,720.16,326.56
+2024-08-04,Oriente,Monitor 4K 27,Ventas B2B,24,179.85,282.36,6776.64,2460.24
+2024-08-06,Oriente,Mouse Inalambrico Ergo,Ventas B2B,25,17.77,37.84,946.0,501.75
+2024-08-08,Sur,Hub USB-C 7 en 1,Tienda Fisica,8,15.13,31.73,253.84,132.8
+2024-08-09,Centro,Hub USB-C 7 en 1,Distribuidores,5,14.75,30.06,150.3,76.55
+2024-08-09,Oriente,Laptop Pro 15,E-commerce,8,451.66,745.0,5960.0,2346.72
+2024-08-10,Sur,Teclado Mecanico RGB,Distribuidores,15,35.58,64.47,967.05,433.35
+2024-08-10,Occidente,Camara Web 1080p,Distribuidores,16,21.98,39.84,637.44,285.76
+2024-08-10,Norte,Auriculares USB-C,Ventas B2B,17,25.18,48.81,829.77,401.71
+2024-08-11,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,6,38.12,72.32,433.92,205.2
+2024-08-11,Oriente,Impresora Laser Multifuncion,E-commerce,6,118.67,200.06,1200.36,488.34
+2024-08-11,Sur,Monitor 4K 27,E-commerce,7,182.59,306.06,2142.42,864.29
+2024-08-11,Sur,Mouse Inalambrico Ergo,Ventas B2B,10,17.92,36.71,367.1,187.9
+2024-08-12,Occidente,Memoria RAM 16GB DDR5,Distribuidores,19,38.59,64.52,1225.88,492.67
+2024-08-13,Oriente,Auriculares USB-C,Ventas B2B,21,25.03,48.82,1025.22,499.59
+2024-08-14,Sur,Impresora Laser Multifuncion,E-commerce,4,119.01,195.15,780.6,304.56
+2024-08-14,Occidente,Teclado Mecanico RGB,Ventas B2B,6,35.59,65.34,392.04,178.5
+2024-08-14,Occidente,Camara Web 1080p,Distribuidores,10,22.18,39.35,393.5,171.7
+2024-08-15,Oriente,Teclado Mecanico RGB,Tienda Fisica,1,35.41,68.73,68.73,33.32
+2024-08-16,Sur,Laptop Pro 15,E-commerce,5,449.98,767.23,3836.15,1586.25
+2024-08-16,Norte,Camara Web 1080p,Ventas B2B,11,21.99,43.01,473.11,231.22
+2024-08-18,Occidente,Teclado Mecanico RGB,Ventas B2B,7,35.62,65.3,457.1,207.76
+2024-08-18,Centro,Laptop Pro 15,Ventas B2B,6,448.14,707.11,4242.66,1553.82
+2024-08-18,Centro,Impresora Laser Multifuncion,Ventas B2B,29,117.97,184.94,5363.26,1942.13
+2024-08-18,Centro,Monitor 4K 27,E-commerce,1,178.33,302.12,302.12,123.79
+2024-08-18,Oriente,Mouse Inalambrico Ergo,Distribuidores,22,18.32,35.4,778.8,375.76
+2024-08-18,Occidente,Laptop Pro 15,Distribuidores,5,449.72,662.65,3313.25,1064.65
+2024-08-18,Oriente,Disco SSD 1TB NVMe,Distribuidores,5,44.8,78.27,391.35,167.35
+2024-08-18,Oriente,Laptop Pro 15,Distribuidores,11,454.32,663.33,7296.63,2299.11
+2024-08-18,Oriente,Impresora Laser Multifuncion,E-commerce,3,119.64,193.12,579.36,220.44
+2024-08-18,Norte,Laptop Pro 15,Distribuidores,6,447.08,683.95,4103.7,1421.22
+2024-08-18,Oriente,Mouse Inalambrico Ergo,E-commerce,1,18.07,40.01,40.01,21.94
+2024-08-19,Centro,Monitor 4K 27,Distribuidores,6,182.23,262.89,1577.34,483.96
+2024-08-19,Centro,Mouse Inalambrico Ergo,Tienda Fisica,4,17.74,40.14,160.56,89.6
+2024-08-20,Centro,Disco SSD 1TB NVMe,Ventas B2B,9,44.44,83.12,748.08,348.12
+2024-08-20,Occidente,Hub USB-C 7 en 1,Tienda Fisica,4,14.93,31.78,127.12,67.4
+2024-08-20,Oriente,Hub USB-C 7 en 1,Tienda Fisica,5,14.81,32.51,162.55,88.5
+2024-08-20,Occidente,Mouse Inalambrico Ergo,Ventas B2B,7,17.82,37.96,265.72,140.98
+2024-08-21,Centro,Disco SSD 1TB NVMe,Ventas B2B,30,44.86,86.51,2595.3,1249.5
+2024-08-21,Centro,Impresora Laser Multifuncion,Tienda Fisica,4,121.65,196.99,787.96,301.36
+2024-08-21,Occidente,Memoria RAM 16GB DDR5,Distribuidores,27,38.19,63.59,1716.93,685.8
+2024-08-22,Norte,Auriculares USB-C,E-commerce,1,25.29,51.15,51.15,25.86
+2024-08-22,Norte,Hub USB-C 7 en 1,Ventas B2B,8,14.95,30.22,241.76,122.16
+2024-08-22,Centro,Teclado Mecanico RGB,Tienda Fisica,6,35.21,69.04,414.24,202.98
+2024-08-23,Centro,Mouse Inalambrico Ergo,Ventas B2B,14,18.13,38.26,535.64,281.82
+2024-08-23,Oriente,Hub USB-C 7 en 1,Ventas B2B,7,15.21,30.78,215.46,108.99
+2024-08-23,Norte,Camara Web 1080p,E-commerce,8,21.9,46.25,370.0,194.8
+2024-08-24,Sur,Memoria RAM 16GB DDR5,Distribuidores,27,37.35,66.15,1786.05,777.6
+2024-08-24,Norte,Teclado Mecanico RGB,Tienda Fisica,1,34.39,71.08,71.08,36.69
+2024-08-25,Occidente,Hub USB-C 7 en 1,Ventas B2B,15,14.72,31.53,472.95,252.15
+2024-08-25,Sur,Impresora Laser Multifuncion,E-commerce,6,121.74,196.84,1181.04,450.6
+2024-08-25,Occidente,Disco SSD 1TB NVMe,Ventas B2B,12,44.55,83.77,1005.24,470.64
+2024-08-25,Norte,Monitor 4K 27,E-commerce,1,182.54,296.49,296.49,113.95
+2024-08-25,Sur,Auriculares USB-C,Tienda Fisica,4,24.61,48.94,195.76,97.32
+2024-08-25,Sur,Laptop Pro 15,Tienda Fisica,3,445.73,770.52,2311.56,974.37
+2024-08-26,Norte,Auriculares USB-C,Ventas B2B,12,24.64,46.21,554.52,258.84
+2024-08-26,Oriente,Mouse Inalambrico Ergo,E-commerce,3,18.26,39.78,119.34,64.56
+2024-08-27,Occidente,Auriculares USB-C,Tienda Fisica,2,25.18,50.1,100.2,49.84
+2024-08-27,Norte,Memoria RAM 16GB DDR5,Distribuidores,29,37.89,66.37,1924.73,825.92
+2024-08-28,Oriente,Memoria RAM 16GB DDR5,Distribuidores,10,38.71,63.84,638.4,251.3
+2024-08-28,Occidente,Memoria RAM 16GB DDR5,Distribuidores,10,38.76,64.55,645.5,257.9
+2024-08-28,Oriente,Auriculares USB-C,Distribuidores,23,24.56,45.01,1035.23,470.35
+2024-08-28,Oriente,Teclado Mecanico RGB,Tienda Fisica,8,34.75,69.19,553.52,275.52
+2024-08-28,Sur,Mouse Inalambrico Ergo,Distribuidores,17,18.24,34.74,590.58,280.5
+2024-08-28,Occidente,Laptop Pro 15,Ventas B2B,21,448.1,725.74,15240.54,5830.44
+2024-08-29,Norte,Teclado Mecanico RGB,Tienda Fisica,3,34.87,71.72,215.16,110.55
+2024-08-30,Occidente,Camara Web 1080p,Distribuidores,16,21.7,41.46,663.36,316.16
+2024-08-30,Sur,Mouse Inalambrico Ergo,Tienda Fisica,5,17.94,38.55,192.75,103.05
+2024-08-30,Oriente,Teclado Mecanico RGB,E-commerce,1,34.38,69.33,69.33,34.95
+2024-08-31,Oriente,Auriculares USB-C,E-commerce,5,25.27,50.05,250.25,123.9
+2024-08-31,Oriente,Mouse Inalambrico Ergo,Distribuidores,15,17.85,34.61,519.15,251.4
+2024-08-31,Norte,Memoria RAM 16GB DDR5,Distribuidores,13,37.79,65.03,845.39,354.12
+2024-09-01,Norte,Monitor 4K 27,Ventas B2B,20,176.93,286.26,5725.2,2186.6
+2024-09-02,Oriente,Disco SSD 1TB NVMe,Tienda Fisica,8,45.38,88.7,709.6,346.56
+2024-09-02,Occidente,Disco SSD 1TB NVMe,Ventas B2B,23,44.23,86.95,1999.85,982.56
+2024-09-02,Sur,Hub USB-C 7 en 1,E-commerce,7,15.25,32.6,228.2,121.45
+2024-09-02,Centro,Teclado Mecanico RGB,Ventas B2B,15,34.71,67.18,1007.7,487.05
+2024-09-02,Norte,Monitor 4K 27,Distribuidores,17,177.39,264.25,4492.25,1476.62
+2024-09-02,Occidente,Mouse Inalambrico Ergo,E-commerce,8,17.69,40.32,322.56,181.04
+2024-09-02,Occidente,Hub USB-C 7 en 1,Ventas B2B,26,15.15,31.51,819.26,425.36
+2024-09-02,Sur,Hub USB-C 7 en 1,E-commerce,7,14.71,31.61,221.27,118.3
+2024-09-03,Centro,Impresora Laser Multifuncion,Tienda Fisica,8,122.22,194.71,1557.68,579.92
+2024-09-03,Sur,Mouse Inalambrico Ergo,Ventas B2B,24,17.74,37.71,905.04,479.28
+2024-09-03,Norte,Hub USB-C 7 en 1,Distribuidores,15,15.11,29.08,436.2,209.55
+2024-09-04,Norte,Impresora Laser Multifuncion,Distribuidores,12,121.06,179.05,2148.6,695.88
+2024-09-04,Norte,Disco SSD 1TB NVMe,E-commerce,7,44.38,86.87,608.09,297.43
+2024-09-04,Occidente,Memoria RAM 16GB DDR5,E-commerce,7,38.42,72.48,507.36,238.42
+2024-09-04,Sur,Impresora Laser Multifuncion,Ventas B2B,26,119.81,190.03,4940.78,1825.72
+2024-09-05,Sur,Camara Web 1080p,E-commerce,8,21.77,44.93,359.44,185.28
+2024-09-05,Centro,Laptop Pro 15,Tienda Fisica,2,452.27,765.15,1530.3,625.76
+2024-09-06,Centro,Hub USB-C 7 en 1,Tienda Fisica,2,15.14,32.42,64.84,34.56
+2024-09-06,Sur,Monitor 4K 27,Distribuidores,16,178.08,271.82,4349.12,1499.84
+2024-09-06,Oriente,Hub USB-C 7 en 1,Tienda Fisica,3,14.96,31.97,95.91,51.03
+2024-09-06,Oriente,Monitor 4K 27,Ventas B2B,24,178.46,286.29,6870.96,2587.92
+2024-09-06,Norte,Monitor 4K 27,Ventas B2B,8,178.93,283.39,2267.12,835.68
+2024-09-06,Norte,Hub USB-C 7 en 1,Ventas B2B,15,15.03,31.47,472.05,246.6
+2024-09-07,Occidente,Mouse Inalambrico Ergo,Ventas B2B,25,18.15,37.41,935.25,481.5
+2024-09-07,Sur,Hub USB-C 7 en 1,Distribuidores,25,14.95,29.17,729.25,355.5
+2024-09-07,Centro,Monitor 4K 27,Ventas B2B,10,179.07,282.03,2820.3,1029.6
+2024-09-07,Oriente,Monitor 4K 27,Distribuidores,20,180.24,274.5,5490.0,1885.2
+2024-09-08,Norte,Memoria RAM 16GB DDR5,Distribuidores,18,37.75,65.46,1178.28,498.78
+2024-09-08,Occidente,Mouse Inalambrico Ergo,Distribuidores,17,17.84,36.16,614.72,311.44
+2024-09-08,Norte,Mouse Inalambrico Ergo,E-commerce,5,18.34,39.37,196.85,105.15
+2024-09-08,Oriente,Auriculares USB-C,Tienda Fisica,7,25.3,50.28,351.96,174.86
+2024-09-09,Norte,Monitor 4K 27,E-commerce,3,179.2,296.69,890.07,352.47
+2024-09-09,Occidente,Auriculares USB-C,E-commerce,8,24.54,48.66,389.28,192.96
+2024-09-09,Sur,Disco SSD 1TB NVMe,Tienda Fisica,5,45.2,87.33,436.65,210.65
+2024-09-09,Sur,Mouse Inalambrico Ergo,Ventas B2B,19,17.94,36.58,695.02,354.16
+2024-09-10,Occidente,Camara Web 1080p,Tienda Fisica,2,21.8,45.12,90.24,46.64
+2024-09-10,Centro,Impresora Laser Multifuncion,Distribuidores,15,120.23,175.13,2626.95,823.5
+2024-09-11,Norte,Monitor 4K 27,Ventas B2B,21,179.69,279.63,5872.23,2098.74
+2024-09-11,Oriente,Monitor 4K 27,Ventas B2B,29,182.45,291.11,8442.19,3151.14
+2024-09-11,Centro,Auriculares USB-C,Ventas B2B,17,24.89,46.17,784.89,361.76
+2024-09-11,Occidente,Hub USB-C 7 en 1,E-commerce,2,15.18,32.36,64.72,34.36
+2024-09-12,Sur,Camara Web 1080p,Distribuidores,30,21.99,39.89,1196.7,537.0
+2024-09-12,Norte,Hub USB-C 7 en 1,Distribuidores,29,15.08,28.48,825.92,388.6
+2024-09-12,Sur,Camara Web 1080p,Distribuidores,18,22.38,40.69,732.42,329.58
+2024-09-13,Sur,Mouse Inalambrico Ergo,Distribuidores,20,18.17,35.6,712.0,348.6
+2024-09-13,Occidente,Monitor 4K 27,Ventas B2B,27,180.23,289.6,7819.2,2952.99
+2024-09-14,Occidente,Teclado Mecanico RGB,Tienda Fisica,2,35.49,68.09,136.18,65.2
+2024-09-14,Oriente,Auriculares USB-C,Tienda Fisica,2,24.87,49.85,99.7,49.96
+2024-09-15,Occidente,Laptop Pro 15,E-commerce,7,444.97,754.02,5278.14,2163.35
+2024-09-15,Sur,Monitor 4K 27,Distribuidores,27,181.08,261.63,7064.01,2174.85
+2024-09-15,Centro,Teclado Mecanico RGB,Ventas B2B,16,35.56,66.6,1065.6,496.64
+2024-09-16,Oriente,Camara Web 1080p,Tienda Fisica,6,22.18,45.84,275.04,141.96
+2024-09-17,Sur,Hub USB-C 7 en 1,E-commerce,3,14.76,32.81,98.43,54.15
+2024-09-18,Oriente,Teclado Mecanico RGB,Tienda Fisica,5,35.02,70.46,352.3,177.2
+2024-09-18,Occidente,Camara Web 1080p,E-commerce,8,21.89,44.9,359.2,184.08
+2024-09-18,Oriente,Teclado Mecanico RGB,Distribuidores,6,34.82,63.09,378.54,169.62
+2024-09-18,Norte,Impresora Laser Multifuncion,Ventas B2B,9,121.04,188.23,1694.07,604.71
+2024-09-20,Centro,Mouse Inalambrico Ergo,E-commerce,3,17.75,39.74,119.22,65.97
+2024-09-21,Oriente,Monitor 4K 27,E-commerce,4,176.86,290.41,1161.64,454.2
+2024-09-21,Centro,Disco SSD 1TB NVMe,E-commerce,7,44.74,90.96,636.72,323.54
+2024-09-21,Sur,Memoria RAM 16GB DDR5,Ventas B2B,7,38.34,66.81,467.67,199.29
+2024-09-22,Centro,Monitor 4K 27,Ventas B2B,7,179.5,292.49,2047.43,790.93
+2024-09-22,Sur,Camara Web 1080p,Distribuidores,26,21.98,40.2,1045.2,473.72
+2024-09-22,Centro,Disco SSD 1TB NVMe,Ventas B2B,19,45.69,82.22,1562.18,694.07
+2024-09-22,Norte,Monitor 4K 27,E-commerce,7,177.76,299.47,2096.29,851.97
+2024-09-23,Occidente,Camara Web 1080p,Distribuidores,18,22.34,41.7,750.6,348.48
+2024-09-23,Centro,Hub USB-C 7 en 1,E-commerce,7,15.2,31.73,222.11,115.71
+2024-09-23,Occidente,Mouse Inalambrico Ergo,Ventas B2B,12,18.05,37.36,448.32,231.72
+2024-09-25,Centro,Monitor 4K 27,Tienda Fisica,7,182.69,290.81,2035.67,756.84
+2024-09-25,Oriente,Teclado Mecanico RGB,Ventas B2B,13,34.57,64.86,843.18,393.77
+2024-09-26,Norte,Impresora Laser Multifuncion,E-commerce,7,118.34,195.19,1366.33,537.95
+2024-09-26,Sur,Camara Web 1080p,Tienda Fisica,7,22.25,44.62,312.34,156.59
+2024-09-27,Norte,Impresora Laser Multifuncion,Distribuidores,9,119.46,182.74,1644.66,569.52
+2024-09-27,Sur,Mouse Inalambrico Ergo,Distribuidores,10,18.29,35.63,356.3,173.4
+2024-09-28,Norte,Auriculares USB-C,Ventas B2B,29,24.77,48.76,1414.04,695.71
+2024-09-29,Sur,Disco SSD 1TB NVMe,Ventas B2B,20,44.57,84.7,1694.0,802.6
+2024-09-30,Sur,Auriculares USB-C,Ventas B2B,11,24.87,48.76,536.36,262.79
+2024-09-30,Norte,Mouse Inalambrico Ergo,Ventas B2B,16,18.31,38.63,618.08,325.12
+2024-09-30,Sur,Hub USB-C 7 en 1,Ventas B2B,10,15.06,31.55,315.5,164.9
+2024-09-30,Centro,Monitor 4K 27,Tienda Fisica,7,183.1,303.82,2126.74,845.04
+2024-10-01,Norte,Memoria RAM 16GB DDR5,Distribuidores,26,38.38,63.88,1660.88,663.0
+2024-10-01,Occidente,Hub USB-C 7 en 1,E-commerce,5,14.75,31.68,158.4,84.65
+2024-10-01,Centro,Mouse Inalambrico Ergo,Ventas B2B,14,17.97,38.32,536.48,284.9
+2024-10-01,Centro,Memoria RAM 16GB DDR5,Ventas B2B,28,37.33,68.49,1917.72,872.48
+2024-10-02,Centro,Camara Web 1080p,Distribuidores,9,21.66,41.09,369.81,174.87
+2024-10-02,Occidente,Laptop Pro 15,Tienda Fisica,4,453.07,762.31,3049.24,1236.96
+2024-10-02,Oriente,Mouse Inalambrico Ergo,Ventas B2B,29,18.04,37.78,1095.62,572.46
+2024-10-03,Centro,Camara Web 1080p,Ventas B2B,9,22.41,43.26,389.34,187.65
+2024-10-03,Norte,Memoria RAM 16GB DDR5,E-commerce,4,37.73,73.72,294.88,143.96
+2024-10-04,Centro,Laptop Pro 15,Distribuidores,5,454.66,669.99,3349.95,1076.65
+2024-10-04,Oriente,Hub USB-C 7 en 1,E-commerce,1,15.2,33.12,33.12,17.92
+2024-10-04,Centro,Memoria RAM 16GB DDR5,Tienda Fisica,7,38.36,73.65,515.55,247.03
+2024-10-04,Occidente,Mouse Inalambrico Ergo,Tienda Fisica,6,18.17,38.44,230.64,121.62
+2024-10-05,Centro,Hub USB-C 7 en 1,Tienda Fisica,5,15.26,31.73,158.65,82.35
+2024-10-05,Occidente,Laptop Pro 15,E-commerce,6,441.28,736.82,4420.92,1773.24
+2024-10-05,Oriente,Impresora Laser Multifuncion,Distribuidores,17,118.9,174.01,2958.17,936.87
+2024-10-06,Centro,Teclado Mecanico RGB,Distribuidores,26,35.54,64.67,1681.42,757.38
+2024-10-06,Sur,Disco SSD 1TB NVMe,Distribuidores,16,45.83,79.85,1277.6,544.32
+2024-10-06,Occidente,Auriculares USB-C,Ventas B2B,24,25.23,46.47,1115.28,509.76
+2024-10-07,Occidente,Mouse Inalambrico Ergo,E-commerce,3,17.88,39.55,118.65,65.01
+2024-10-07,Oriente,Mouse Inalambrico Ergo,Ventas B2B,15,17.81,36.43,546.45,279.3
+2024-10-08,Sur,Auriculares USB-C,Ventas B2B,11,25.43,48.22,530.42,250.69
+2024-10-08,Norte,Memoria RAM 16GB DDR5,Tienda Fisica,6,37.62,70.34,422.04,196.32
+2024-10-08,Oriente,Camara Web 1080p,Tienda Fisica,5,22.15,44.33,221.65,110.9
+2024-10-08,Norte,Auriculares USB-C,Ventas B2B,9,24.62,48.51,436.59,215.01
+2024-10-09,Occidente,Disco SSD 1TB NVMe,Ventas B2B,15,45.67,86.99,1304.85,619.8
+2024-10-09,Sur,Hub USB-C 7 en 1,Tienda Fisica,2,14.89,33.47,66.94,37.16
+2024-10-09,Occidente,Teclado Mecanico RGB,E-commerce,7,35.0,71.44,500.08,255.08
+2024-10-09,Centro,Teclado Mecanico RGB,Distribuidores,24,35.05,62.92,1510.08,668.88
+2024-10-10,Sur,Hub USB-C 7 en 1,E-commerce,1,14.74,32.76,32.76,18.02
+2024-10-10,Centro,Teclado Mecanico RGB,Ventas B2B,8,35.52,66.7,533.6,249.44
+2024-10-10,Norte,Camara Web 1080p,Tienda Fisica,5,21.63,44.08,220.4,112.25
+2024-10-10,Occidente,Hub USB-C 7 en 1,Ventas B2B,14,14.79,30.56,427.84,220.78
+2024-10-10,Sur,Mouse Inalambrico Ergo,E-commerce,5,18.13,40.5,202.5,111.85
+2024-10-10,Oriente,Laptop Pro 15,Distribuidores,23,446.47,677.4,15580.2,5311.39
+2024-10-11,Occidente,Disco SSD 1TB NVMe,Tienda Fisica,1,44.26,89.29,89.29,45.03
+2024-10-11,Centro,Teclado Mecanico RGB,E-commerce,5,34.31,69.76,348.8,177.25
+2024-10-12,Centro,Memoria RAM 16GB DDR5,E-commerce,1,38.29,71.39,71.39,33.1
+2024-10-13,Sur,Impresora Laser Multifuncion,Tienda Fisica,4,119.31,201.92,807.68,330.44
+2024-10-13,Occidente,Impresora Laser Multifuncion,Distribuidores,13,118.69,184.08,2393.04,850.07
+2024-10-13,Norte,Camara Web 1080p,Distribuidores,15,22.39,41.24,618.6,282.75
+2024-10-13,Occidente,Camara Web 1080p,Tienda Fisica,7,21.97,43.86,307.02,153.23
+2024-10-14,Centro,Hub USB-C 7 en 1,E-commerce,2,15.08,32.43,64.86,34.7
+2024-10-14,Occidente,Impresora Laser Multifuncion,Tienda Fisica,7,119.3,200.97,1406.79,571.69
+2024-10-14,Occidente,Camara Web 1080p,E-commerce,4,21.62,45.75,183.0,96.52
+2024-10-14,Norte,Mouse Inalambrico Ergo,Ventas B2B,28,18.35,38.21,1069.88,556.08
+2024-10-15,Oriente,Impresora Laser Multifuncion,Ventas B2B,8,117.65,186.31,1490.48,549.28
+2024-10-15,Centro,Hub USB-C 7 en 1,E-commerce,8,14.92,33.42,267.36,148.0
+2024-10-16,Centro,Camara Web 1080p,Tienda Fisica,4,22.07,44.55,178.2,89.92
+2024-10-17,Occidente,Monitor 4K 27,Tienda Fisica,3,177.53,301.11,903.33,370.74
+2024-10-17,Occidente,Monitor 4K 27,Distribuidores,14,179.67,271.38,3799.32,1283.94
+2024-10-17,Sur,Teclado Mecanico RGB,Ventas B2B,18,35.02,64.76,1165.68,535.32
+2024-10-17,Oriente,Auriculares USB-C,Tienda Fisica,2,25.18,49.33,98.66,48.3
+2024-10-17,Sur,Impresora Laser Multifuncion,E-commerce,5,121.31,203.71,1018.55,412.0
+2024-10-17,Norte,Disco SSD 1TB NVMe,Tienda Fisica,3,44.21,90.68,272.04,139.41
+2024-10-19,Oriente,Memoria RAM 16GB DDR5,Distribuidores,6,37.8,65.21,391.26,164.46
+2024-10-19,Oriente,Hub USB-C 7 en 1,E-commerce,2,15.13,33.07,66.14,35.88
+2024-10-20,Occidente,Teclado Mecanico RGB,E-commerce,1,35.55,68.42,68.42,32.87
+2024-10-20,Occidente,Teclado Mecanico RGB,Ventas B2B,28,35.11,68.12,1907.36,924.28
+2024-10-21,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,6,37.69,71.52,429.12,202.98
+2024-10-21,Occidente,Laptop Pro 15,Distribuidores,23,441.72,685.38,15763.74,5604.18
+2024-10-21,Centro,Memoria RAM 16GB DDR5,E-commerce,5,37.84,73.08,365.4,176.2
+2024-10-21,Sur,Monitor 4K 27,Distribuidores,30,178.1,268.01,8040.3,2697.3
+2024-10-22,Centro,Mouse Inalambrico Ergo,Ventas B2B,24,18.1,37.52,900.48,466.08
+2024-10-22,Norte,Camara Web 1080p,E-commerce,6,21.85,44.89,269.34,138.24
+2024-10-22,Sur,Memoria RAM 16GB DDR5,Tienda Fisica,3,38.17,72.58,217.74,103.23
+2024-10-22,Oriente,Mouse Inalambrico Ergo,E-commerce,6,17.86,40.2,241.2,134.04
+2024-10-23,Oriente,Hub USB-C 7 en 1,Distribuidores,25,14.89,29.14,728.5,356.25
+2024-10-23,Occidente,Mouse Inalambrico Ergo,Tienda Fisica,8,17.76,39.81,318.48,176.4
+2024-10-23,Norte,Laptop Pro 15,Ventas B2B,16,453.61,714.26,11428.16,4170.4
+2024-10-23,Sur,Monitor 4K 27,Tienda Fisica,3,179.92,290.37,871.11,331.35
+2024-10-24,Centro,Memoria RAM 16GB DDR5,Distribuidores,18,38.75,65.0,1170.0,472.5
+2024-10-24,Occidente,Mouse Inalambrico Ergo,E-commerce,5,18.14,40.44,202.2,111.5
+2024-10-24,Norte,Teclado Mecanico RGB,E-commerce,8,35.04,69.44,555.52,275.2
+2024-10-25,Centro,Laptop Pro 15,Tienda Fisica,5,449.91,767.21,3836.05,1586.5
+2024-10-25,Occidente,Laptop Pro 15,Distribuidores,25,447.47,664.32,16608.0,5421.25
+2024-10-25,Norte,Memoria RAM 16GB DDR5,Ventas B2B,29,37.45,69.23,2007.67,921.62
+2024-10-25,Occidente,Mouse Inalambrico Ergo,Distribuidores,11,17.66,35.63,391.93,197.67
+2024-10-26,Occidente,Impresora Laser Multifuncion,Ventas B2B,24,120.15,188.52,4524.48,1640.88
+2024-10-26,Occidente,Teclado Mecanico RGB,Ventas B2B,18,34.75,64.51,1161.18,535.68
+2024-10-27,Occidente,Memoria RAM 16GB DDR5,E-commerce,8,38.06,71.33,570.64,266.16
+2024-10-28,Occidente,Hub USB-C 7 en 1,Distribuidores,8,15.2,28.89,231.12,109.52
+2024-10-28,Oriente,Auriculares USB-C,Tienda Fisica,2,25.45,49.11,98.22,47.32
+2024-10-28,Oriente,Camara Web 1080p,Tienda Fisica,7,22.33,45.66,319.62,163.31
+2024-10-28,Occidente,Monitor 4K 27,Tienda Fisica,2,182.06,305.59,611.18,247.06
+2024-10-28,Occidente,Monitor 4K 27,Ventas B2B,9,178.23,288.58,2597.22,993.15
+2024-10-29,Centro,Monitor 4K 27,Ventas B2B,8,180.19,283.32,2266.56,825.04
+2024-10-29,Sur,Disco SSD 1TB NVMe,Ventas B2B,6,45.85,86.79,520.74,245.64
+2024-10-29,Norte,Impresora Laser Multifuncion,E-commerce,4,121.62,202.71,810.84,324.36
+2024-10-29,Sur,Hub USB-C 7 en 1,Tienda Fisica,7,15.29,31.6,221.2,114.17
+2024-10-29,Oriente,Monitor 4K 27,Tienda Fisica,7,181.0,294.93,2064.51,797.51
+2024-10-30,Norte,Memoria RAM 16GB DDR5,E-commerce,1,38.35,73.77,73.77,35.42
+2024-10-30,Sur,Camara Web 1080p,Ventas B2B,5,21.57,42.35,211.75,103.9
+2024-10-31,Norte,Monitor 4K 27,E-commerce,6,177.6,301.02,1806.12,740.52
+2024-10-31,Occidente,Camara Web 1080p,Tienda Fisica,2,21.96,45.88,91.76,47.84
+2024-10-31,Norte,Impresora Laser Multifuncion,Ventas B2B,6,118.09,192.07,1152.42,443.88
+2024-11-01,Centro,Camara Web 1080p,Tienda Fisica,4,21.64,45.59,182.36,95.8
+2024-11-01,Occidente,Impresora Laser Multifuncion,Ventas B2B,5,119.0,187.78,938.9,343.9
+2024-11-01,Sur,Laptop Pro 15,Distribuidores,6,455.56,673.85,4043.1,1309.74
+2024-11-01,Occidente,Memoria RAM 16GB DDR5,Distribuidores,14,37.75,63.63,890.82,362.32
+2024-11-02,Occidente,Teclado Mecanico RGB,Tienda Fisica,3,34.93,71.24,213.72,108.93
+2024-11-02,Centro,Hub USB-C 7 en 1,Ventas B2B,23,14.96,30.43,699.89,355.81
+2024-11-03,Norte,Mouse Inalambrico Ergo,Distribuidores,24,18.09,36.23,869.52,435.36
+2024-11-04,Sur,Monitor 4K 27,E-commerce,8,179.74,300.14,2401.12,963.2
+2024-11-04,Norte,Monitor 4K 27,E-commerce,4,179.85,305.63,1222.52,503.12
+2024-11-04,Sur,Laptop Pro 15,Ventas B2B,5,446.97,717.38,3586.9,1352.05
+2024-11-04,Occidente,Laptop Pro 15,Ventas B2B,21,448.57,728.52,15298.92,5878.95
+2024-11-05,Oriente,Monitor 4K 27,Tienda Fisica,4,179.5,305.96,1223.84,505.84
+2024-11-05,Centro,Hub USB-C 7 en 1,Tienda Fisica,1,14.75,33.37,33.37,18.62
+2024-11-05,Sur,Disco SSD 1TB NVMe,E-commerce,2,45.35,87.68,175.36,84.66
+2024-11-06,Centro,Camara Web 1080p,Ventas B2B,18,22.42,43.82,788.76,385.2
+2024-11-06,Sur,Hub USB-C 7 en 1,E-commerce,5,14.91,32.84,164.2,89.65
+2024-11-08,Norte,Mouse Inalambrico Ergo,Ventas B2B,25,18.17,38.56,964.0,509.75
+2024-11-09,Sur,Hub USB-C 7 en 1,Tienda Fisica,8,14.78,32.98,263.84,145.6
+2024-11-09,Centro,Teclado Mecanico RGB,Distribuidores,12,34.68,64.64,775.68,359.52
+2024-11-09,Occidente,Auriculares USB-C,E-commerce,4,24.73,48.57,194.28,95.36
+2024-11-09,Norte,Auriculares USB-C,Distribuidores,18,24.5,44.28,797.04,356.04
+2024-11-09,Sur,Camara Web 1080p,Tienda Fisica,2,22.28,45.71,91.42,46.86
+2024-11-10,Occidente,Laptop Pro 15,Distribuidores,5,444.25,683.21,3416.05,1194.8
+2024-11-10,Occidente,Laptop Pro 15,Tienda Fisica,2,449.68,733.36,1466.72,567.36
+2024-11-11,Oriente,Auriculares USB-C,Tienda Fisica,6,24.72,49.82,298.92,150.6
+2024-11-11,Sur,Memoria RAM 16GB DDR5,Tienda Fisica,3,37.7,73.94,221.82,108.72
+2024-11-11,Centro,Memoria RAM 16GB DDR5,Distribuidores,7,38.43,64.09,448.63,179.62
+2024-11-11,Centro,Hub USB-C 7 en 1,E-commerce,6,15.18,33.39,200.34,109.26
+2024-11-12,Oriente,Impresora Laser Multifuncion,Tienda Fisica,7,121.65,195.94,1371.58,520.03
+2024-11-12,Norte,Auriculares USB-C,Tienda Fisica,2,25.0,50.32,100.64,50.64
+2024-11-12,Occidente,Memoria RAM 16GB DDR5,Tienda Fisica,2,38.26,71.77,143.54,67.02
+2024-11-12,Norte,Mouse Inalambrico Ergo,E-commerce,1,17.76,38.43,38.43,20.67
+2024-11-13,Oriente,Teclado Mecanico RGB,E-commerce,1,35.1,70.74,70.74,35.64
+2024-11-13,Occidente,Auriculares USB-C,Distribuidores,13,25.29,43.85,570.05,241.28
+2024-11-13,Occidente,Memoria RAM 16GB DDR5,Distribuidores,27,37.93,63.23,1707.21,683.1
+2024-11-13,Centro,Hub USB-C 7 en 1,E-commerce,6,15.13,32.81,196.86,106.08
+2024-11-13,Sur,Auriculares USB-C,Tienda Fisica,6,25.19,48.82,292.92,141.78
+2024-11-13,Norte,Laptop Pro 15,E-commerce,2,453.75,732.9,1465.8,558.3
+2024-11-14,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,4,37.65,70.41,281.64,131.04
+2024-11-15,Oriente,Monitor 4K 27,Distribuidores,26,182.59,267.16,6946.16,2198.82
+2024-11-15,Norte,Auriculares USB-C,Ventas B2B,7,24.63,46.28,323.96,151.55
+2024-11-16,Sur,Auriculares USB-C,Ventas B2B,7,25.21,46.73,327.11,150.64
+2024-11-16,Norte,Mouse Inalambrico Ergo,Ventas B2B,18,17.67,37.19,669.42,351.36
+2024-11-17,Occidente,Impresora Laser Multifuncion,E-commerce,2,117.82,195.75,391.5,155.86
+2024-11-17,Occidente,Auriculares USB-C,Distribuidores,20,24.74,45.82,916.4,421.6
+2024-11-17,Sur,Disco SSD 1TB NVMe,Ventas B2B,11,44.26,82.52,907.72,420.86
+2024-11-18,Norte,Mouse Inalambrico Ergo,Distribuidores,19,17.93,35.13,667.47,326.8
+2024-11-18,Occidente,Monitor 4K 27,Ventas B2B,28,181.36,291.44,8160.32,3082.24
+2024-11-19,Centro,Monitor 4K 27,Distribuidores,8,180.42,267.27,2138.16,694.8
+2024-11-19,Norte,Impresora Laser Multifuncion,Distribuidores,7,121.64,181.9,1273.3,421.82
+2024-11-20,Norte,Disco SSD 1TB NVMe,Distribuidores,27,45.79,79.47,2145.69,909.36
+2024-11-20,Occidente,Monitor 4K 27,Ventas B2B,19,181.14,291.82,5544.58,2102.92
+2024-11-21,Oriente,Monitor 4K 27,Distribuidores,18,177.69,275.67,4962.06,1763.64
+2024-11-22,Norte,Teclado Mecanico RGB,Tienda Fisica,8,35.48,70.51,564.08,280.24
+2024-11-22,Centro,Monitor 4K 27,Ventas B2B,8,178.62,282.3,2258.4,829.44
+2024-11-22,Oriente,Impresora Laser Multifuncion,Distribuidores,10,121.64,183.15,1831.5,615.1
+2024-11-22,Sur,Laptop Pro 15,E-commerce,5,445.58,730.55,3652.75,1424.85
+2024-11-23,Norte,Laptop Pro 15,Distribuidores,12,445.02,684.58,8214.96,2874.72
+2024-11-23,Occidente,Mouse Inalambrico Ergo,Distribuidores,29,18.2,34.97,1014.13,486.33
+2024-11-23,Centro,Camara Web 1080p,Tienda Fisica,1,22.14,45.41,45.41,23.27
+2024-11-24,Norte,Memoria RAM 16GB DDR5,Ventas B2B,26,38.03,66.87,1738.62,749.84
+2024-11-24,Oriente,Impresora Laser Multifuncion,Ventas B2B,19,121.77,193.66,3679.54,1365.91
+2024-11-24,Occidente,Hub USB-C 7 en 1,E-commerce,1,15.11,32.15,32.15,17.04
+2024-11-25,Sur,Memoria RAM 16GB DDR5,Ventas B2B,25,37.52,66.9,1672.5,734.5
+2024-11-26,Norte,Hub USB-C 7 en 1,Ventas B2B,19,15.05,31.72,602.68,316.73
+2024-11-26,Centro,Impresora Laser Multifuncion,Ventas B2B,23,117.76,185.12,4257.76,1549.28
+2024-11-26,Oriente,Teclado Mecanico RGB,Tienda Fisica,6,34.47,71.75,430.5,223.68
+2024-11-26,Sur,Camara Web 1080p,Tienda Fisica,3,21.99,44.51,133.53,67.56
+2024-11-26,Centro,Memoria RAM 16GB DDR5,Ventas B2B,19,37.7,66.89,1270.91,554.61
+2024-11-26,Sur,Laptop Pro 15,Tienda Fisica,5,449.87,771.18,3855.9,1606.55
+2024-11-27,Sur,Auriculares USB-C,Distribuidores,29,24.55,45.41,1316.89,604.94
+2024-11-27,Centro,Laptop Pro 15,E-commerce,2,441.75,753.27,1506.54,623.04
+2024-11-28,Norte,Auriculares USB-C,Ventas B2B,28,25.45,46.75,1309.0,596.4
+2024-11-28,Centro,Monitor 4K 27,Distribuidores,28,178.3,269.82,7554.96,2562.56
+2024-11-29,Occidente,Teclado Mecanico RGB,Distribuidores,15,35.14,63.65,954.75,427.65
+2024-11-30,Oriente,Auriculares USB-C,Tienda Fisica,2,24.93,51.14,102.28,52.42
+2024-11-30,Sur,Auriculares USB-C,Tienda Fisica,8,24.76,51.08,408.64,210.56
+2024-12-02,Norte,Hub USB-C 7 en 1,Distribuidores,9,14.73,29.33,263.97,131.4
+2024-12-02,Occidente,Auriculares USB-C,E-commerce,1,25.28,50.02,50.02,24.74
+2024-12-03,Occidente,Auriculares USB-C,Ventas B2B,25,25.46,46.24,1156.0,519.5
+2024-12-03,Centro,Mouse Inalambrico Ergo,E-commerce,7,17.85,38.44,269.08,144.13
+2024-12-03,Sur,Laptop Pro 15,Distribuidores,16,455.94,693.81,11100.96,3805.92
+2024-12-03,Norte,Mouse Inalambrico Ergo,Ventas B2B,30,18.14,36.76,1102.8,558.6
+2024-12-04,Sur,Disco SSD 1TB NVMe,Tienda Fisica,4,45.27,91.18,364.72,183.64
+2024-12-04,Occidente,Mouse Inalambrico Ergo,Ventas B2B,14,17.84,37.65,527.1,277.34
+2024-12-04,Centro,Monitor 4K 27,E-commerce,8,180.77,298.49,2387.92,941.76
+2024-12-06,Centro,Monitor 4K 27,Ventas B2B,11,183.37,289.59,3185.49,1168.42
+2024-12-06,Centro,Impresora Laser Multifuncion,E-commerce,6,119.75,204.68,1228.08,509.58
+2024-12-07,Norte,Memoria RAM 16GB DDR5,Distribuidores,10,37.86,64.81,648.1,269.5
+2024-12-07,Occidente,Memoria RAM 16GB DDR5,Ventas B2B,5,37.25,68.61,343.05,156.8
+2024-12-07,Sur,Monitor 4K 27,Tienda Fisica,3,181.45,292.97,878.91,334.56
+2024-12-07,Sur,Teclado Mecanico RGB,E-commerce,2,34.36,69.13,138.26,69.54
+2024-12-08,Norte,Teclado Mecanico RGB,E-commerce,8,34.75,68.84,550.72,272.72
+2024-12-09,Oriente,Camara Web 1080p,Distribuidores,27,21.93,39.65,1070.55,478.44
+2024-12-09,Occidente,Monitor 4K 27,Ventas B2B,23,177.35,289.38,6655.74,2576.69
+2024-12-10,Centro,Laptop Pro 15,Ventas B2B,13,455.7,723.01,9399.13,3475.03
+2024-12-10,Norte,Mouse Inalambrico Ergo,Tienda Fisica,7,17.96,39.59,277.13,151.41
+2024-12-10,Oriente,Memoria RAM 16GB DDR5,Tienda Fisica,3,37.97,72.55,217.65,103.74
+2024-12-11,Norte,Auriculares USB-C,Ventas B2B,26,24.92,47.8,1242.8,594.88
+2024-12-11,Norte,Mouse Inalambrico Ergo,Tienda Fisica,1,18.26,38.34,38.34,20.08
+2024-12-11,Occidente,Mouse Inalambrico Ergo,Ventas B2B,12,18.01,38.19,458.28,242.16
+2024-12-11,Centro,Laptop Pro 15,Tienda Fisica,7,447.58,755.36,5287.52,2154.46
+2024-12-12,Occidente,Monitor 4K 27,Ventas B2B,6,176.61,279.25,1675.5,615.84
+2024-12-12,Sur,Hub USB-C 7 en 1,Distribuidores,17,15.03,28.37,482.29,226.78
+2024-12-12,Centro,Disco SSD 1TB NVMe,Tienda Fisica,2,45.63,91.08,182.16,90.9
+2024-12-12,Centro,Mouse Inalambrico Ergo,Tienda Fisica,6,17.8,38.88,233.28,126.48
+2024-12-13,Occidente,Memoria RAM 16GB DDR5,Distribuidores,6,37.58,66.68,400.08,174.6
+2024-12-13,Occidente,Camara Web 1080p,E-commerce,6,22.44,44.95,269.7,135.06
+2024-12-13,Centro,Disco SSD 1TB NVMe,Distribuidores,7,45.15,80.64,564.48,248.43
+2024-12-13,Oriente,Impresora Laser Multifuncion,Tienda Fisica,3,119.14,204.55,613.65,256.23
+2024-12-14,Sur,Monitor 4K 27,Tienda Fisica,5,182.08,290.63,1453.15,542.75
+2024-12-14,Centro,Hub USB-C 7 en 1,Ventas B2B,11,15.27,30.47,335.17,167.2
+2024-12-14,Occidente,Disco SSD 1TB NVMe,Tienda Fisica,5,45.54,90.14,450.7,223.0
+2024-12-14,Norte,Mouse Inalambrico Ergo,Distribuidores,20,18.07,34.86,697.2,335.8
+2024-12-14,Oriente,Camara Web 1080p,Distribuidores,18,21.61,41.36,744.48,355.5
+2024-12-15,Norte,Hub USB-C 7 en 1,E-commerce,4,14.8,32.26,129.04,69.84
+2024-12-15,Sur,Teclado Mecanico RGB,E-commerce,2,35.15,69.41,138.82,68.52
+2024-12-15,Sur,Memoria RAM 16GB DDR5,E-commerce,4,37.94,70.94,283.76,132.0
+2024-12-15,Oriente,Teclado Mecanico RGB,Distribuidores,11,35.57,62.06,682.66,291.39
+2024-12-15,Norte,Memoria RAM 16GB DDR5,E-commerce,3,38.15,69.88,209.64,95.19
+2024-12-15,Norte,Teclado Mecanico RGB,E-commerce,2,34.83,69.6,139.2,69.54
+2024-12-15,Norte,Monitor 4K 27,Distribuidores,18,180.8,271.56,4888.08,1633.68
+2024-12-16,Occidente,Monitor 4K 27,Tienda Fisica,6,180.24,301.9,1811.4,729.96
+2024-12-16,Sur,Memoria RAM 16GB DDR5,Ventas B2B,8,38.59,68.16,545.28,236.56
+2024-12-16,Centro,Camara Web 1080p,Tienda Fisica,1,22.21,44.2,44.2,21.99
+2024-12-16,Oriente,Monitor 4K 27,E-commerce,7,181.06,306.89,2148.23,880.81
+2024-12-16,Centro,Teclado Mecanico RGB,Tienda Fisica,2,35.34,68.82,137.64,66.96
+2024-12-16,Centro,Auriculares USB-C,Distribuidores,8,25.03,44.59,356.72,156.48
+2024-12-17,Sur,Laptop Pro 15,Ventas B2B,27,446.97,694.87,18761.49,6693.3
+2024-12-17,Oriente,Monitor 4K 27,Distribuidores,21,181.68,261.31,5487.51,1672.23
+2024-12-18,Norte,Camara Web 1080p,Distribuidores,6,21.65,39.85,239.1,109.2
+2024-12-18,Norte,Auriculares USB-C,Tienda Fisica,7,24.55,51.05,357.35,185.5
+2024-12-18,Norte,Laptop Pro 15,E-commerce,7,451.46,742.14,5194.98,2034.76
+2024-12-19,Sur,Auriculares USB-C,Ventas B2B,26,25.15,47.31,1230.06,576.16
+2024-12-19,Sur,Camara Web 1080p,Tienda Fisica,6,22.07,44.05,264.3,131.88
+2024-12-19,Centro,Camara Web 1080p,E-commerce,2,21.59,44.61,89.22,46.04
+2024-12-19,Norte,Teclado Mecanico RGB,Distribuidores,19,35.02,63.0,1197.0,531.62
+2024-12-20,Occidente,Teclado Mecanico RGB,Ventas B2B,6,34.88,67.11,402.66,193.38
+2024-12-20,Oriente,Mouse Inalambrico Ergo,E-commerce,6,17.85,39.85,239.1,132.0
+2024-12-22,Occidente,Disco SSD 1TB NVMe,E-commerce,7,45.28,90.78,635.46,318.5
+2024-12-22,Sur,Memoria RAM 16GB DDR5,Ventas B2B,24,37.25,66.67,1600.08,706.08
+2024-12-22,Centro,Laptop Pro 15,Ventas B2B,17,448.5,724.82,12321.94,4697.44
+2024-12-22,Oriente,Mouse Inalambrico Ergo,E-commerce,6,17.87,39.43,236.58,129.36
+2024-12-22,Occidente,Auriculares USB-C,Tienda Fisica,8,25.15,48.52,388.16,186.96
+2024-12-22,Occidente,Disco SSD 1TB NVMe,E-commerce,8,45.02,89.28,714.24,354.08
+2024-12-22,Norte,Memoria RAM 16GB DDR5,Ventas B2B,12,37.37,69.44,833.28,384.84
+2024-12-23,Oriente,Teclado Mecanico RGB,Tienda Fisica,2,35.03,68.81,137.62,67.56
+2024-12-23,Occidente,Disco SSD 1TB NVMe,E-commerce,8,45.52,88.37,706.96,342.8
+2024-12-23,Sur,Hub USB-C 7 en 1,E-commerce,1,14.92,32.8,32.8,17.88
+2024-12-23,Norte,Disco SSD 1TB NVMe,Tienda Fisica,5,44.41,87.85,439.25,217.2
+2024-12-23,Oriente,Monitor 4K 27,Ventas B2B,14,181.33,287.63,4026.82,1488.2
+2024-12-24,Centro,Disco SSD 1TB NVMe,Tienda Fisica,3,44.18,86.53,259.59,127.05
+2024-12-24,Centro,Memoria RAM 16GB DDR5,Tienda Fisica,2,38.01,72.59,145.18,69.16
+2024-12-24,Sur,Memoria RAM 16GB DDR5,E-commerce,1,37.76,70.2,70.2,32.44
+2024-12-25,Occidente,Memoria RAM 16GB DDR5,E-commerce,4,38.27,72.41,289.64,136.56
+2024-12-25,Occidente,Disco SSD 1TB NVMe,Tienda Fisica,3,45.18,91.25,273.75,138.21
+2024-12-26,Oriente,Mouse Inalambrico Ergo,Distribuidores,27,18.3,35.53,959.31,465.21
+2024-12-26,Centro,Monitor 4K 27,Distribuidores,16,180.83,264.57,4233.12,1339.84
+2024-12-26,Sur,Mouse Inalambrico Ergo,Distribuidores,29,18.15,36.18,1049.22,522.87
+2024-12-26,Centro,Auriculares USB-C,Distribuidores,21,25.49,45.48,955.08,419.79
+2024-12-26,Centro,Hub USB-C 7 en 1,E-commerce,3,14.74,32.72,98.16,53.94
+2024-12-27,Centro,Disco SSD 1TB NVMe,Ventas B2B,20,44.54,84.81,1696.2,805.4
+2024-12-27,Oriente,Disco SSD 1TB NVMe,E-commerce,8,45.84,87.0,696.0,329.28
+2024-12-27,Norte,Teclado Mecanico RGB,Ventas B2B,25,34.31,64.78,1619.5,761.75
+2024-12-27,Centro,Disco SSD 1TB NVMe,Distribuidores,13,45.05,82.48,1072.24,486.59
+2024-12-28,Occidente,Auriculares USB-C,Ventas B2B,5,24.87,47.99,239.95,115.6
+2024-12-28,Sur,Memoria RAM 16GB DDR5,Tienda Fisica,7,38.71,72.25,505.75,234.78
+2024-12-28,Sur,Laptop Pro 15,E-commerce,8,447.72,755.3,6042.4,2460.64
+2024-12-28,Occidente,Mouse Inalambrico Ergo,Distribuidores,28,18.15,35.95,1006.6,498.4
+2024-12-29,Oriente,Auriculares USB-C,Tienda Fisica,7,24.52,49.46,346.22,174.58
+2024-12-29,Centro,Hub USB-C 7 en 1,Ventas B2B,13,15.23,31.4,408.2,210.21
+2024-12-30,Sur,Impresora Laser Multifuncion,E-commerce,2,122.33,202.49,404.98,160.32
+2024-12-30,Occidente,Laptop Pro 15,E-commerce,8,448.9,736.58,5892.64,2301.44
+2024-12-30,Sur,Monitor 4K 27,Tienda Fisica,2,181.48,301.41,602.82,239.86
+2024-12-30,Norte,Disco SSD 1TB NVMe,Distribuidores,14,45.41,82.32,1152.48,516.74
+2024-12-31,Centro,Teclado Mecanico RGB,E-commerce,1,34.7,71.28,71.28,36.58
+2024-12-31,Norte,Camara Web 1080p,E-commerce,2,22.4,44.86,89.72,44.92
+2024-12-31,Sur,Disco SSD 1TB NVMe,Ventas B2B,12,45.43,82.18,986.16,441.0
+2024-12-31,Occidente,Monitor 4K 27,Tienda Fisica,5,183.11,302.36,1511.8,596.25

@@ -1,0 +1,801 @@
+fecha,tipo_movimiento,categoria_gasto,centro_costo,monto,moneda,estado
+2024-01-01,Egreso,Sueldos y Planilla,Ventas,4608.24,USD,Conciliado
+2024-01-01,Ingreso,Venta Suscripciones SaaS,Ventas,2424.15,USD,Conciliado
+2024-01-01,Egreso,Arriendos y Servicios,Tecnologia,3193.65,USD,Conciliado
+2024-01-02,Egreso,Arriendos y Servicios,Administracion,676.93,USD,Conciliado
+2024-01-03,Egreso,Servicios Cloud,Ventas,2121.8,USD,Conciliado
+2024-01-03,Egreso,Servicios Cloud,Tecnologia,4666.1,USD,Conciliado
+2024-01-04,Ingreso,Venta Suscripciones SaaS,Ventas,3819.66,USD,Completado
+2024-01-04,Egreso,Software Licencias,Operaciones,7735.24,USD,Conciliado
+2024-01-05,Egreso,Logistica y Envíos,Ventas,7219.55,USD,Conciliado
+2024-01-05,Ingreso,Venta Suscripciones SaaS,Operaciones,13962.6,USD,Conciliado
+2024-01-05,Ingreso,Soporte Tecnico,Operaciones,2449.84,USD,Conciliado
+2024-01-06,Egreso,Arriendos y Servicios,Tecnologia,1216.85,USD,Conciliado
+2024-01-07,Egreso,Logistica y Envíos,Operaciones,3881.84,USD,Conciliado
+2024-01-07,Ingreso,Soporte Tecnico,Ventas,11797.95,USD,Conciliado
+2024-01-07,Ingreso,Soporte Tecnico,Ventas,5777.66,USD,Conciliado
+2024-01-09,Ingreso,Consultoria Analitica,Ventas,6363.82,USD,Conciliado
+2024-01-09,Egreso,Arriendos y Servicios,Ventas,2011.31,USD,Conciliado
+2024-01-09,Ingreso,Venta Suscripciones SaaS,Operaciones,14708.52,USD,Conciliado
+2024-01-11,Ingreso,Licenciamiento Enterprise,Operaciones,5008.76,USD,Completado
+2024-01-12,Egreso,Logistica y Envíos,Administracion,5420.65,USD,Conciliado
+2024-01-12,Egreso,Sueldos y Planilla,Tecnologia,1072.98,USD,Conciliado
+2024-01-12,Ingreso,Consultoria Analitica,Ventas,10099.33,USD,Conciliado
+2024-01-13,Egreso,Marketing Digital,Tecnologia,3386.21,USD,Conciliado
+2024-01-14,Egreso,Logistica y Envíos,Tecnologia,4190.19,USD,Conciliado
+2024-01-14,Egreso,Arriendos y Servicios,Tecnologia,6143.47,USD,Conciliado
+2024-01-15,Ingreso,Soporte Tecnico,Operaciones,11000.63,USD,Completado
+2024-01-16,Ingreso,Soporte Tecnico,Operaciones,12785.83,USD,Conciliado
+2024-01-16,Ingreso,Soporte Tecnico,Ventas,4443.72,USD,Conciliado
+2024-01-18,Ingreso,Licenciamiento Enterprise,Ventas,4286.35,USD,Conciliado
+2024-01-19,Egreso,Software Licencias,Administracion,5951.26,USD,Conciliado
+2024-01-21,Egreso,Sueldos y Planilla,Tecnologia,5488.33,USD,Conciliado
+2024-01-21,Ingreso,Soporte Tecnico,Operaciones,3860.37,USD,Conciliado
+2024-01-22,Egreso,Logistica y Envíos,Operaciones,7377.18,USD,Conciliado
+2024-01-22,Ingreso,Soporte Tecnico,Ventas,4430.88,USD,Conciliado
+2024-01-22,Egreso,Arriendos y Servicios,Operaciones,7271.04,USD,Conciliado
+2024-01-23,Egreso,Software Licencias,Administracion,4219.46,USD,Conciliado
+2024-01-23,Egreso,Sueldos y Planilla,Tecnologia,4364.1,USD,Conciliado
+2024-01-23,Egreso,Logistica y Envíos,Administracion,1912.94,USD,Conciliado
+2024-01-24,Ingreso,Consultoria Analitica,Ventas,10118.65,USD,Conciliado
+2024-01-24,Egreso,Software Licencias,Administracion,4751.61,USD,Conciliado
+2024-01-25,Ingreso,Soporte Tecnico,Operaciones,1410.7,USD,Conciliado
+2024-01-25,Egreso,Marketing Digital,Operaciones,2258.41,USD,Conciliado
+2024-01-25,Egreso,Software Licencias,Operaciones,5403.61,USD,Conciliado
+2024-01-25,Ingreso,Soporte Tecnico,Operaciones,14551.98,USD,Conciliado
+2024-01-25,Egreso,Logistica y Envíos,Administracion,6726.65,USD,Completado
+2024-01-27,Ingreso,Soporte Tecnico,Ventas,12525.55,USD,Conciliado
+2024-01-27,Ingreso,Soporte Tecnico,Ventas,2154.26,USD,Conciliado
+2024-01-27,Ingreso,Soporte Tecnico,Ventas,8128.24,USD,Conciliado
+2024-01-27,Egreso,Marketing Digital,Tecnologia,4480.87,USD,Conciliado
+2024-01-27,Ingreso,Licenciamiento Enterprise,Ventas,10901.69,USD,Conciliado
+2024-01-28,Egreso,Software Licencias,Administracion,877.5,USD,Conciliado
+2024-01-28,Egreso,Software Licencias,Administracion,7558.31,USD,Conciliado
+2024-01-29,Ingreso,Venta Suscripciones SaaS,Operaciones,12173.16,USD,Conciliado
+2024-01-29,Egreso,Arriendos y Servicios,Ventas,1308.82,USD,Conciliado
+2024-01-29,Egreso,Software Licencias,Administracion,1453.93,USD,Conciliado
+2024-01-30,Ingreso,Soporte Tecnico,Ventas,7791.33,USD,Conciliado
+2024-01-30,Egreso,Software Licencias,Tecnologia,6474.63,USD,Conciliado
+2024-01-31,Ingreso,Soporte Tecnico,Ventas,7521.64,USD,Conciliado
+2024-01-31,Egreso,Logistica y Envíos,Administracion,4102.22,USD,Conciliado
+2024-02-01,Egreso,Arriendos y Servicios,Operaciones,1738.0,USD,Completado
+2024-02-02,Egreso,Marketing Digital,Administracion,4386.63,USD,Conciliado
+2024-02-02,Egreso,Logistica y Envíos,Ventas,392.17,USD,Conciliado
+2024-02-02,Egreso,Servicios Cloud,Tecnologia,7483.2,USD,Completado
+2024-02-04,Egreso,Software Licencias,Operaciones,2492.28,USD,Conciliado
+2024-02-04,Ingreso,Licenciamiento Enterprise,Ventas,5751.18,USD,Conciliado
+2024-02-04,Ingreso,Venta Suscripciones SaaS,Ventas,6973.4,USD,Conciliado
+2024-02-05,Egreso,Marketing Digital,Tecnologia,5022.93,USD,Conciliado
+2024-02-05,Egreso,Logistica y Envíos,Ventas,5416.52,USD,Conciliado
+2024-02-05,Egreso,Marketing Digital,Operaciones,6210.87,USD,Conciliado
+2024-02-05,Egreso,Arriendos y Servicios,Operaciones,2347.5,USD,Conciliado
+2024-02-06,Egreso,Marketing Digital,Ventas,5384.92,USD,Conciliado
+2024-02-06,Egreso,Sueldos y Planilla,Operaciones,287.65,USD,Conciliado
+2024-02-06,Ingreso,Licenciamiento Enterprise,Operaciones,3809.16,USD,Conciliado
+2024-02-07,Ingreso,Venta Suscripciones SaaS,Ventas,1562.28,USD,Conciliado
+2024-02-07,Egreso,Software Licencias,Ventas,523.51,USD,Conciliado
+2024-02-07,Ingreso,Venta Suscripciones SaaS,Ventas,700.0,USD,Conciliado
+2024-02-07,Ingreso,Licenciamiento Enterprise,Ventas,8592.22,USD,Completado
+2024-02-08,Egreso,Software Licencias,Tecnologia,483.26,USD,Conciliado
+2024-02-08,Ingreso,Venta Suscripciones SaaS,Operaciones,3367.38,USD,Conciliado
+2024-02-09,Ingreso,Consultoria Analitica,Operaciones,10953.04,USD,Conciliado
+2024-02-10,Ingreso,Soporte Tecnico,Ventas,12332.34,USD,Conciliado
+2024-02-10,Egreso,Logistica y Envíos,Ventas,4995.71,USD,Conciliado
+2024-02-10,Egreso,Software Licencias,Tecnologia,3992.05,USD,Conciliado
+2024-02-11,Ingreso,Venta Suscripciones SaaS,Ventas,5120.93,USD,Conciliado
+2024-02-12,Egreso,Sueldos y Planilla,Tecnologia,7775.87,USD,Conciliado
+2024-02-13,Ingreso,Venta Suscripciones SaaS,Operaciones,11296.54,USD,Conciliado
+2024-02-13,Egreso,Marketing Digital,Tecnologia,634.67,USD,Conciliado
+2024-02-14,Ingreso,Soporte Tecnico,Operaciones,8576.28,USD,Conciliado
+2024-02-14,Egreso,Sueldos y Planilla,Administracion,6044.32,USD,Conciliado
+2024-02-14,Ingreso,Soporte Tecnico,Ventas,3395.28,USD,Conciliado
+2024-02-15,Egreso,Sueldos y Planilla,Tecnologia,4327.7,USD,Completado
+2024-02-15,Ingreso,Venta Suscripciones SaaS,Operaciones,9155.41,USD,Completado
+2024-02-15,Egreso,Software Licencias,Operaciones,5148.91,USD,Conciliado
+2024-02-15,Ingreso,Soporte Tecnico,Operaciones,9685.57,USD,Conciliado
+2024-02-15,Egreso,Arriendos y Servicios,Ventas,5385.27,USD,Completado
+2024-02-17,Ingreso,Venta Suscripciones SaaS,Operaciones,8638.05,USD,Conciliado
+2024-02-17,Egreso,Software Licencias,Operaciones,2297.98,USD,Conciliado
+2024-02-17,Ingreso,Consultoria Analitica,Operaciones,13510.67,USD,Conciliado
+2024-02-17,Egreso,Marketing Digital,Administracion,1067.97,USD,Conciliado
+2024-02-18,Ingreso,Consultoria Analitica,Ventas,7423.08,USD,Conciliado
+2024-02-19,Egreso,Marketing Digital,Administracion,3446.27,USD,Completado
+2024-02-19,Ingreso,Licenciamiento Enterprise,Operaciones,8588.56,USD,Conciliado
+2024-02-19,Egreso,Sueldos y Planilla,Operaciones,1616.26,USD,Conciliado
+2024-02-19,Ingreso,Soporte Tecnico,Operaciones,2727.05,USD,Conciliado
+2024-02-20,Egreso,Sueldos y Planilla,Operaciones,5041.57,USD,Conciliado
+2024-02-20,Egreso,Software Licencias,Administracion,6993.38,USD,Conciliado
+2024-02-21,Ingreso,Licenciamiento Enterprise,Operaciones,3213.71,USD,Conciliado
+2024-02-22,Ingreso,Consultoria Analitica,Ventas,10870.34,USD,Conciliado
+2024-02-23,Egreso,Marketing Digital,Administracion,3352.0,USD,Conciliado
+2024-02-24,Egreso,Sueldos y Planilla,Ventas,2251.55,USD,Conciliado
+2024-02-24,Egreso,Marketing Digital,Administracion,5121.12,USD,Conciliado
+2024-02-24,Ingreso,Soporte Tecnico,Operaciones,8097.46,USD,Completado
+2024-02-24,Ingreso,Licenciamiento Enterprise,Operaciones,6948.67,USD,Conciliado
+2024-02-24,Egreso,Arriendos y Servicios,Operaciones,1678.02,USD,Conciliado
+2024-02-25,Ingreso,Consultoria Analitica,Ventas,8276.14,USD,Conciliado
+2024-02-25,Egreso,Marketing Digital,Administracion,4648.79,USD,Conciliado
+2024-02-25,Egreso,Marketing Digital,Administracion,5847.31,USD,Conciliado
+2024-02-25,Ingreso,Venta Suscripciones SaaS,Ventas,12706.0,USD,Completado
+2024-02-27,Ingreso,Soporte Tecnico,Ventas,9416.39,USD,Conciliado
+2024-02-28,Egreso,Arriendos y Servicios,Operaciones,6031.93,USD,Conciliado
+2024-02-28,Egreso,Servicios Cloud,Ventas,5216.91,USD,Conciliado
+2024-02-28,Ingreso,Consultoria Analitica,Operaciones,531.86,USD,Conciliado
+2024-02-28,Egreso,Logistica y Envíos,Ventas,3884.27,USD,Conciliado
+2024-02-29,Ingreso,Venta Suscripciones SaaS,Operaciones,4913.29,USD,Conciliado
+2024-02-29,Egreso,Marketing Digital,Operaciones,7021.29,USD,Conciliado
+2024-03-01,Egreso,Logistica y Envíos,Ventas,7324.09,USD,Conciliado
+2024-03-01,Egreso,Software Licencias,Tecnologia,5790.26,USD,Conciliado
+2024-03-02,Egreso,Servicios Cloud,Tecnologia,1516.82,USD,Completado
+2024-03-02,Egreso,Sueldos y Planilla,Administracion,3670.14,USD,Conciliado
+2024-03-02,Ingreso,Licenciamiento Enterprise,Ventas,12482.61,USD,Conciliado
+2024-03-02,Ingreso,Soporte Tecnico,Operaciones,4547.13,USD,Conciliado
+2024-03-03,Egreso,Logistica y Envíos,Operaciones,5373.86,USD,Completado
+2024-03-03,Egreso,Logistica y Envíos,Ventas,824.22,USD,Conciliado
+2024-03-03,Ingreso,Consultoria Analitica,Ventas,2542.73,USD,Conciliado
+2024-03-04,Egreso,Logistica y Envíos,Ventas,5644.76,USD,Conciliado
+2024-03-05,Egreso,Arriendos y Servicios,Tecnologia,2722.76,USD,Completado
+2024-03-05,Egreso,Marketing Digital,Tecnologia,5890.19,USD,Conciliado
+2024-03-07,Egreso,Marketing Digital,Administracion,1376.5,USD,Conciliado
+2024-03-07,Egreso,Arriendos y Servicios,Operaciones,4537.04,USD,Conciliado
+2024-03-07,Ingreso,Licenciamiento Enterprise,Operaciones,12838.25,USD,Conciliado
+2024-03-08,Egreso,Servicios Cloud,Operaciones,7046.23,USD,Conciliado
+2024-03-08,Ingreso,Licenciamiento Enterprise,Operaciones,5237.43,USD,Conciliado
+2024-03-08,Egreso,Marketing Digital,Operaciones,4293.73,USD,Conciliado
+2024-03-08,Ingreso,Licenciamiento Enterprise,Operaciones,12512.99,USD,Conciliado
+2024-03-08,Egreso,Arriendos y Servicios,Ventas,6426.83,USD,Conciliado
+2024-03-09,Egreso,Logistica y Envíos,Operaciones,6007.11,USD,Conciliado
+2024-03-09,Ingreso,Soporte Tecnico,Ventas,5709.14,USD,Conciliado
+2024-03-11,Egreso,Servicios Cloud,Tecnologia,6070.68,USD,Conciliado
+2024-03-11,Ingreso,Consultoria Analitica,Operaciones,6400.16,USD,Conciliado
+2024-03-12,Ingreso,Soporte Tecnico,Operaciones,881.12,USD,Conciliado
+2024-03-12,Egreso,Sueldos y Planilla,Operaciones,6462.98,USD,Conciliado
+2024-03-12,Ingreso,Venta Suscripciones SaaS,Ventas,12540.4,USD,Conciliado
+2024-03-12,Egreso,Sueldos y Planilla,Operaciones,709.0,USD,Conciliado
+2024-03-13,Ingreso,Licenciamiento Enterprise,Ventas,7102.32,USD,Conciliado
+2024-03-13,Ingreso,Venta Suscripciones SaaS,Operaciones,3950.94,USD,Conciliado
+2024-03-14,Ingreso,Licenciamiento Enterprise,Operaciones,11145.9,USD,Completado
+2024-03-14,Egreso,Arriendos y Servicios,Operaciones,1846.24,USD,Conciliado
+2024-03-15,Ingreso,Consultoria Analitica,Ventas,9234.79,USD,Conciliado
+2024-03-15,Ingreso,Soporte Tecnico,Operaciones,4501.45,USD,Conciliado
+2024-03-15,Ingreso,Venta Suscripciones SaaS,Ventas,3398.59,USD,Completado
+2024-03-16,Egreso,Servicios Cloud,Tecnologia,7152.01,USD,Conciliado
+2024-03-16,Egreso,Arriendos y Servicios,Ventas,122.4,USD,Completado
+2024-03-16,Ingreso,Licenciamiento Enterprise,Operaciones,9552.6,USD,Conciliado
+2024-03-17,Ingreso,Consultoria Analitica,Operaciones,9885.54,USD,Conciliado
+2024-03-17,Ingreso,Venta Suscripciones SaaS,Ventas,13911.46,USD,Conciliado
+2024-03-18,Egreso,Sueldos y Planilla,Administracion,3341.98,USD,Completado
+2024-03-18,Ingreso,Consultoria Analitica,Operaciones,5457.74,USD,Conciliado
+2024-03-20,Egreso,Arriendos y Servicios,Administracion,2103.7,USD,Conciliado
+2024-03-21,Ingreso,Venta Suscripciones SaaS,Operaciones,2769.72,USD,Conciliado
+2024-03-21,Egreso,Servicios Cloud,Administracion,7935.52,USD,Conciliado
+2024-03-21,Egreso,Logistica y Envíos,Ventas,6829.78,USD,Conciliado
+2024-03-22,Egreso,Logistica y Envíos,Administracion,4811.63,USD,Conciliado
+2024-03-24,Egreso,Marketing Digital,Operaciones,4231.74,USD,Conciliado
+2024-03-25,Egreso,Arriendos y Servicios,Operaciones,6016.77,USD,Conciliado
+2024-03-26,Egreso,Software Licencias,Ventas,5775.02,USD,Completado
+2024-03-27,Egreso,Arriendos y Servicios,Operaciones,1318.13,USD,Conciliado
+2024-03-27,Egreso,Sueldos y Planilla,Operaciones,1196.84,USD,Conciliado
+2024-03-28,Egreso,Sueldos y Planilla,Tecnologia,5882.68,USD,Conciliado
+2024-03-28,Egreso,Arriendos y Servicios,Tecnologia,1530.97,USD,Conciliado
+2024-03-28,Ingreso,Soporte Tecnico,Ventas,9212.16,USD,Conciliado
+2024-03-29,Ingreso,Soporte Tecnico,Ventas,14869.3,USD,Conciliado
+2024-03-30,Egreso,Marketing Digital,Tecnologia,3307.99,USD,Conciliado
+2024-03-30,Egreso,Sueldos y Planilla,Tecnologia,7477.99,USD,Completado
+2024-03-30,Egreso,Servicios Cloud,Ventas,543.73,USD,Conciliado
+2024-03-31,Egreso,Marketing Digital,Administracion,2402.44,USD,Completado
+2024-03-31,Egreso,Sueldos y Planilla,Ventas,5870.91,USD,Conciliado
+2024-03-31,Egreso,Servicios Cloud,Ventas,1577.11,USD,Conciliado
+2024-04-01,Egreso,Servicios Cloud,Operaciones,6977.1,USD,Conciliado
+2024-04-02,Ingreso,Consultoria Analitica,Operaciones,924.9,USD,Conciliado
+2024-04-02,Egreso,Arriendos y Servicios,Tecnologia,5519.49,USD,Conciliado
+2024-04-04,Egreso,Arriendos y Servicios,Administracion,1359.03,USD,Conciliado
+2024-04-05,Ingreso,Licenciamiento Enterprise,Ventas,11966.13,USD,Conciliado
+2024-04-05,Egreso,Logistica y Envíos,Ventas,3225.1,USD,Conciliado
+2024-04-05,Ingreso,Venta Suscripciones SaaS,Operaciones,10086.09,USD,Conciliado
+2024-04-06,Egreso,Arriendos y Servicios,Ventas,5822.01,USD,Conciliado
+2024-04-07,Ingreso,Soporte Tecnico,Ventas,10268.24,USD,Completado
+2024-04-08,Egreso,Marketing Digital,Ventas,4508.88,USD,Completado
+2024-04-09,Egreso,Marketing Digital,Ventas,2873.69,USD,Conciliado
+2024-04-10,Ingreso,Soporte Tecnico,Ventas,8761.95,USD,Conciliado
+2024-04-10,Egreso,Sueldos y Planilla,Administracion,2506.8,USD,Conciliado
+2024-04-10,Ingreso,Venta Suscripciones SaaS,Ventas,11047.67,USD,Conciliado
+2024-04-11,Ingreso,Consultoria Analitica,Operaciones,1977.57,USD,Completado
+2024-04-11,Egreso,Logistica y Envíos,Tecnologia,4050.62,USD,Conciliado
+2024-04-11,Egreso,Logistica y Envíos,Operaciones,7617.17,USD,Conciliado
+2024-04-12,Egreso,Marketing Digital,Administracion,7473.63,USD,Completado
+2024-04-12,Egreso,Marketing Digital,Tecnologia,2637.22,USD,Completado
+2024-04-12,Ingreso,Soporte Tecnico,Ventas,2576.75,USD,Conciliado
+2024-04-12,Ingreso,Consultoria Analitica,Ventas,13154.77,USD,Conciliado
+2024-04-13,Ingreso,Soporte Tecnico,Ventas,4782.59,USD,Conciliado
+2024-04-14,Egreso,Marketing Digital,Operaciones,4092.73,USD,Completado
+2024-04-14,Egreso,Sueldos y Planilla,Administracion,4337.48,USD,Conciliado
+2024-04-15,Egreso,Software Licencias,Administracion,7041.23,USD,Conciliado
+2024-04-16,Egreso,Logistica y Envíos,Tecnologia,2711.77,USD,Conciliado
+2024-04-17,Egreso,Arriendos y Servicios,Operaciones,4892.63,USD,Conciliado
+2024-04-17,Egreso,Sueldos y Planilla,Administracion,6933.11,USD,Conciliado
+2024-04-18,Egreso,Arriendos y Servicios,Operaciones,7023.3,USD,Conciliado
+2024-04-18,Egreso,Marketing Digital,Administracion,6113.71,USD,Conciliado
+2024-04-18,Egreso,Logistica y Envíos,Operaciones,5953.46,USD,Conciliado
+2024-04-19,Egreso,Sueldos y Planilla,Administracion,7367.16,USD,Completado
+2024-04-20,Egreso,Servicios Cloud,Tecnologia,2826.87,USD,Conciliado
+2024-04-22,Ingreso,Soporte Tecnico,Ventas,1228.17,USD,Completado
+2024-04-22,Egreso,Sueldos y Planilla,Administracion,6421.28,USD,Completado
+2024-04-22,Ingreso,Soporte Tecnico,Operaciones,9567.18,USD,Conciliado
+2024-04-23,Egreso,Software Licencias,Operaciones,6608.46,USD,Conciliado
+2024-04-23,Egreso,Servicios Cloud,Administracion,2160.12,USD,Conciliado
+2024-04-23,Egreso,Software Licencias,Operaciones,2721.88,USD,Conciliado
+2024-04-23,Egreso,Software Licencias,Operaciones,3545.38,USD,Conciliado
+2024-04-24,Egreso,Arriendos y Servicios,Operaciones,5892.49,USD,Conciliado
+2024-04-25,Ingreso,Venta Suscripciones SaaS,Ventas,9030.48,USD,Conciliado
+2024-04-25,Egreso,Software Licencias,Administracion,5427.81,USD,Completado
+2024-04-25,Ingreso,Consultoria Analitica,Ventas,12183.75,USD,Conciliado
+2024-04-25,Egreso,Arriendos y Servicios,Tecnologia,586.95,USD,Conciliado
+2024-04-26,Egreso,Servicios Cloud,Tecnologia,6857.01,USD,Conciliado
+2024-04-27,Ingreso,Licenciamiento Enterprise,Ventas,2749.26,USD,Completado
+2024-04-29,Egreso,Arriendos y Servicios,Operaciones,7085.46,USD,Completado
+2024-04-29,Egreso,Servicios Cloud,Administracion,2337.81,USD,Conciliado
+2024-04-30,Egreso,Arriendos y Servicios,Tecnologia,2045.1,USD,Conciliado
+2024-04-30,Egreso,Sueldos y Planilla,Ventas,6471.85,USD,Conciliado
+2024-04-30,Egreso,Marketing Digital,Tecnologia,7979.66,USD,Conciliado
+2024-04-30,Egreso,Sueldos y Planilla,Operaciones,3170.3,USD,Conciliado
+2024-04-30,Egreso,Servicios Cloud,Tecnologia,3218.95,USD,Conciliado
+2024-04-30,Egreso,Logistica y Envíos,Ventas,1648.9,USD,Conciliado
+2024-05-01,Egreso,Sueldos y Planilla,Tecnologia,7063.19,USD,Conciliado
+2024-05-01,Ingreso,Licenciamiento Enterprise,Operaciones,12985.21,USD,Conciliado
+2024-05-01,Egreso,Servicios Cloud,Ventas,7783.22,USD,Conciliado
+2024-05-02,Ingreso,Soporte Tecnico,Ventas,13607.63,USD,Conciliado
+2024-05-02,Egreso,Marketing Digital,Operaciones,3107.23,USD,Conciliado
+2024-05-02,Ingreso,Consultoria Analitica,Ventas,5912.94,USD,Conciliado
+2024-05-02,Ingreso,Venta Suscripciones SaaS,Ventas,13907.1,USD,Conciliado
+2024-05-03,Ingreso,Consultoria Analitica,Operaciones,10870.93,USD,Conciliado
+2024-05-04,Egreso,Sueldos y Planilla,Ventas,3130.33,USD,Completado
+2024-05-04,Egreso,Sueldos y Planilla,Tecnologia,2469.8,USD,Conciliado
+2024-05-04,Ingreso,Licenciamiento Enterprise,Operaciones,12339.17,USD,Conciliado
+2024-05-04,Egreso,Arriendos y Servicios,Ventas,7777.68,USD,Conciliado
+2024-05-05,Ingreso,Soporte Tecnico,Ventas,4414.24,USD,Conciliado
+2024-05-05,Egreso,Arriendos y Servicios,Tecnologia,6812.93,USD,Conciliado
+2024-05-06,Egreso,Marketing Digital,Administracion,6149.93,USD,Conciliado
+2024-05-06,Ingreso,Venta Suscripciones SaaS,Ventas,9509.37,USD,Conciliado
+2024-05-07,Egreso,Marketing Digital,Tecnologia,1414.07,USD,Conciliado
+2024-05-07,Egreso,Software Licencias,Tecnologia,2627.49,USD,Conciliado
+2024-05-07,Ingreso,Venta Suscripciones SaaS,Ventas,13811.45,USD,Conciliado
+2024-05-07,Ingreso,Licenciamiento Enterprise,Ventas,5025.34,USD,Conciliado
+2024-05-07,Egreso,Marketing Digital,Tecnologia,1332.36,USD,Conciliado
+2024-05-08,Ingreso,Soporte Tecnico,Operaciones,12534.76,USD,Conciliado
+2024-05-09,Ingreso,Consultoria Analitica,Ventas,10229.18,USD,Completado
+2024-05-10,Ingreso,Venta Suscripciones SaaS,Operaciones,612.08,USD,Conciliado
+2024-05-10,Egreso,Software Licencias,Operaciones,860.78,USD,Conciliado
+2024-05-11,Egreso,Logistica y Envíos,Operaciones,7742.33,USD,Conciliado
+2024-05-12,Ingreso,Venta Suscripciones SaaS,Operaciones,1761.9,USD,Conciliado
+2024-05-12,Egreso,Arriendos y Servicios,Ventas,6127.05,USD,Completado
+2024-05-13,Egreso,Sueldos y Planilla,Operaciones,7971.28,USD,Conciliado
+2024-05-13,Ingreso,Venta Suscripciones SaaS,Operaciones,8600.15,USD,Conciliado
+2024-05-15,Ingreso,Soporte Tecnico,Operaciones,5512.46,USD,Conciliado
+2024-05-15,Ingreso,Venta Suscripciones SaaS,Ventas,5581.98,USD,Conciliado
+2024-05-16,Egreso,Software Licencias,Ventas,5219.48,USD,Conciliado
+2024-05-16,Egreso,Servicios Cloud,Administracion,3047.11,USD,Conciliado
+2024-05-16,Egreso,Arriendos y Servicios,Tecnologia,7885.36,USD,Conciliado
+2024-05-17,Egreso,Arriendos y Servicios,Tecnologia,258.41,USD,Conciliado
+2024-05-19,Egreso,Logistica y Envíos,Administracion,3936.73,USD,Conciliado
+2024-05-19,Egreso,Logistica y Envíos,Operaciones,3975.77,USD,Conciliado
+2024-05-20,Egreso,Software Licencias,Operaciones,2357.25,USD,Conciliado
+2024-05-20,Ingreso,Licenciamiento Enterprise,Operaciones,2939.03,USD,Conciliado
+2024-05-20,Ingreso,Consultoria Analitica,Ventas,8856.04,USD,Conciliado
+2024-05-21,Egreso,Arriendos y Servicios,Tecnologia,4814.65,USD,Conciliado
+2024-05-21,Egreso,Logistica y Envíos,Operaciones,2785.01,USD,Conciliado
+2024-05-21,Egreso,Servicios Cloud,Administracion,6313.75,USD,Conciliado
+2024-05-21,Egreso,Marketing Digital,Operaciones,2163.06,USD,Conciliado
+2024-05-21,Ingreso,Consultoria Analitica,Operaciones,7094.01,USD,Conciliado
+2024-05-22,Egreso,Servicios Cloud,Tecnologia,3600.73,USD,Conciliado
+2024-05-22,Egreso,Marketing Digital,Administracion,2874.05,USD,Conciliado
+2024-05-22,Egreso,Logistica y Envíos,Tecnologia,6776.73,USD,Conciliado
+2024-05-23,Egreso,Arriendos y Servicios,Ventas,5299.06,USD,Completado
+2024-05-24,Egreso,Arriendos y Servicios,Administracion,4681.39,USD,Completado
+2024-05-24,Ingreso,Licenciamiento Enterprise,Ventas,10344.02,USD,Conciliado
+2024-05-24,Egreso,Software Licencias,Operaciones,5412.91,USD,Conciliado
+2024-05-25,Egreso,Software Licencias,Tecnologia,4992.16,USD,Conciliado
+2024-05-25,Ingreso,Consultoria Analitica,Operaciones,8709.06,USD,Conciliado
+2024-05-25,Ingreso,Soporte Tecnico,Operaciones,11733.79,USD,Completado
+2024-05-26,Ingreso,Venta Suscripciones SaaS,Operaciones,9417.62,USD,Conciliado
+2024-05-26,Ingreso,Soporte Tecnico,Ventas,12189.43,USD,Conciliado
+2024-05-27,Egreso,Servicios Cloud,Administracion,2836.27,USD,Conciliado
+2024-05-28,Ingreso,Licenciamiento Enterprise,Operaciones,8873.38,USD,Conciliado
+2024-05-28,Ingreso,Licenciamiento Enterprise,Ventas,6676.93,USD,Conciliado
+2024-05-28,Ingreso,Soporte Tecnico,Operaciones,9457.08,USD,Conciliado
+2024-05-29,Egreso,Marketing Digital,Administracion,3382.37,USD,Completado
+2024-05-29,Egreso,Marketing Digital,Tecnologia,5646.56,USD,Completado
+2024-05-31,Ingreso,Venta Suscripciones SaaS,Ventas,8898.11,USD,Conciliado
+2024-05-31,Ingreso,Consultoria Analitica,Ventas,4882.88,USD,Conciliado
+2024-05-31,Egreso,Servicios Cloud,Tecnologia,4110.75,USD,Conciliado
+2024-05-31,Egreso,Sueldos y Planilla,Tecnologia,4009.61,USD,Conciliado
+2024-05-31,Ingreso,Venta Suscripciones SaaS,Ventas,1947.23,USD,Completado
+2024-06-01,Egreso,Software Licencias,Administracion,1737.49,USD,Conciliado
+2024-06-02,Egreso,Software Licencias,Administracion,3326.3,USD,Conciliado
+2024-06-02,Egreso,Servicios Cloud,Tecnologia,2662.56,USD,Conciliado
+2024-06-02,Ingreso,Consultoria Analitica,Operaciones,8717.09,USD,Conciliado
+2024-06-02,Ingreso,Venta Suscripciones SaaS,Operaciones,827.48,USD,Conciliado
+2024-06-02,Ingreso,Venta Suscripciones SaaS,Ventas,6276.83,USD,Conciliado
+2024-06-03,Egreso,Software Licencias,Administracion,3308.13,USD,Conciliado
+2024-06-04,Ingreso,Consultoria Analitica,Operaciones,2217.55,USD,Conciliado
+2024-06-05,Egreso,Software Licencias,Administracion,5177.65,USD,Completado
+2024-06-06,Egreso,Software Licencias,Ventas,3245.23,USD,Completado
+2024-06-07,Egreso,Marketing Digital,Ventas,148.24,USD,Conciliado
+2024-06-08,Egreso,Arriendos y Servicios,Ventas,3323.13,USD,Completado
+2024-06-09,Ingreso,Soporte Tecnico,Operaciones,2397.74,USD,Conciliado
+2024-06-09,Ingreso,Consultoria Analitica,Operaciones,14679.49,USD,Conciliado
+2024-06-10,Ingreso,Consultoria Analitica,Operaciones,9012.02,USD,Completado
+2024-06-11,Egreso,Logistica y Envíos,Operaciones,3780.08,USD,Conciliado
+2024-06-11,Ingreso,Soporte Tecnico,Ventas,5798.48,USD,Conciliado
+2024-06-11,Egreso,Arriendos y Servicios,Tecnologia,1845.07,USD,Completado
+2024-06-12,Egreso,Marketing Digital,Tecnologia,2572.08,USD,Conciliado
+2024-06-13,Egreso,Software Licencias,Administracion,1986.56,USD,Conciliado
+2024-06-13,Ingreso,Soporte Tecnico,Ventas,9272.2,USD,Conciliado
+2024-06-13,Egreso,Arriendos y Servicios,Tecnologia,1605.56,USD,Conciliado
+2024-06-14,Ingreso,Soporte Tecnico,Ventas,13041.2,USD,Conciliado
+2024-06-14,Ingreso,Consultoria Analitica,Ventas,9005.83,USD,Conciliado
+2024-06-14,Egreso,Software Licencias,Operaciones,4963.31,USD,Conciliado
+2024-06-15,Ingreso,Soporte Tecnico,Operaciones,12564.38,USD,Conciliado
+2024-06-16,Egreso,Marketing Digital,Administracion,3622.73,USD,Conciliado
+2024-06-16,Ingreso,Licenciamiento Enterprise,Ventas,3887.36,USD,Conciliado
+2024-06-16,Ingreso,Consultoria Analitica,Operaciones,14541.8,USD,Conciliado
+2024-06-18,Egreso,Logistica y Envíos,Administracion,1931.66,USD,Conciliado
+2024-06-18,Egreso,Servicios Cloud,Operaciones,5991.42,USD,Completado
+2024-06-18,Ingreso,Licenciamiento Enterprise,Ventas,7224.53,USD,Conciliado
+2024-06-18,Egreso,Arriendos y Servicios,Operaciones,4839.61,USD,Conciliado
+2024-06-18,Egreso,Logistica y Envíos,Operaciones,3618.33,USD,Conciliado
+2024-06-19,Egreso,Logistica y Envíos,Ventas,6437.66,USD,Conciliado
+2024-06-19,Ingreso,Licenciamiento Enterprise,Ventas,8417.2,USD,Conciliado
+2024-06-19,Ingreso,Venta Suscripciones SaaS,Ventas,3571.21,USD,Completado
+2024-06-20,Egreso,Sueldos y Planilla,Operaciones,2906.74,USD,Conciliado
+2024-06-21,Ingreso,Consultoria Analitica,Operaciones,14649.98,USD,Conciliado
+2024-06-22,Egreso,Logistica y Envíos,Ventas,7706.86,USD,Conciliado
+2024-06-22,Ingreso,Consultoria Analitica,Ventas,1607.5,USD,Conciliado
+2024-06-23,Ingreso,Consultoria Analitica,Operaciones,14379.59,USD,Conciliado
+2024-06-23,Ingreso,Licenciamiento Enterprise,Ventas,8558.97,USD,Conciliado
+2024-06-23,Egreso,Logistica y Envíos,Ventas,1616.84,USD,Conciliado
+2024-06-24,Egreso,Software Licencias,Operaciones,6198.72,USD,Conciliado
+2024-06-24,Ingreso,Soporte Tecnico,Operaciones,6303.63,USD,Conciliado
+2024-06-25,Egreso,Marketing Digital,Administracion,5147.62,USD,Conciliado
+2024-06-25,Egreso,Logistica y Envíos,Ventas,7768.57,USD,Conciliado
+2024-06-25,Egreso,Logistica y Envíos,Tecnologia,7108.66,USD,Conciliado
+2024-06-26,Ingreso,Soporte Tecnico,Ventas,3866.09,USD,Conciliado
+2024-06-26,Egreso,Software Licencias,Ventas,4948.24,USD,Completado
+2024-06-27,Egreso,Logistica y Envíos,Operaciones,520.73,USD,Conciliado
+2024-06-27,Egreso,Software Licencias,Tecnologia,2260.31,USD,Conciliado
+2024-06-27,Egreso,Logistica y Envíos,Administracion,5803.75,USD,Conciliado
+2024-06-27,Egreso,Servicios Cloud,Tecnologia,3568.65,USD,Conciliado
+2024-06-27,Egreso,Sueldos y Planilla,Administracion,3786.91,USD,Conciliado
+2024-06-28,Ingreso,Venta Suscripciones SaaS,Ventas,11827.88,USD,Conciliado
+2024-06-28,Ingreso,Licenciamiento Enterprise,Ventas,11359.94,USD,Conciliado
+2024-06-29,Ingreso,Soporte Tecnico,Operaciones,12875.0,USD,Conciliado
+2024-06-29,Ingreso,Consultoria Analitica,Ventas,9502.92,USD,Conciliado
+2024-06-29,Egreso,Marketing Digital,Tecnologia,3747.77,USD,Conciliado
+2024-06-29,Egreso,Arriendos y Servicios,Administracion,4608.04,USD,Conciliado
+2024-06-29,Egreso,Logistica y Envíos,Tecnologia,4730.03,USD,Conciliado
+2024-06-30,Ingreso,Licenciamiento Enterprise,Ventas,3150.37,USD,Conciliado
+2024-07-01,Egreso,Marketing Digital,Tecnologia,2004.89,USD,Conciliado
+2024-07-02,Egreso,Sueldos y Planilla,Tecnologia,4751.94,USD,Conciliado
+2024-07-02,Egreso,Logistica y Envíos,Administracion,1178.62,USD,Completado
+2024-07-03,Egreso,Logistica y Envíos,Administracion,3781.43,USD,Conciliado
+2024-07-03,Egreso,Arriendos y Servicios,Tecnologia,4791.18,USD,Conciliado
+2024-07-03,Ingreso,Licenciamiento Enterprise,Ventas,10135.38,USD,Conciliado
+2024-07-03,Egreso,Marketing Digital,Administracion,2818.71,USD,Conciliado
+2024-07-04,Egreso,Marketing Digital,Ventas,1991.67,USD,Completado
+2024-07-04,Egreso,Servicios Cloud,Ventas,3670.84,USD,Completado
+2024-07-04,Egreso,Arriendos y Servicios,Administracion,7727.66,USD,Conciliado
+2024-07-05,Egreso,Logistica y Envíos,Operaciones,1432.25,USD,Conciliado
+2024-07-06,Egreso,Servicios Cloud,Administracion,6104.03,USD,Conciliado
+2024-07-07,Egreso,Sueldos y Planilla,Ventas,3123.5,USD,Conciliado
+2024-07-08,Egreso,Sueldos y Planilla,Tecnologia,3495.32,USD,Conciliado
+2024-07-08,Ingreso,Soporte Tecnico,Operaciones,14283.05,USD,Conciliado
+2024-07-09,Egreso,Software Licencias,Tecnologia,770.73,USD,Conciliado
+2024-07-10,Egreso,Sueldos y Planilla,Ventas,4296.21,USD,Conciliado
+2024-07-10,Egreso,Software Licencias,Tecnologia,7391.58,USD,Conciliado
+2024-07-11,Egreso,Software Licencias,Administracion,4728.41,USD,Conciliado
+2024-07-11,Egreso,Software Licencias,Ventas,2529.33,USD,Conciliado
+2024-07-11,Egreso,Sueldos y Planilla,Operaciones,4179.34,USD,Conciliado
+2024-07-11,Egreso,Software Licencias,Administracion,6453.87,USD,Conciliado
+2024-07-12,Ingreso,Consultoria Analitica,Operaciones,9976.24,USD,Conciliado
+2024-07-12,Ingreso,Soporte Tecnico,Operaciones,1970.71,USD,Conciliado
+2024-07-12,Egreso,Sueldos y Planilla,Administracion,6084.04,USD,Conciliado
+2024-07-13,Ingreso,Licenciamiento Enterprise,Ventas,9254.03,USD,Conciliado
+2024-07-13,Egreso,Sueldos y Planilla,Operaciones,4052.07,USD,Conciliado
+2024-07-13,Egreso,Software Licencias,Administracion,1318.79,USD,Conciliado
+2024-07-14,Egreso,Arriendos y Servicios,Operaciones,2437.39,USD,Conciliado
+2024-07-14,Ingreso,Soporte Tecnico,Operaciones,1146.95,USD,Conciliado
+2024-07-14,Ingreso,Venta Suscripciones SaaS,Operaciones,6669.6,USD,Conciliado
+2024-07-14,Egreso,Logistica y Envíos,Ventas,5090.53,USD,Completado
+2024-07-15,Egreso,Logistica y Envíos,Ventas,2061.34,USD,Conciliado
+2024-07-15,Ingreso,Licenciamiento Enterprise,Operaciones,14333.5,USD,Conciliado
+2024-07-15,Egreso,Logistica y Envíos,Operaciones,4950.33,USD,Conciliado
+2024-07-16,Ingreso,Consultoria Analitica,Ventas,12928.11,USD,Conciliado
+2024-07-16,Egreso,Logistica y Envíos,Ventas,6419.2,USD,Conciliado
+2024-07-16,Ingreso,Venta Suscripciones SaaS,Operaciones,3434.05,USD,Conciliado
+2024-07-17,Ingreso,Consultoria Analitica,Operaciones,3053.46,USD,Conciliado
+2024-07-17,Egreso,Logistica y Envíos,Administracion,7728.46,USD,Conciliado
+2024-07-17,Egreso,Software Licencias,Tecnologia,2569.97,USD,Conciliado
+2024-07-18,Ingreso,Soporte Tecnico,Operaciones,4636.11,USD,Conciliado
+2024-07-19,Egreso,Software Licencias,Ventas,4749.86,USD,Conciliado
+2024-07-20,Ingreso,Consultoria Analitica,Ventas,10893.42,USD,Conciliado
+2024-07-20,Egreso,Sueldos y Planilla,Tecnologia,3711.85,USD,Conciliado
+2024-07-22,Egreso,Sueldos y Planilla,Operaciones,7499.21,USD,Completado
+2024-07-22,Ingreso,Soporte Tecnico,Operaciones,12460.29,USD,Conciliado
+2024-07-22,Egreso,Software Licencias,Administracion,2193.53,USD,Conciliado
+2024-07-22,Ingreso,Venta Suscripciones SaaS,Operaciones,14083.51,USD,Conciliado
+2024-07-23,Egreso,Logistica y Envíos,Ventas,2778.39,USD,Conciliado
+2024-07-23,Egreso,Marketing Digital,Ventas,700.63,USD,Conciliado
+2024-07-24,Egreso,Arriendos y Servicios,Tecnologia,389.91,USD,Conciliado
+2024-07-24,Ingreso,Venta Suscripciones SaaS,Ventas,1830.49,USD,Conciliado
+2024-07-24,Ingreso,Consultoria Analitica,Operaciones,5756.59,USD,Conciliado
+2024-07-24,Ingreso,Consultoria Analitica,Operaciones,4523.28,USD,Conciliado
+2024-07-24,Ingreso,Venta Suscripciones SaaS,Operaciones,8943.7,USD,Completado
+2024-07-25,Ingreso,Consultoria Analitica,Ventas,11043.95,USD,Conciliado
+2024-07-27,Egreso,Sueldos y Planilla,Administracion,5555.81,USD,Conciliado
+2024-07-27,Ingreso,Soporte Tecnico,Ventas,6778.86,USD,Conciliado
+2024-07-28,Ingreso,Soporte Tecnico,Operaciones,3166.25,USD,Conciliado
+2024-07-29,Ingreso,Soporte Tecnico,Operaciones,10725.8,USD,Conciliado
+2024-07-29,Egreso,Marketing Digital,Ventas,6949.68,USD,Conciliado
+2024-07-29,Ingreso,Venta Suscripciones SaaS,Ventas,2354.33,USD,Conciliado
+2024-08-01,Egreso,Sueldos y Planilla,Operaciones,3168.51,USD,Conciliado
+2024-08-02,Egreso,Arriendos y Servicios,Operaciones,4229.98,USD,Conciliado
+2024-08-02,Egreso,Sueldos y Planilla,Ventas,6429.95,USD,Completado
+2024-08-02,Egreso,Arriendos y Servicios,Ventas,3131.31,USD,Conciliado
+2024-08-02,Egreso,Software Licencias,Ventas,379.02,USD,Conciliado
+2024-08-02,Egreso,Marketing Digital,Administracion,2984.12,USD,Conciliado
+2024-08-03,Ingreso,Venta Suscripciones SaaS,Operaciones,12922.61,USD,Conciliado
+2024-08-03,Ingreso,Venta Suscripciones SaaS,Ventas,7319.45,USD,Completado
+2024-08-04,Egreso,Servicios Cloud,Ventas,2964.52,USD,Completado
+2024-08-04,Ingreso,Soporte Tecnico,Ventas,3427.83,USD,Conciliado
+2024-08-05,Ingreso,Consultoria Analitica,Ventas,4816.78,USD,Conciliado
+2024-08-06,Egreso,Servicios Cloud,Ventas,694.43,USD,Conciliado
+2024-08-06,Ingreso,Consultoria Analitica,Operaciones,13670.41,USD,Conciliado
+2024-08-07,Ingreso,Soporte Tecnico,Operaciones,3135.07,USD,Conciliado
+2024-08-07,Ingreso,Consultoria Analitica,Ventas,3483.87,USD,Conciliado
+2024-08-07,Ingreso,Consultoria Analitica,Ventas,4092.9,USD,Conciliado
+2024-08-08,Ingreso,Venta Suscripciones SaaS,Ventas,4251.71,USD,Conciliado
+2024-08-10,Ingreso,Venta Suscripciones SaaS,Operaciones,14330.33,USD,Completado
+2024-08-10,Ingreso,Licenciamiento Enterprise,Operaciones,9430.73,USD,Conciliado
+2024-08-10,Ingreso,Venta Suscripciones SaaS,Operaciones,1588.1,USD,Conciliado
+2024-08-10,Ingreso,Venta Suscripciones SaaS,Ventas,5300.87,USD,Conciliado
+2024-08-10,Ingreso,Licenciamiento Enterprise,Ventas,3715.67,USD,Conciliado
+2024-08-12,Egreso,Software Licencias,Tecnologia,2489.89,USD,Conciliado
+2024-08-12,Egreso,Logistica y Envíos,Ventas,1059.27,USD,Conciliado
+2024-08-12,Egreso,Marketing Digital,Tecnologia,7039.96,USD,Conciliado
+2024-08-13,Ingreso,Soporte Tecnico,Ventas,722.54,USD,Conciliado
+2024-08-14,Egreso,Arriendos y Servicios,Ventas,3838.17,USD,Conciliado
+2024-08-14,Egreso,Software Licencias,Administracion,7146.96,USD,Conciliado
+2024-08-14,Egreso,Sueldos y Planilla,Ventas,4261.26,USD,Conciliado
+2024-08-14,Ingreso,Soporte Tecnico,Operaciones,4267.2,USD,Conciliado
+2024-08-15,Ingreso,Venta Suscripciones SaaS,Operaciones,11038.81,USD,Conciliado
+2024-08-15,Egreso,Servicios Cloud,Ventas,4566.64,USD,Conciliado
+2024-08-15,Ingreso,Licenciamiento Enterprise,Operaciones,12348.08,USD,Conciliado
+2024-08-16,Egreso,Marketing Digital,Administracion,2726.28,USD,Conciliado
+2024-08-17,Ingreso,Consultoria Analitica,Ventas,14596.39,USD,Conciliado
+2024-08-18,Ingreso,Soporte Tecnico,Operaciones,8762.82,USD,Conciliado
+2024-08-18,Ingreso,Licenciamiento Enterprise,Ventas,14744.59,USD,Conciliado
+2024-08-18,Ingreso,Licenciamiento Enterprise,Ventas,10555.14,USD,Conciliado
+2024-08-19,Egreso,Sueldos y Planilla,Operaciones,3360.69,USD,Conciliado
+2024-08-20,Egreso,Marketing Digital,Operaciones,1384.97,USD,Conciliado
+2024-08-20,Ingreso,Licenciamiento Enterprise,Ventas,3842.8,USD,Conciliado
+2024-08-20,Ingreso,Consultoria Analitica,Ventas,13896.71,USD,Conciliado
+2024-08-20,Ingreso,Venta Suscripciones SaaS,Operaciones,5031.95,USD,Conciliado
+2024-08-20,Ingreso,Licenciamiento Enterprise,Operaciones,5018.74,USD,Conciliado
+2024-08-20,Egreso,Servicios Cloud,Operaciones,7846.66,USD,Conciliado
+2024-08-21,Egreso,Sueldos y Planilla,Administracion,7995.05,USD,Conciliado
+2024-08-21,Egreso,Arriendos y Servicios,Administracion,4240.53,USD,Completado
+2024-08-21,Egreso,Marketing Digital,Ventas,6619.96,USD,Conciliado
+2024-08-21,Egreso,Software Licencias,Administracion,7030.62,USD,Conciliado
+2024-08-22,Egreso,Software Licencias,Tecnologia,2929.96,USD,Conciliado
+2024-08-23,Ingreso,Consultoria Analitica,Ventas,3732.39,USD,Conciliado
+2024-08-23,Ingreso,Venta Suscripciones SaaS,Ventas,671.39,USD,Conciliado
+2024-08-24,Egreso,Sueldos y Planilla,Operaciones,3563.79,USD,Conciliado
+2024-08-25,Egreso,Software Licencias,Tecnologia,7392.28,USD,Conciliado
+2024-08-26,Ingreso,Soporte Tecnico,Operaciones,10448.07,USD,Conciliado
+2024-08-27,Egreso,Arriendos y Servicios,Tecnologia,6900.16,USD,Conciliado
+2024-08-27,Egreso,Software Licencias,Operaciones,3279.82,USD,Conciliado
+2024-08-27,Egreso,Marketing Digital,Tecnologia,4029.23,USD,Completado
+2024-08-27,Ingreso,Venta Suscripciones SaaS,Operaciones,5294.92,USD,Conciliado
+2024-08-28,Ingreso,Soporte Tecnico,Operaciones,14725.07,USD,Conciliado
+2024-08-29,Egreso,Sueldos y Planilla,Administracion,6094.85,USD,Conciliado
+2024-08-29,Ingreso,Soporte Tecnico,Ventas,3109.73,USD,Conciliado
+2024-08-29,Egreso,Arriendos y Servicios,Ventas,7996.89,USD,Conciliado
+2024-08-29,Egreso,Marketing Digital,Administracion,2990.8,USD,Conciliado
+2024-08-30,Ingreso,Licenciamiento Enterprise,Operaciones,6343.12,USD,Conciliado
+2024-08-31,Egreso,Sueldos y Planilla,Administracion,2193.95,USD,Completado
+2024-09-01,Egreso,Marketing Digital,Administracion,7657.82,USD,Completado
+2024-09-01,Ingreso,Soporte Tecnico,Ventas,1795.3,USD,Conciliado
+2024-09-01,Ingreso,Consultoria Analitica,Operaciones,12193.46,USD,Conciliado
+2024-09-01,Ingreso,Venta Suscripciones SaaS,Operaciones,8239.85,USD,Completado
+2024-09-02,Egreso,Logistica y Envíos,Tecnologia,6604.38,USD,Conciliado
+2024-09-02,Ingreso,Licenciamiento Enterprise,Operaciones,14028.85,USD,Conciliado
+2024-09-03,Ingreso,Venta Suscripciones SaaS,Operaciones,5576.65,USD,Conciliado
+2024-09-05,Egreso,Logistica y Envíos,Ventas,7229.3,USD,Conciliado
+2024-09-06,Ingreso,Venta Suscripciones SaaS,Ventas,13099.16,USD,Conciliado
+2024-09-06,Egreso,Sueldos y Planilla,Operaciones,5686.75,USD,Conciliado
+2024-09-06,Ingreso,Consultoria Analitica,Ventas,5044.5,USD,Conciliado
+2024-09-06,Ingreso,Soporte Tecnico,Ventas,6889.97,USD,Conciliado
+2024-09-07,Egreso,Software Licencias,Administracion,2575.89,USD,Conciliado
+2024-09-07,Ingreso,Consultoria Analitica,Operaciones,5061.41,USD,Conciliado
+2024-09-07,Egreso,Sueldos y Planilla,Administracion,7688.11,USD,Conciliado
+2024-09-08,Egreso,Logistica y Envíos,Operaciones,2848.89,USD,Conciliado
+2024-09-08,Egreso,Logistica y Envíos,Tecnologia,680.58,USD,Conciliado
+2024-09-08,Ingreso,Consultoria Analitica,Operaciones,12865.98,USD,Conciliado
+2024-09-08,Ingreso,Licenciamiento Enterprise,Ventas,14567.1,USD,Conciliado
+2024-09-08,Ingreso,Venta Suscripciones SaaS,Ventas,2706.16,USD,Conciliado
+2024-09-09,Egreso,Arriendos y Servicios,Administracion,414.9,USD,Conciliado
+2024-09-09,Ingreso,Soporte Tecnico,Ventas,2050.94,USD,Conciliado
+2024-09-10,Egreso,Sueldos y Planilla,Operaciones,3951.64,USD,Conciliado
+2024-09-10,Egreso,Servicios Cloud,Operaciones,4624.44,USD,Conciliado
+2024-09-11,Egreso,Marketing Digital,Ventas,6228.35,USD,Conciliado
+2024-09-11,Ingreso,Licenciamiento Enterprise,Operaciones,12116.65,USD,Conciliado
+2024-09-12,Ingreso,Soporte Tecnico,Ventas,2571.64,USD,Conciliado
+2024-09-12,Egreso,Servicios Cloud,Ventas,1708.11,USD,Completado
+2024-09-12,Egreso,Logistica y Envíos,Tecnologia,5605.78,USD,Conciliado
+2024-09-13,Egreso,Logistica y Envíos,Tecnologia,2974.54,USD,Conciliado
+2024-09-15,Egreso,Sueldos y Planilla,Operaciones,1799.64,USD,Conciliado
+2024-09-15,Egreso,Arriendos y Servicios,Tecnologia,2309.79,USD,Conciliado
+2024-09-15,Egreso,Logistica y Envíos,Administracion,5509.1,USD,Conciliado
+2024-09-16,Egreso,Sueldos y Planilla,Ventas,3053.92,USD,Conciliado
+2024-09-16,Egreso,Arriendos y Servicios,Operaciones,3969.79,USD,Conciliado
+2024-09-17,Ingreso,Consultoria Analitica,Ventas,1493.56,USD,Conciliado
+2024-09-17,Egreso,Servicios Cloud,Ventas,2441.83,USD,Conciliado
+2024-09-17,Egreso,Marketing Digital,Tecnologia,6426.74,USD,Conciliado
+2024-09-18,Ingreso,Consultoria Analitica,Operaciones,4193.48,USD,Conciliado
+2024-09-18,Egreso,Servicios Cloud,Administracion,3682.12,USD,Conciliado
+2024-09-18,Ingreso,Venta Suscripciones SaaS,Ventas,13619.3,USD,Conciliado
+2024-09-18,Ingreso,Licenciamiento Enterprise,Ventas,13874.1,USD,Conciliado
+2024-09-18,Egreso,Sueldos y Planilla,Tecnologia,4960.0,USD,Conciliado
+2024-09-19,Ingreso,Soporte Tecnico,Ventas,1829.85,USD,Conciliado
+2024-09-19,Ingreso,Consultoria Analitica,Operaciones,1310.72,USD,Completado
+2024-09-20,Ingreso,Licenciamiento Enterprise,Operaciones,2856.28,USD,Conciliado
+2024-09-20,Egreso,Servicios Cloud,Administracion,2557.87,USD,Conciliado
+2024-09-21,Egreso,Marketing Digital,Ventas,762.61,USD,Conciliado
+2024-09-21,Egreso,Software Licencias,Ventas,7863.76,USD,Conciliado
+2024-09-21,Egreso,Servicios Cloud,Administracion,6462.9,USD,Conciliado
+2024-09-21,Egreso,Arriendos y Servicios,Tecnologia,7757.03,USD,Completado
+2024-09-21,Egreso,Software Licencias,Ventas,6674.2,USD,Conciliado
+2024-09-23,Egreso,Software Licencias,Administracion,1722.67,USD,Conciliado
+2024-09-23,Egreso,Marketing Digital,Operaciones,6695.49,USD,Conciliado
+2024-09-24,Egreso,Sueldos y Planilla,Administracion,2816.69,USD,Conciliado
+2024-09-25,Egreso,Servicios Cloud,Ventas,1472.53,USD,Conciliado
+2024-09-26,Egreso,Servicios Cloud,Administracion,3051.37,USD,Conciliado
+2024-09-28,Egreso,Arriendos y Servicios,Tecnologia,2660.83,USD,Conciliado
+2024-09-28,Ingreso,Licenciamiento Enterprise,Ventas,9918.63,USD,Completado
+2024-09-29,Egreso,Servicios Cloud,Operaciones,232.14,USD,Conciliado
+2024-09-29,Egreso,Servicios Cloud,Ventas,836.2,USD,Completado
+2024-09-29,Egreso,Logistica y Envíos,Tecnologia,1585.2,USD,Conciliado
+2024-09-30,Ingreso,Soporte Tecnico,Ventas,12220.42,USD,Conciliado
+2024-10-01,Ingreso,Soporte Tecnico,Operaciones,1642.6,USD,Conciliado
+2024-10-01,Ingreso,Venta Suscripciones SaaS,Operaciones,2172.46,USD,Conciliado
+2024-10-01,Egreso,Software Licencias,Ventas,1562.68,USD,Conciliado
+2024-10-01,Ingreso,Licenciamiento Enterprise,Ventas,3357.58,USD,Conciliado
+2024-10-01,Egreso,Logistica y Envíos,Administracion,2186.68,USD,Conciliado
+2024-10-02,Egreso,Software Licencias,Ventas,5922.6,USD,Conciliado
+2024-10-02,Ingreso,Consultoria Analitica,Ventas,11053.94,USD,Conciliado
+2024-10-02,Egreso,Software Licencias,Ventas,7452.49,USD,Conciliado
+2024-10-03,Egreso,Software Licencias,Operaciones,1689.09,USD,Conciliado
+2024-10-03,Egreso,Servicios Cloud,Ventas,7418.3,USD,Conciliado
+2024-10-03,Ingreso,Consultoria Analitica,Ventas,3853.29,USD,Conciliado
+2024-10-03,Ingreso,Consultoria Analitica,Ventas,2093.93,USD,Conciliado
+2024-10-03,Ingreso,Consultoria Analitica,Ventas,11962.22,USD,Conciliado
+2024-10-03,Egreso,Servicios Cloud,Operaciones,7299.55,USD,Conciliado
+2024-10-03,Egreso,Software Licencias,Administracion,5228.93,USD,Conciliado
+2024-10-03,Egreso,Arriendos y Servicios,Ventas,3614.27,USD,Conciliado
+2024-10-04,Egreso,Servicios Cloud,Operaciones,1581.9,USD,Conciliado
+2024-10-04,Ingreso,Venta Suscripciones SaaS,Ventas,14289.36,USD,Conciliado
+2024-10-04,Ingreso,Soporte Tecnico,Ventas,1985.96,USD,Conciliado
+2024-10-04,Egreso,Logistica y Envíos,Operaciones,3032.45,USD,Conciliado
+2024-10-05,Ingreso,Consultoria Analitica,Ventas,13671.97,USD,Conciliado
+2024-10-05,Egreso,Servicios Cloud,Ventas,6051.0,USD,Conciliado
+2024-10-05,Ingreso,Soporte Tecnico,Ventas,12366.47,USD,Conciliado
+2024-10-06,Egreso,Sueldos y Planilla,Operaciones,3957.01,USD,Conciliado
+2024-10-06,Egreso,Arriendos y Servicios,Tecnologia,7923.56,USD,Conciliado
+2024-10-06,Egreso,Sueldos y Planilla,Administracion,1289.47,USD,Conciliado
+2024-10-06,Egreso,Sueldos y Planilla,Ventas,6231.56,USD,Conciliado
+2024-10-06,Ingreso,Consultoria Analitica,Operaciones,4821.82,USD,Completado
+2024-10-07,Egreso,Sueldos y Planilla,Administracion,5974.88,USD,Conciliado
+2024-10-07,Egreso,Software Licencias,Ventas,5920.87,USD,Conciliado
+2024-10-08,Egreso,Arriendos y Servicios,Ventas,6435.76,USD,Conciliado
+2024-10-08,Egreso,Servicios Cloud,Ventas,2310.23,USD,Conciliado
+2024-10-08,Egreso,Logistica y Envíos,Tecnologia,6555.12,USD,Conciliado
+2024-10-08,Egreso,Arriendos y Servicios,Tecnologia,677.84,USD,Conciliado
+2024-10-09,Ingreso,Venta Suscripciones SaaS,Operaciones,1453.35,USD,Completado
+2024-10-09,Egreso,Sueldos y Planilla,Ventas,6165.47,USD,Conciliado
+2024-10-09,Ingreso,Licenciamiento Enterprise,Ventas,9409.21,USD,Conciliado
+2024-10-09,Ingreso,Soporte Tecnico,Ventas,9981.67,USD,Conciliado
+2024-10-10,Ingreso,Venta Suscripciones SaaS,Ventas,14114.49,USD,Conciliado
+2024-10-10,Ingreso,Soporte Tecnico,Operaciones,10141.48,USD,Conciliado
+2024-10-10,Egreso,Software Licencias,Administracion,7177.43,USD,Completado
+2024-10-10,Egreso,Marketing Digital,Operaciones,1685.3,USD,Conciliado
+2024-10-10,Egreso,Software Licencias,Operaciones,4366.99,USD,Conciliado
+2024-10-11,Ingreso,Licenciamiento Enterprise,Operaciones,10215.19,USD,Conciliado
+2024-10-11,Egreso,Sueldos y Planilla,Tecnologia,848.33,USD,Conciliado
+2024-10-12,Ingreso,Soporte Tecnico,Ventas,701.82,USD,Conciliado
+2024-10-12,Egreso,Software Licencias,Administracion,7301.46,USD,Conciliado
+2024-10-12,Egreso,Marketing Digital,Administracion,4516.84,USD,Conciliado
+2024-10-13,Egreso,Logistica y Envíos,Ventas,7793.31,USD,Completado
+2024-10-14,Egreso,Software Licencias,Administracion,4718.23,USD,Conciliado
+2024-10-14,Ingreso,Licenciamiento Enterprise,Ventas,10547.57,USD,Completado
+2024-10-14,Egreso,Sueldos y Planilla,Administracion,1389.83,USD,Conciliado
+2024-10-15,Ingreso,Venta Suscripciones SaaS,Operaciones,1677.73,USD,Conciliado
+2024-10-15,Ingreso,Consultoria Analitica,Ventas,8804.17,USD,Conciliado
+2024-10-15,Ingreso,Consultoria Analitica,Ventas,10384.83,USD,Completado
+2024-10-15,Ingreso,Consultoria Analitica,Operaciones,12632.1,USD,Conciliado
+2024-10-16,Ingreso,Consultoria Analitica,Ventas,9002.55,USD,Conciliado
+2024-10-16,Egreso,Arriendos y Servicios,Operaciones,2653.35,USD,Conciliado
+2024-10-16,Egreso,Sueldos y Planilla,Administracion,5913.77,USD,Completado
+2024-10-17,Egreso,Servicios Cloud,Tecnologia,1329.08,USD,Conciliado
+2024-10-17,Ingreso,Consultoria Analitica,Ventas,4199.18,USD,Completado
+2024-10-18,Ingreso,Soporte Tecnico,Ventas,5796.8,USD,Conciliado
+2024-10-19,Egreso,Sueldos y Planilla,Administracion,6298.49,USD,Conciliado
+2024-10-19,Egreso,Marketing Digital,Ventas,4879.55,USD,Completado
+2024-10-19,Egreso,Logistica y Envíos,Administracion,6178.56,USD,Conciliado
+2024-10-19,Egreso,Software Licencias,Operaciones,339.26,USD,Conciliado
+2024-10-20,Egreso,Software Licencias,Tecnologia,3399.78,USD,Conciliado
+2024-10-20,Ingreso,Licenciamiento Enterprise,Ventas,10545.14,USD,Conciliado
+2024-10-20,Egreso,Software Licencias,Tecnologia,3220.49,USD,Conciliado
+2024-10-20,Egreso,Logistica y Envíos,Tecnologia,3631.84,USD,Completado
+2024-10-20,Egreso,Servicios Cloud,Operaciones,6293.85,USD,Conciliado
+2024-10-21,Egreso,Logistica y Envíos,Operaciones,1544.69,USD,Conciliado
+2024-10-22,Egreso,Sueldos y Planilla,Administracion,6128.66,USD,Completado
+2024-10-22,Egreso,Software Licencias,Administracion,3372.38,USD,Conciliado
+2024-10-22,Egreso,Logistica y Envíos,Operaciones,3696.06,USD,Conciliado
+2024-10-22,Egreso,Software Licencias,Administracion,1882.1,USD,Conciliado
+2024-10-22,Ingreso,Soporte Tecnico,Ventas,7435.64,USD,Conciliado
+2024-10-24,Ingreso,Licenciamiento Enterprise,Operaciones,6669.81,USD,Conciliado
+2024-10-25,Ingreso,Soporte Tecnico,Operaciones,9749.62,USD,Conciliado
+2024-10-25,Egreso,Arriendos y Servicios,Administracion,5069.3,USD,Conciliado
+2024-10-26,Ingreso,Venta Suscripciones SaaS,Operaciones,2883.44,USD,Conciliado
+2024-10-26,Egreso,Servicios Cloud,Ventas,2711.45,USD,Conciliado
+2024-10-26,Ingreso,Venta Suscripciones SaaS,Ventas,5686.65,USD,Conciliado
+2024-10-27,Ingreso,Licenciamiento Enterprise,Ventas,12760.01,USD,Conciliado
+2024-10-27,Egreso,Logistica y Envíos,Tecnologia,1018.52,USD,Conciliado
+2024-10-28,Ingreso,Venta Suscripciones SaaS,Ventas,11502.71,USD,Conciliado
+2024-10-28,Egreso,Marketing Digital,Tecnologia,4592.17,USD,Conciliado
+2024-10-28,Egreso,Logistica y Envíos,Operaciones,2523.9,USD,Conciliado
+2024-10-28,Ingreso,Venta Suscripciones SaaS,Operaciones,12445.74,USD,Completado
+2024-10-28,Egreso,Sueldos y Planilla,Tecnologia,7714.45,USD,Conciliado
+2024-10-30,Ingreso,Consultoria Analitica,Ventas,12545.6,USD,Conciliado
+2024-10-31,Egreso,Servicios Cloud,Operaciones,1928.66,USD,Conciliado
+2024-10-31,Egreso,Marketing Digital,Administracion,5506.86,USD,Conciliado
+2024-11-01,Egreso,Servicios Cloud,Ventas,6315.68,USD,Completado
+2024-11-01,Egreso,Logistica y Envíos,Administracion,4093.85,USD,Conciliado
+2024-11-01,Egreso,Marketing Digital,Operaciones,7834.1,USD,Conciliado
+2024-11-01,Ingreso,Venta Suscripciones SaaS,Operaciones,4918.02,USD,Conciliado
+2024-11-01,Ingreso,Consultoria Analitica,Operaciones,9784.22,USD,Conciliado
+2024-11-01,Ingreso,Venta Suscripciones SaaS,Ventas,8449.08,USD,Conciliado
+2024-11-02,Ingreso,Consultoria Analitica,Ventas,4870.58,USD,Conciliado
+2024-11-02,Egreso,Logistica y Envíos,Administracion,4321.5,USD,Conciliado
+2024-11-03,Egreso,Arriendos y Servicios,Operaciones,6282.82,USD,Conciliado
+2024-11-03,Ingreso,Venta Suscripciones SaaS,Ventas,8879.82,USD,Conciliado
+2024-11-03,Egreso,Arriendos y Servicios,Tecnologia,2350.87,USD,Conciliado
+2024-11-04,Egreso,Sueldos y Planilla,Operaciones,4409.25,USD,Conciliado
+2024-11-05,Ingreso,Venta Suscripciones SaaS,Ventas,3819.4,USD,Completado
+2024-11-05,Egreso,Software Licencias,Ventas,2506.32,USD,Conciliado
+2024-11-06,Ingreso,Soporte Tecnico,Ventas,13573.32,USD,Completado
+2024-11-07,Egreso,Servicios Cloud,Ventas,6231.76,USD,Conciliado
+2024-11-07,Ingreso,Consultoria Analitica,Ventas,2231.92,USD,Conciliado
+2024-11-07,Egreso,Sueldos y Planilla,Operaciones,2261.41,USD,Completado
+2024-11-09,Ingreso,Soporte Tecnico,Operaciones,11447.09,USD,Conciliado
+2024-11-10,Egreso,Logistica y Envíos,Operaciones,7754.47,USD,Conciliado
+2024-11-10,Egreso,Software Licencias,Ventas,344.85,USD,Conciliado
+2024-11-10,Egreso,Arriendos y Servicios,Ventas,1208.93,USD,Conciliado
+2024-11-11,Egreso,Sueldos y Planilla,Ventas,2015.42,USD,Conciliado
+2024-11-12,Egreso,Marketing Digital,Tecnologia,4661.08,USD,Conciliado
+2024-11-12,Ingreso,Soporte Tecnico,Operaciones,7032.46,USD,Conciliado
+2024-11-12,Ingreso,Soporte Tecnico,Ventas,2736.67,USD,Conciliado
+2024-11-12,Egreso,Arriendos y Servicios,Administracion,7310.74,USD,Conciliado
+2024-11-12,Ingreso,Consultoria Analitica,Ventas,10840.07,USD,Conciliado
+2024-11-12,Egreso,Arriendos y Servicios,Tecnologia,6607.14,USD,Conciliado
+2024-11-12,Ingreso,Soporte Tecnico,Ventas,4985.87,USD,Conciliado
+2024-11-13,Ingreso,Licenciamiento Enterprise,Operaciones,6883.23,USD,Conciliado
+2024-11-14,Egreso,Logistica y Envíos,Tecnologia,4775.95,USD,Conciliado
+2024-11-15,Egreso,Sueldos y Planilla,Tecnologia,5797.35,USD,Conciliado
+2024-11-15,Egreso,Software Licencias,Ventas,2827.82,USD,Completado
+2024-11-16,Egreso,Logistica y Envíos,Tecnologia,6991.83,USD,Conciliado
+2024-11-16,Ingreso,Consultoria Analitica,Ventas,6723.85,USD,Conciliado
+2024-11-17,Egreso,Marketing Digital,Tecnologia,6330.02,USD,Conciliado
+2024-11-17,Egreso,Arriendos y Servicios,Administracion,6103.03,USD,Conciliado
+2024-11-18,Egreso,Software Licencias,Administracion,5601.2,USD,Conciliado
+2024-11-18,Ingreso,Consultoria Analitica,Operaciones,632.55,USD,Conciliado
+2024-11-18,Ingreso,Soporte Tecnico,Operaciones,10094.14,USD,Conciliado
+2024-11-19,Ingreso,Soporte Tecnico,Ventas,11653.4,USD,Completado
+2024-11-20,Egreso,Arriendos y Servicios,Ventas,662.6,USD,Conciliado
+2024-11-21,Ingreso,Venta Suscripciones SaaS,Operaciones,12437.2,USD,Completado
+2024-11-22,Egreso,Arriendos y Servicios,Tecnologia,7120.92,USD,Completado
+2024-11-22,Egreso,Servicios Cloud,Tecnologia,4775.98,USD,Conciliado
+2024-11-22,Ingreso,Venta Suscripciones SaaS,Ventas,7366.77,USD,Conciliado
+2024-11-23,Ingreso,Licenciamiento Enterprise,Ventas,4050.93,USD,Conciliado
+2024-11-23,Egreso,Logistica y Envíos,Tecnologia,4170.72,USD,Conciliado
+2024-11-23,Egreso,Marketing Digital,Ventas,3003.6,USD,Conciliado
+2024-11-23,Ingreso,Venta Suscripciones SaaS,Ventas,9111.9,USD,Conciliado
+2024-11-23,Egreso,Marketing Digital,Administracion,3432.35,USD,Conciliado
+2024-11-23,Egreso,Marketing Digital,Ventas,3905.05,USD,Conciliado
+2024-11-24,Egreso,Logistica y Envíos,Ventas,7125.15,USD,Completado
+2024-11-24,Egreso,Logistica y Envíos,Operaciones,1429.05,USD,Conciliado
+2024-11-25,Egreso,Arriendos y Servicios,Tecnologia,2068.27,USD,Completado
+2024-11-26,Egreso,Marketing Digital,Administracion,7943.57,USD,Conciliado
+2024-11-26,Egreso,Arriendos y Servicios,Tecnologia,7820.9,USD,Completado
+2024-11-26,Egreso,Logistica y Envíos,Operaciones,7737.81,USD,Completado
+2024-11-26,Egreso,Sueldos y Planilla,Ventas,1371.54,USD,Conciliado
+2024-11-27,Ingreso,Licenciamiento Enterprise,Operaciones,1870.34,USD,Conciliado
+2024-11-27,Ingreso,Soporte Tecnico,Ventas,12783.43,USD,Conciliado
+2024-11-28,Ingreso,Consultoria Analitica,Operaciones,2495.19,USD,Completado
+2024-11-28,Egreso,Servicios Cloud,Administracion,3301.7,USD,Conciliado
+2024-11-28,Egreso,Servicios Cloud,Administracion,2550.34,USD,Conciliado
+2024-11-28,Egreso,Sueldos y Planilla,Operaciones,4080.76,USD,Conciliado
+2024-11-29,Egreso,Marketing Digital,Administracion,1533.76,USD,Conciliado
+2024-11-29,Egreso,Sueldos y Planilla,Ventas,2473.44,USD,Conciliado
+2024-11-30,Egreso,Servicios Cloud,Administracion,5549.02,USD,Conciliado
+2024-11-30,Ingreso,Soporte Tecnico,Ventas,6478.91,USD,Conciliado
+2024-12-01,Egreso,Servicios Cloud,Operaciones,3808.98,USD,Conciliado
+2024-12-01,Ingreso,Soporte Tecnico,Operaciones,9426.96,USD,Conciliado
+2024-12-01,Egreso,Marketing Digital,Administracion,2132.88,USD,Completado
+2024-12-01,Ingreso,Licenciamiento Enterprise,Ventas,9482.98,USD,Conciliado
+2024-12-01,Ingreso,Consultoria Analitica,Operaciones,1759.22,USD,Conciliado
+2024-12-02,Egreso,Marketing Digital,Operaciones,328.73,USD,Conciliado
+2024-12-02,Egreso,Arriendos y Servicios,Operaciones,6998.91,USD,Conciliado
+2024-12-02,Ingreso,Venta Suscripciones SaaS,Ventas,11578.72,USD,Conciliado
+2024-12-02,Egreso,Marketing Digital,Administracion,4082.47,USD,Conciliado
+2024-12-02,Egreso,Arriendos y Servicios,Tecnologia,2359.45,USD,Conciliado
+2024-12-03,Ingreso,Venta Suscripciones SaaS,Ventas,8705.97,USD,Completado
+2024-12-03,Egreso,Sueldos y Planilla,Ventas,4190.22,USD,Conciliado
+2024-12-03,Ingreso,Consultoria Analitica,Ventas,6975.63,USD,Conciliado
+2024-12-04,Ingreso,Licenciamiento Enterprise,Operaciones,683.46,USD,Conciliado
+2024-12-04,Ingreso,Consultoria Analitica,Ventas,8235.28,USD,Conciliado
+2024-12-04,Egreso,Servicios Cloud,Administracion,1811.09,USD,Completado
+2024-12-05,Egreso,Software Licencias,Administracion,7848.46,USD,Completado
+2024-12-05,Ingreso,Licenciamiento Enterprise,Operaciones,4998.36,USD,Conciliado
+2024-12-05,Egreso,Logistica y Envíos,Tecnologia,1274.37,USD,Conciliado
+2024-12-05,Ingreso,Licenciamiento Enterprise,Operaciones,13031.5,USD,Completado
+2024-12-06,Egreso,Logistica y Envíos,Tecnologia,6957.93,USD,Completado
+2024-12-08,Ingreso,Consultoria Analitica,Operaciones,7242.99,USD,Conciliado
+2024-12-09,Egreso,Logistica y Envíos,Administracion,7206.95,USD,Conciliado
+2024-12-09,Egreso,Software Licencias,Tecnologia,7977.6,USD,Conciliado
+2024-12-10,Egreso,Arriendos y Servicios,Ventas,417.83,USD,Conciliado
+2024-12-10,Egreso,Marketing Digital,Operaciones,4718.02,USD,Conciliado
+2024-12-11,Egreso,Sueldos y Planilla,Tecnologia,5952.16,USD,Conciliado
+2024-12-12,Egreso,Arriendos y Servicios,Administracion,786.82,USD,Conciliado
+2024-12-12,Egreso,Logistica y Envíos,Administracion,4923.7,USD,Conciliado
+2024-12-12,Egreso,Software Licencias,Ventas,2026.91,USD,Conciliado
+2024-12-12,Ingreso,Venta Suscripciones SaaS,Ventas,9349.63,USD,Conciliado
+2024-12-12,Ingreso,Consultoria Analitica,Operaciones,950.69,USD,Completado
+2024-12-13,Egreso,Arriendos y Servicios,Tecnologia,5370.35,USD,Conciliado
+2024-12-13,Ingreso,Venta Suscripciones SaaS,Operaciones,2570.3,USD,Conciliado
+2024-12-13,Egreso,Marketing Digital,Tecnologia,3038.91,USD,Conciliado
+2024-12-13,Egreso,Arriendos y Servicios,Operaciones,3100.03,USD,Conciliado
+2024-12-13,Egreso,Sueldos y Planilla,Ventas,4657.14,USD,Completado
+2024-12-14,Ingreso,Venta Suscripciones SaaS,Operaciones,3266.37,USD,Conciliado
+2024-12-14,Egreso,Servicios Cloud,Operaciones,4251.5,USD,Conciliado
+2024-12-14,Ingreso,Venta Suscripciones SaaS,Operaciones,10003.31,USD,Conciliado
+2024-12-14,Ingreso,Licenciamiento Enterprise,Ventas,6490.06,USD,Conciliado
+2024-12-15,Egreso,Servicios Cloud,Administracion,886.64,USD,Conciliado
+2024-12-15,Ingreso,Venta Suscripciones SaaS,Operaciones,10513.63,USD,Conciliado
+2024-12-15,Egreso,Logistica y Envíos,Tecnologia,7335.87,USD,Conciliado
+2024-12-16,Egreso,Software Licencias,Ventas,3880.4,USD,Conciliado
+2024-12-16,Ingreso,Consultoria Analitica,Operaciones,2448.59,USD,Conciliado
+2024-12-16,Egreso,Software Licencias,Ventas,7790.21,USD,Conciliado
+2024-12-17,Ingreso,Licenciamiento Enterprise,Operaciones,1377.98,USD,Conciliado
+2024-12-17,Ingreso,Venta Suscripciones SaaS,Operaciones,4582.0,USD,Conciliado
+2024-12-18,Egreso,Arriendos y Servicios,Ventas,3849.26,USD,Conciliado
+2024-12-18,Egreso,Software Licencias,Operaciones,2484.74,USD,Conciliado
+2024-12-18,Egreso,Servicios Cloud,Ventas,3519.5,USD,Conciliado
+2024-12-18,Egreso,Logistica y Envíos,Administracion,2466.92,USD,Conciliado
+2024-12-20,Ingreso,Venta Suscripciones SaaS,Operaciones,12850.6,USD,Completado
+2024-12-22,Egreso,Logistica y Envíos,Ventas,4739.99,USD,Completado
+2024-12-22,Egreso,Sueldos y Planilla,Administracion,919.33,USD,Conciliado
+2024-12-23,Ingreso,Venta Suscripciones SaaS,Operaciones,10700.07,USD,Completado
+2024-12-24,Egreso,Marketing Digital,Tecnologia,4119.17,USD,Completado
+2024-12-24,Ingreso,Venta Suscripciones SaaS,Ventas,7917.98,USD,Conciliado
+2024-12-25,Ingreso,Venta Suscripciones SaaS,Ventas,12949.6,USD,Conciliado
+2024-12-25,Ingreso,Consultoria Analitica,Ventas,6736.01,USD,Conciliado
+2024-12-27,Egreso,Arriendos y Servicios,Ventas,4762.33,USD,Conciliado
+2024-12-28,Egreso,Marketing Digital,Operaciones,4515.48,USD,Conciliado
+2024-12-29,Ingreso,Licenciamiento Enterprise,Ventas,13424.31,USD,Conciliado
+2024-12-29,Ingreso,Licenciamiento Enterprise,Operaciones,12766.04,USD,Conciliado
+2024-12-29,Ingreso,Soporte Tecnico,Operaciones,4433.1,USD,Conciliado
+2024-12-31,Egreso,Servicios Cloud,Operaciones,6503.05,USD,Conciliado
+2024-12-31,Ingreso,Soporte Tecnico,Ventas,8030.32,USD,Conciliado
+2024-12-31,Ingreso,Soporte Tecnico,Operaciones,5488.49,USD,Conciliado
+2024-12-31,Ingreso,Soporte Tecnico,Operaciones,13644.63,USD,Conciliado
