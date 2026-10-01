@@ -294,16 +294,28 @@ def get_dataframe_from_storage(supabase: Any, file_id: str, glossary_map: dict =
     NOTA: Ya NO limpiamos aquí. La limpieza la hará el DataEngine en el siguiente paso.
     """
     import os
+
+    from app.core.analytical_contract import UploadFlowContractV1
+    from app.core.structured_logging import emit_structured_log
     from app.services.ingestion_validator import (
         download_storage_file_with_retry,
         parse_tabular_bytes_to_dfs,
+        validate_upload_contract,
     )
 
     if glossary_map is None:
         glossary_map = {}
 
-    resp = supabase.table('uploaded_files').select('storage_path').eq('id', file_id).single().execute()
-    storage_path = resp.data.get('storage_path', '') if isinstance(resp.data, dict) else ''
+    resp = (
+        supabase.table('uploaded_files')
+        .select('storage_path, user_id')
+        .eq('id', file_id)
+        .single()
+        .execute()
+    )
+    row = resp.data if isinstance(resp.data, dict) else {}
+    storage_path = row.get('storage_path', '') or ''
+    owner_user_id = str(row.get('user_id') or '')
     file_name = os.path.basename(storage_path) or 'dataset.csv'
 
     audit_log = []
@@ -314,6 +326,23 @@ def get_dataframe_from_storage(supabase: Any, file_id: str, glossary_map: dict =
             bucket_name='dash-uploads',
             storage_path=storage_path,
         )
+        contract_ok, contract_reason = validate_upload_contract(
+            UploadFlowContractV1(),
+            file_name=file_name,
+            file_size_bytes=len(file_bytes),
+            storage_path=storage_path,
+            user_id=owner_user_id,
+        )
+        if not contract_ok:
+            emit_structured_log(
+                "ingestion_upload_contract_rejected",
+                level="warning",
+                file_id=file_id,
+                storage_path=storage_path,
+                owner_user_id=owner_user_id,
+                reason=contract_reason,
+            )
+            raise ValueError(contract_reason or "Archivo rechazado por el contrato de ingesta.")
         dfs = parse_tabular_bytes_to_dfs(file_bytes, file_name)
         return dfs, audit_log
     except Exception as e:

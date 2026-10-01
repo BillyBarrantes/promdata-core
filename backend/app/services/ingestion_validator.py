@@ -169,6 +169,12 @@ def parse_tabular_bytes_to_dfs(
     Convierte bytes crudos a un diccionario de DataFrames de pandas ({nombre_hoja: df}).
     Valida codificación, delimitadores y descarta archivos sin filas.
     """
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+        raise ValueError(
+            f"El archivo '{file_name}' ({len(file_bytes)} bytes) supera el límite "
+            f"máximo permitido de {MAX_FILE_SIZE_BYTES} bytes (50 MB)."
+        )
+
     fmt = detect_file_format_and_validate_bytes(file_bytes, file_name)
 
     if fmt == "zip":

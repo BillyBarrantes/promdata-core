@@ -972,6 +972,27 @@ def get_enterprise_telemetry_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _read_upload_bounded(file: UploadFile, max_bytes: int) -> bytes:
+    """Lee un UploadFile en chunks con tope de bytes antes de materializarlo en memoria."""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"El documento supera el límite máximo de "
+                    f"{max_bytes // (1024 * 1024)} MB."
+                ),
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.post("/knowledge/documents/upload", response_model=KnowledgeDocumentUploadResponse, status_code=202)
 async def upload_knowledge_document(
     file: UploadFile = File(...),
@@ -983,7 +1004,7 @@ async def upload_knowledge_document(
         service_client = get_supabase_service_client()
         team_id = resolve_user_team_id(user_id=user.id, service_client=service_client)
 
-        file_bytes = await file.read()
+        file_bytes = await _read_upload_bounded(file, settings.KNOWLEDGE_MAX_DOCUMENT_BYTES)
         if not file_bytes:
             raise HTTPException(status_code=400, detail="El documento está vacío.")
 
