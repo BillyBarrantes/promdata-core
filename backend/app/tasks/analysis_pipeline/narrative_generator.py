@@ -12,6 +12,8 @@ from app.core.serializers import convert_keys_to_str
 from app.services.ai_response_cache import build_cache_key, get_cached_json, set_cached_json
 from app.services.analysis_explainability import build_analysis_explainability
 from app.services.analysis_diagnostic_context import build_enterprise_diagnostic_context
+from app.services.evidence_bundle import build_evidence_bundle
+from app.services.narrative_reconciliation_guard import reconcile_narrative_with_facts
 from app.services.predictive_engine import PredictiveEngine
 
 from app.tasks.analysis_pipeline.data_loader import clean_business_terms
@@ -355,14 +357,38 @@ def generate_chart_narrative(
                 settings.NARRATIVE_CACHE_TTL_SECONDS,
             )
 
+        hard_facts = ibis_output.get('hard_facts', {})
+        # Reconciliation Guard: reconciliar cifras citadas con hechos matemáticos
+        narrative_text, _ = reconcile_narrative_with_facts(
+            narrative_text, hard_facts, safe_narrative_data
+        )
+
         items.append({"type": "mensaje_resumen", "content": narrative_text})
         items.append({"type": "explicabilidad_analitica", "data": explainability_payload})
-    except Exception:
+    except Exception as narrative_error:
+        # [TIER 1 2026-09] Nunca reportar "éxito" si la narrativa falló.
+        emit_structured_log(
+            "chart_narrative_failed",
+            level="warning",
+            error_type=type(narrative_error).__name__,
+            error=str(narrative_error)[:300],
+        )
         items.append({
             "type": "mensaje_resumen",
-            "content": "### 📊 Análisis Calculado Exitosamente\nLos datos han sido procesados. Revisa los gráficos adjuntos para el detalle."
+            "content": (
+                "### 📊 Análisis procesado\n"
+                "Los datos fueron calculados y están disponibles en los gráficos adjuntos. "
+                "La narrativa automática no pudo generarse en esta ocasión."
+            ),
         })
         items.append({"type": "explicabilidad_analitica", "data": explainability_payload})
+
+    # EvidenceBundleV1 determinista para trazabilidad del widget
+    try:
+        evidence_bundle = build_evidence_bundle(plan, ibis_output)
+        items.append({"type": "evidence_bundle", "data": evidence_bundle.model_dump(mode="json")})
+    except Exception as e:
+        emit_structured_log("evidence_bundle_build_warning", level="warning", error=str(e)[:200])
 
     try:
         hard_facts = ibis_output.get('hard_facts', {})
@@ -374,7 +400,11 @@ def generate_chart_narrative(
             )
             if recommendations:
                 items.append({"type": "recomendaciones", "data": recommendations})
-    except Exception:
-        pass
+    except Exception as rec_error:
+        emit_structured_log(
+            "predictive_recommendations_warning",
+            level="warning",
+            error=str(rec_error)[:200],
+        )
 
     return items

@@ -61,6 +61,13 @@ def test_platform_examples_expose_required_surface_area() -> None:
         "GEMINI_CLIENT_PROVIDER",
         "GEMINI_VERTEX_PROJECT",
         "GEMINI_VERTEX_LOCATION",
+        "LLM_PROVIDER",
+        "DEEPSEEK_API_KEY",
+        "DEEPSEEK_BASE_URL",
+        "DEEPSEEK_MODEL",
+        "AI_MODEL_NAME",
+        "NARRATIVE_FAST_MODEL_NAME",
+        "NARRATIVE_STRICT_MODEL_NAME",
         "CELERY_BROKER_URL",
         "CELERY_RESULT_BACKEND",
         "BACKEND_PUBLIC_URL",
@@ -100,7 +107,56 @@ def test_platform_examples_keep_frontend_backend_urls_in_sync() -> None:
         assert frontend_payload["NEXT_PUBLIC_API_BASE_URL"].rstrip("/") == backend_payload["BACKEND_PUBLIC_URL"].rstrip("/"), (
             f"{env_name}: NEXT_PUBLIC_API_BASE_URL y BACKEND_PUBLIC_URL deben apuntar al mismo endpoint público"
         )
+        assert urlparse(frontend_payload["NEXT_PUBLIC_API_BASE_URL"]).path in {"", "/"}, (
+            f"{env_name}: la URL base pública no debe contener /api ni otro path"
+        )
         assert backend_payload["FRONTEND_APP_URL"].strip(), f"{env_name}: FRONTEND_APP_URL no puede quedar vacío"
+
+
+def test_examples_pin_deepseek_flash_as_the_active_analysis_model() -> None:
+    examples = _load_environment_examples()
+
+    for env_name in ("backend_dev", "backend_staging", "backend_prod"):
+        payload = examples[env_name]
+        assert payload["LLM_PROVIDER"] == "deepseek", f"{env_name}: DeepSeek debe ser el proveedor activo"
+        assert payload["DEEPSEEK_BASE_URL"] == "https://api.deepseek.com"
+        for key in ("DEEPSEEK_MODEL", "AI_MODEL_NAME", "NARRATIVE_FAST_MODEL_NAME", "NARRATIVE_STRICT_MODEL_NAME"):
+            assert payload[key] == "DeepSeek-V4.1-flash", f"{env_name}: {key} debe usar DeepSeek-V4.1-flash"
+        assert payload["GEMINI_API_KEY"], f"{env_name}: Gemini se conserva para embeddings"
+
+
+def test_production_examples_use_app_domain_as_a_single_origin() -> None:
+    examples = _load_environment_examples()
+    frontend = examples["frontend_prod"]
+    backend = examples["backend_prod"]
+    app_domain = frontend["APP_DOMAIN"]
+
+    assert app_domain
+    for value in (
+        frontend["NEXT_PUBLIC_API_BASE_URL"],
+        backend["BACKEND_PUBLIC_URL"],
+        backend["FRONTEND_APP_URL"],
+    ):
+        parsed = urlparse(value)
+        assert parsed.scheme == "https"
+        assert parsed.hostname == app_domain
+        assert parsed.path in {"", "/"}, "Las URLs base no deben incluir /api"
+
+
+def test_vps_compose_derives_domain_and_real_frontend_build_inputs() -> None:
+    compose = (ROOT_DIR / "docker-compose.prod.yml").read_text(encoding="utf-8")
+    caddyfile = (ROOT_DIR / "Caddyfile").read_text(encoding="utf-8")
+
+    assert "{$APP_DOMAIN}" in caddyfile
+    assert "NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?" in compose
+    assert "NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?" in compose
+    assert "NEXT_PUBLIC_API_BASE_URL: https://${APP_DOMAIN:?" in compose
+    assert "BACKEND_PUBLIC_URL: https://${APP_DOMAIN:?" in compose
+    assert "FRONTEND_APP_URL: https://${APP_DOMAIN:?" in compose
+    assert "NEXT_PUBLIC_API_URL" not in compose
+    assert "GEMINI_RPM_GOVERNOR" not in compose
+    assert "gemini-3.7-flash" not in compose
+    assert "livion.lat" not in compose + caddyfile
 
 
 def test_staging_and_prod_examples_enforce_secure_operational_contract() -> None:

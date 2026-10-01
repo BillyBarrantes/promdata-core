@@ -33,7 +33,36 @@ from app.services.analysis_memory_context import (
     unwrap_prompt_payload,
 )
 from app.services.semantic_translator import SemanticTranslator
+from app.services.semantic_translator.temporal_resolver import apply_relative_time_windows
+from app.services.semantic_translator.validator import finalize_plans
+from app.services.expiry_intent import build_expiry_analysis_bundle
+from app.services.metric_semantics import align_plan_metrics_with_prompt
+from app.services.semantic_translator.metric_archetype import (
+    cumulative_aggregation,
+    has_accumulation_lexicon,
+    monotonic_direction,
+)
 from app.core.semantic_grammar import PreAggregationSpec
+
+
+def _extract_previous_dimensions(parent_context: dict[str, Any] | None) -> list[str]:
+    """[F2-D4] Dimensiones usadas en el análisis previo (para drill-down).
+
+    Se leen del contexto estructurado del parent (semantic_context.plans[].dimensions),
+    en lugar del parse legacy de "Agrupado por:" que nunca se emitía.
+    """
+    semantic_context = (parent_context or {}).get("semantic_context") or {}
+    dimensions: list[str] = []
+    for plan in list(semantic_context.get("plans") or []):
+        if not isinstance(plan, dict):
+            continue
+        for dimension in list(plan.get("dimensions") or []):
+            if dimension:
+                dimensions.append(str(dimension))
+        split_dimension = plan.get("split_dimension")
+        if split_dimension:
+            dimensions.append(str(split_dimension))
+    return list(dict.fromkeys(dimensions))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -319,6 +348,11 @@ def _auto_correct_hallucinated_metrics(
 
             blocked_metrics = _blocked_plan_metrics(plan, candidate_df)
             if blocked_metrics:
+                _pre_agg = getattr(plan, "pre_aggregation", None)
+                _pre_agg_metrics = list(getattr(_pre_agg, "metrics", []) or []) if _pre_agg else []
+                if _pre_agg_metrics:
+                    blocked_metrics = [m for m in blocked_metrics if m not in _pre_agg_metrics]
+            if blocked_metrics:
                 _apply_metric_correction(
                     plan, count_metric, blocked_metrics, prompt, candidate_df
                 )
@@ -330,6 +364,188 @@ def _auto_correct_hallucinated_metrics(
         corrected_plans.append(plan)
 
     return corrected_plans
+
+
+def _intent_primary_metric(intent: Any) -> str | None:
+    """Métrica principal de un intent (cualquiera de las familias)."""
+    intent_type = getattr(intent, "type", None)
+    if intent_type in ("descriptive", "diagnostic"):
+        metrics = [m for m in (getattr(intent, "metrics", None) or []) if m]
+        if metrics:
+            return str(metrics[0])
+    if intent_type in ("trend", "predictive"):
+        value_column = getattr(intent, "value_column", None)
+        if value_column:
+            return str(value_column)
+    if intent_type == "distribution":
+        metric = getattr(intent, "metric", None)
+        if metric:
+            return str(metric)
+    return None
+
+
+def _guard_contract(candidate_df: pd.DataFrame) -> dict[str, Any]:
+    """Contrato del dataset desde los attrs (soporta la clave legacy y la nueva).
+
+    Producción escribe ``semantic_contract`` (adapter) mientras que la clave
+    histórica es ``dataset_contract``; leer ambas evita que el fallback por
+    contrato quede muerto.
+    """
+    attrs = getattr(candidate_df, "attrs", {}) or {}
+    for key in ("dataset_contract", "semantic_contract"):
+        value = attrs.get(key)
+        if isinstance(value, dict) and value:
+            return value
+    return {}
+
+
+def _resolve_guard_time_column(candidate_df: pd.DataFrame, intent: Any) -> str | None:
+    """Eje temporal para ordenar la serie (contrato/schema, no por nombre)."""
+    date_column = getattr(intent, "date_column", None)
+    if isinstance(date_column, str) and date_column in candidate_df.columns:
+        return date_column
+    contract = _guard_contract(candidate_df)
+    for key in ("time_axis", "ordinal_axis"):
+        axis = str(contract.get(key) or "").strip()
+        if axis and axis in candidate_df.columns:
+            return axis
+    profile = (getattr(candidate_df, "attrs", {}) or {}).get("schema_profile")
+    if isinstance(profile, dict):
+        for column in candidate_df.columns:
+            if (profile.get(column) or {}).get("role") == "date":
+                return column
+    return None
+
+
+def _ordered_metric_series(
+    candidate_df: pd.DataFrame,
+    time_col: str,
+    metric: str,
+    contract: dict[str, Any],
+) -> Any:
+    """Serie de la métrica ordenada cronológicamente por el eje disponible.
+
+    Si el eje es el ordinal del contrato, ordena por el rango persistido en
+    ``ordinal_axis_order`` (no alfabéticamente). Devuelve ``None`` si no se
+    puede ordenar.
+    """
+    try:
+        ordinal_axis = str(contract.get("ordinal_axis") or "").strip()
+        ordinal_order = contract.get("ordinal_axis_order") or []
+        if time_col == ordinal_axis and ordinal_order:
+            rank = {str(value): index for index, value in enumerate(ordinal_order)}
+            ordering = candidate_df[time_col].astype(str).map(rank)
+            ordered_index = ordering.sort_values(kind="stable").index
+            return candidate_df[metric].loc[ordered_index]
+        return candidate_df[[time_col, metric]].sort_values(time_col)[metric]
+    except Exception:
+        return None
+
+
+def _append_cumulative_disclosure(plan: Any) -> None:
+    """Divulgación honesta de que la métrica es una serie acumulada."""
+    title = getattr(plan, "title", None)
+    if not isinstance(title, str) or not title:
+        return
+    suffix = "(serie acumulada · último valor)"
+    if suffix in title:
+        return
+    try:
+        plan.title = f"{title} {suffix}"
+    except (ValueError, TypeError):
+        pass
+
+
+# Máximo de filas para evaluar monotonía sin comprometer el hot path.
+_CUMULATIVE_GUARD_MAX_ROWS = 200_000
+
+
+def _apply_cumulative_metric_guard(
+    plans: list[Any] | None,
+    candidate_df: pd.DataFrame | None,
+    prompt: str | None = None,
+) -> list[Any]:
+    """[#4 2026-09] Corrige la agregación de métricas acumuladas (running totals).
+
+    Una serie ya acumulada NO debe sumarse por período: re-contaría. Con DOS
+    señales fail-closed (monotonía temporal AND léxico genérico de acumulación
+    en nombre o prompt) y agregación efectiva 'sum', se cambia a 'max'/'min'
+    (último valor del período) y se divulga en el título. Domain-agnostic:
+    ninguna lista de nombres de negocio.
+
+    Corre en el executor de producción → cubre TODAS las rutas (macro, simple,
+    unified, caché). Solo actúa sobre 'sum'; una agregación explícita distinta
+    (avg/min/max/count) se respeta.
+    """
+    if not plans:
+        return []
+    if candidate_df is None or candidate_df.empty:
+        return plans
+    if len(candidate_df) > _CUMULATIVE_GUARD_MAX_ROWS:
+        return plans
+
+    direction_cache: dict[str, str | None] = {}
+    time_col_cache: dict[str, str | None] = {}
+    contract = _guard_contract(candidate_df)
+    metric_semantics = contract.get("metric_semantics") or {}
+
+    for plan in plans:
+        try:
+            intent = getattr(plan, "main_intent", None)
+            if intent is None:
+                continue
+            aggregation = str(getattr(intent, "aggregation", "") or "sum").strip().lower()
+            if aggregation != "sum":
+                continue
+            metric = _intent_primary_metric(intent)
+            if not metric or metric not in candidate_df.columns:
+                continue
+            if not has_accumulation_lexicon(metric, prompt):
+                continue
+            intent_key = f"{getattr(intent, 'type', '')}::{metric}"
+            if metric not in direction_cache:
+                declared = None
+                entry = metric_semantics.get(metric)
+                if isinstance(entry, dict):
+                    declared = entry.get("cumulative_monotonic_direction")
+                if declared in ("inc", "dec"):
+                    direction_cache[metric] = declared
+                else:
+                    if intent_key not in time_col_cache:
+                        time_col_cache[intent_key] = _resolve_guard_time_column(candidate_df, intent)
+                    time_col = time_col_cache[intent_key]
+                    if time_col is None or time_col not in candidate_df.columns:
+                        direction_cache[metric] = None
+                    else:
+                        ordered = _ordered_metric_series(candidate_df, time_col, metric, contract)
+                        direction_cache[metric] = monotonic_direction(ordered) if ordered is not None else None
+            direction = direction_cache[metric]
+            new_aggregation = cumulative_aggregation(direction)
+            if not new_aggregation:
+                # [Fase 0.2 2026-09] Degradación silenciosa: hay léxico de
+                # acumulación pero no se pudo probar monotonía (sin eje). Se
+                # registra para no ocultar un posible running total sin corregir.
+                emit_structured_log(
+                    "cumulative_detected_not_corrected",
+                    level="warning",
+                    metric=metric,
+                    intent_type=getattr(intent, "type", None),
+                    reason="no_monotonic_direction",
+                )
+                continue
+            intent.aggregation = new_aggregation
+            _append_cumulative_disclosure(plan)
+            emit_structured_log(
+                "semantic_cumulative_metric_guard",
+                metric=metric,
+                direction=direction,
+                aggregation=new_aggregation,
+                intent_type=getattr(intent, "type", None),
+                title=getattr(plan, "title", None),
+            )
+        except Exception as _cumulative_err:
+            print(f"⚠️ [CUMULATIVE GUARD] Error no-fatal: {_cumulative_err}")
+    return plans
 
 
 def _plan_has_valid_avg_on_numeric(plan: Any, candidate_df: pd.DataFrame | None) -> bool:
@@ -574,6 +790,25 @@ def _selected_candidate_id(pipeline_result: Any) -> str:
     return str(getattr(analytical_bundle, "selected_candidate_id", "") or "").strip()
 
 
+def _should_skip_related_parquets(selected_candidate_id: Any) -> bool:
+    """Indica si deben omitirse los parquets de related_frames.
+
+    [PARQUET-OPT 2026-09] Cuando el candidato seleccionado es la vista
+    unified_all__ (toda la data ya consolidada), el engine nunca consulta los
+    parquets de related_frames (el bloque de abajo limpia related_paths). Por
+    tanto, escribirlos es I/O muerto: ~9 archivos y ~25s de worker.
+
+    Args:
+        selected_candidate_id: ID del candidato analítico seleccionado.
+
+    Returns:
+        True si el candidato es unified_all__ (omitir related frames).
+    """
+    return bool(
+        selected_candidate_id and "unified_all__" in str(selected_candidate_id)
+    )
+
+
 def build_canonical_tabular_production_execution(
     *,
     file_id: str,
@@ -581,6 +816,7 @@ def build_canonical_tabular_production_execution(
     prompt: str | None = None,
     service_client: Any | None = None,
     max_plans: int = 3,
+    prompt_type: str | None = None,
 ) -> CanonicalShadowQueryExecution:
     """Execute the user-facing tabular path without Canary/Shadow strategy bundles.
 
@@ -638,21 +874,195 @@ def build_canonical_tabular_production_execution(
         file_id=file_id,
         columns=list(candidate_df.columns),
     )
+    # [F2-D3] Activar la capa de memoria de sesión en producción:
+    # continuity gate + bypass de pedidos autocontenidos + intent instruction.
+    memory_context_text = build_parent_memory_context_text(parent_context)
+    memory_instruction = ""
+    if memory_context_text:
+        previous_prompt = str((parent_context or {}).get("parent_prompt") or "")
+        keep_memory = (
+            SemanticTranslator.evaluate_continuity(actual_prompt, previous_prompt)
+            if previous_prompt
+            else True
+        )
+        if not keep_memory:
+            emit_structured_log(
+                "analysis_memory_continuity_dropped",
+                level="warning",
+                file_id=file_id,
+                reason="topic_shift",
+            )
+            memory_context_text = ""
+        elif SemanticTranslator.should_bypass_memory_context(
+            actual_prompt, list(candidate_df.columns), schema_profile
+        ):
+            emit_structured_log(
+                "analysis_memory_bypassed_self_contained",
+                file_id=file_id,
+            )
+            memory_context_text = ""
+        else:
+            memory_instruction = SemanticTranslator._classify_memory_intent(
+                actual_prompt,
+                memory_context_text,
+                _extract_previous_dimensions(parent_context),
+            )
     plans = SemanticTranslator.translate(
         actual_prompt,
         list(candidate_df.columns),
         _build_glossary_context(candidate_df),
         _build_topology_context(candidate_df),
-        memory_context=build_parent_memory_context_text(parent_context),
+        memory_context=memory_context_text,
+        memory_instruction=memory_instruction,
         schema_profile=schema_profile,
         dataset_contract=dataset_contract,
         related_frames_context=related_frames_context,
         candidate_df=candidate_df,
     ) or []
+    # [F2-D5] Alineación métrica-semántica en el path canónico (antes solo en legacy).
+    # Corrige la métrica elegida según la preferencia de unidad del prompt (mismo
+    # contrato de firma; no cambia planes aditivos por defecto). Degradación segura:
+    # una falla aquí nunca debe tumbar el análisis.
+    try:
+        plans = align_plan_metrics_with_prompt(plans, actual_prompt, schema_profile) or plans
+    except Exception as exc:
+        emit_structured_log(
+            "analysis_metric_alignment_error",
+            level="warning",
+            file_id=file_id,
+            error=str(exc)[:160],
+        )
     plans = apply_parent_context_to_placeholder_filters(
         plans=plans,
         parent_context=parent_context,
     )
+
+    # [P1 2026-09] Ventana temporal relativa determinista (próximos/últimos N).
+    # El LLM puede emitir solo una cota; aquí se garantiza la ventana completa
+    # anclada al reference_date del dataset. Degradación segura.
+    try:
+        plans = apply_relative_time_windows(
+            plans,
+            actual_prompt,
+            reference_date=(getattr(candidate_df, "attrs", {}) or {}).get("reference_date"),
+            schema_profile=schema_profile,
+            time_axis=str(dataset_contract.get("time_axis") or "") or None,
+        ) or plans
+    except Exception as exc:
+        emit_structured_log(
+            "analysis_relative_window_error",
+            level="warning",
+            file_id=file_id,
+            error=str(exc)[:160],
+        )
+
+    # [MEJORA 4 2026-09] Intención determinista de vencimientos: cuando el prompt
+    # pide "productos a vencer", construimos el bundle sin depender del LLM
+    # (columna de vencimiento + ventana + corte actual). Degradación segura:
+    # si no aplica o no se puede resolver la ventana, se conservan los planes.
+    try:
+        expiry_plans = build_expiry_analysis_bundle(
+            prompt=actual_prompt,
+            columns=list(candidate_df.columns),
+            schema_profile=schema_profile,
+            dataset_contract=dataset_contract,
+            candidate_df=candidate_df,
+            reference_date=(getattr(candidate_df, "attrs", {}) or {}).get("reference_date"),
+            prompt_type=prompt_type,
+            max_plans=max_plans,
+        )
+        if expiry_plans:
+            # [Fase 1.4 2026-09] El bundle determinista pasa por el choke point
+            # de planes: visual advisory (combo → serie derivada) + invariantes.
+            plans = finalize_plans(
+                expiry_plans,
+                schema_profile,
+                dataset_contract=dataset_contract,
+                prompt=actual_prompt,
+            )
+            emit_structured_log(
+                "expiry_deterministic_bundle_applied",
+                file_id=file_id,
+                plan_count=len(plans),
+            )
+    except Exception as exc:
+        emit_structured_log(
+            "expiry_bundle_error",
+            level="warning",
+            file_id=file_id,
+            error=str(exc)[:160],
+        )
+
+    # [F2-D2] Constraint guard (observabilidad): reporta restricciones del prompt
+    # que el plan no satisfizo (temporal+top_n, rollup, split negado). No bloquea.
+    try:
+        unresolved_constraints = SemanticTranslator._fast_path_unresolved_constraints(
+            actual_prompt, plans
+        )
+        if unresolved_constraints:
+            emit_structured_log(
+                "analysis_constraints_unresolved",
+                level="warning",
+                file_id=file_id,
+                constraints=unresolved_constraints,
+            )
+    except Exception as exc:
+        emit_structured_log(
+            "analysis_constraints_guard_error",
+            level="warning",
+            file_id=file_id,
+            error=str(exc)[:160],
+        )
+
+    # [F2-D1] Contrato analítico (observabilidad, no bloqueante). Computa el estado
+    # (valid/blocked/clarification_required) para trazabilidad sin alterar el pipeline.
+    try:
+        _intent_type = (
+            str(getattr(plans[0].main_intent, "type", "unknown")) if plans else "unknown"
+        )
+        analytical_contract = SemanticTranslator._build_query_analytical_contract(
+            query_id=f"{file_id}:{len(plans)}",
+            file_id=file_id,
+            intent_type=_intent_type,
+            plans=plans,
+            columns=list(candidate_df.columns),
+            schema_profile=schema_profile,
+        )
+        emit_structured_log(
+            "analysis_contract_evaluated",
+            file_id=file_id,
+            contract_state=getattr(analytical_contract, "state", "unknown"),
+            block_reason=getattr(analytical_contract, "block_reason", None),
+        )
+    except Exception as exc:
+        emit_structured_log(
+            "analysis_contract_error",
+            level="warning",
+            file_id=file_id,
+            error=str(exc)[:160],
+        )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # [UNIFIED DATA MODEL] Short-circuit ANTES de FASE 3B/3C/3D
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Cuando el candidato seleccionado es la vista unificada, toda la data ya
+    # está consolidada: no hay JOIN cross-sheet ni pre-agregación transaccional.
+    # Limpiar related_frame_ids/join_keys/pre_aggregation AQUÍ (y no solo en el
+    # bloque tardío de ~1050) evita que la FASE 3D dispare una pre-agregación
+    # automática que colapse el schema a [join_key, ...métricas] y rompa las
+    # dimensiones/fechas del plan.
+    # Incidente 2026-09-23: "semana 30 del 2021" matcheó tokens de frame_id
+    # ('30','2021') → related_frame_ids espurios → pre-agregación → query_failed.
+    # Schema-agnostic: solo mira el id del candidato, no columnas ni nombres.
+    # ═══════════════════════════════════════════════════════════════════════════
+    _is_unified_candidate = bool(
+        selected_candidate_id and "unified_all__" in str(selected_candidate_id)
+    )
+    if _is_unified_candidate and plans:
+        for plan in plans:
+            plan.related_frame_ids = []
+            plan.join_keys = []
+            plan.pre_aggregation = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # [FASE 3B MULTI-HOJA] Resolver frame_ids para JOINs deterministas
@@ -665,7 +1075,7 @@ def build_canonical_tabular_production_execution(
     _available_frame_ids: list[str] = []
     if hasattr(adapter_runtime, "related_frame_ids") and adapter_runtime.related_frame_ids:
         _available_frame_ids = list(adapter_runtime.related_frame_ids)
-    if plans and actual_prompt:
+    if plans and actual_prompt and not _is_unified_candidate:
         for plan in plans:
             if not getattr(plan, "related_frame_ids", None):
                 plan.related_frame_ids = _resolve_plan_frame_ids_deterministic(
@@ -682,7 +1092,7 @@ def build_canonical_tabular_production_execution(
     # el plan la recibe aunque el LLM no la haya puesto en el JSON.
     # ═══════════════════════════════════════════════════════════════════════════
     _frame_relations = getattr(adapter_runtime, "frame_relations", []) or []
-    if plans and _frame_relations:
+    if plans and _frame_relations and not _is_unified_candidate:
         for plan in plans:
             # Solo heredar join_keys si el plan realmente va a hacer JOIN
             if not getattr(plan, "related_frame_ids", None):
@@ -704,7 +1114,7 @@ def build_canonical_tabular_production_execution(
     # Esta es la última línea de defensa que garantiza que ningún JOIN
     # transaccional escape sin consolidación previa.
     # ═══════════════════════════════════════════════════════════════════════════
-    if plans and candidate_df is not None and not candidate_df.empty:
+    if plans and candidate_df is not None and not candidate_df.empty and not _is_unified_candidate:
         for plan in plans:
             # Solo detectar cardinalidad en planes cross-sheet (necesitan JOIN)
             if not getattr(plan, "related_frame_ids", None):
@@ -717,6 +1127,9 @@ def build_canonical_tabular_production_execution(
 
             join_key = _plan_join_keys[0]
             if join_key not in candidate_df.columns:
+                continue
+
+            if pd.api.types.is_numeric_dtype(candidate_df[join_key]):
                 continue
 
             total_rows = len(candidate_df)
@@ -858,6 +1271,10 @@ def build_canonical_tabular_production_execution(
     # ═══════════════════════════════════════════════════════════════════════════
     plans = _auto_correct_hallucinated_metrics(plans, candidate_df, actual_prompt)
 
+    # [#4 2026-09] Guard de métricas acumuladas: corrige sum→max/min cuando la
+    # serie es acumulada (dos señales fail-closed). Cubre todas las rutas.
+    plans = _apply_cumulative_metric_guard(plans, candidate_df, actual_prompt)
+
     bounded_plans = list(plans[: max(int(max_plans or 0), 1)])
     plan_summaries = [_summarize_plan(plan, index + 1) for index, plan in enumerate(bounded_plans)]
 
@@ -880,13 +1297,16 @@ def build_canonical_tabular_production_execution(
                 (getattr(candidate_df, "attrs", {}) or {}).get("schema_profile", {}) or {}
             )
 
+    _skip_related_parquets = _should_skip_related_parquets(selected_candidate_id)
     shadow_file_id, parquet_path, related_paths = _persist_shadow_candidate(
         candidate_df,
         file_id=file_id,
         candidate_id=selected_candidate_id,
-        related_frames=get_related_frames(pipeline_result.analytical_adapter_runtime)
-        if hasattr(pipeline_result, "analytical_adapter_runtime")
-        and hasattr(pipeline_result.analytical_adapter_runtime, "related_frame_ids") else None,
+        related_frames=None if _skip_related_parquets else (
+            get_related_frames(pipeline_result.analytical_adapter_runtime)
+            if hasattr(pipeline_result, "analytical_adapter_runtime")
+            and hasattr(pipeline_result.analytical_adapter_runtime, "related_frame_ids") else None
+        ),
     )
     # [FASE 3B MULTI-HOJA] Excluir vistas derivadas (JOINs pre-calculados del materializador).
     # El engine Ibis hace sus propios JOINs desde hojas raw — las vistas derived__
@@ -1010,6 +1430,7 @@ def execute_canonical_tabular_production_analysis(
     uploaded_file_row: dict[str, Any] | None = None,
     mime_type: str | None = None,
     max_plans: int = 3,
+    prompt_type: str | None = None,
 ) -> CanonicalTabularProductionExecutionResult:
     pipeline_result = run_canonical_dark_pipeline_for_uploaded_file(
         file_id=file_id,
@@ -1023,6 +1444,7 @@ def execute_canonical_tabular_production_analysis(
         prompt=prompt,
         service_client=service_client,
         max_plans=max_plans,
+        prompt_type=prompt_type,
     )
     successful_count = sum(1 for row in execution.execution_summaries if row.get("status") == "success")
     # [V3] Extraer tipo de error dominante para que el Big Data Shield
@@ -1065,6 +1487,10 @@ def execute_canonical_tabular_production_analysis(
     final_struct.setdefault("traceability", {})
     final_struct["traceability"]["runtime"] = "canonical_tabular_production"
     final_struct["traceability"]["prompt_strategy"] = execution.prompt_strategy
+    plans = execution.plans
+    if plans and plans[0] and hasattr(plans[0], 'coverage_metadata') and plans[0].coverage_metadata:
+        semantic_context = final_struct["traceability"].setdefault("semantic_context", {})
+        semantic_context["metric_coverage"] = plans[0].coverage_metadata
     return CanonicalTabularProductionExecutionResult(
         status="completed",
         final_struct=final_struct,

@@ -87,7 +87,20 @@ def build_canonical_tabular_canary_route(
     allowlist_match: str | None = None
     eligible = file_extension in _TABULAR_EXTENSIONS
 
-    if router_enabled and eligible:
+    # [Fase 2 2026-09] Retiro reversible del runtime legacy. Con el kill-switch
+    # apagado y el runtime universal habilitado, TODO archivo tabular elegible
+    # va a universal (sin allowlist ni porcentaje de tráfico). El legacy queda
+    # solo como válvula de emergencia si el gate de salud no pasa.
+    legacy_enabled = bool(settings.LEGACY_ANALYSIS_RUNTIME_ENABLED)
+    retire_legacy = (
+        (not legacy_enabled) and router_enabled and eligible and functional_switch_enabled
+    )
+
+    if retire_legacy:
+        requested_runtime = "universal_tabular"
+        decision_mode = "legacy_retired"
+        decision_reason = "legacy_runtime_retired"
+    elif router_enabled and eligible:
         if normalized_file_id and normalized_file_id in allowlisted_files:
             requested_runtime = "universal_tabular"
             decision_mode = "allowlist_file"
@@ -125,7 +138,12 @@ def build_canonical_tabular_canary_route(
         decision_reason = "functional_switch_disabled"
     elif ready_for_functional_canary:
         effective_runtime = "universal_tabular"
-        decision_reason = "canary_health_gate_passed"
+        decision_reason = "legacy_runtime_retired" if retire_legacy else "canary_health_gate_passed"
+    elif retire_legacy:
+        # Universal no saludable con legacy retirado: el legacy se conserva
+        # únicamente como válvula de emergencia (no hay otra ruta disponible).
+        effective_runtime = "legacy"
+        decision_reason = "legacy_runtime_retired_health_hold"
     elif fail_open_enabled:
         effective_runtime = "legacy"
         decision_reason = "health_gate_blocked_fail_open"
@@ -143,6 +161,8 @@ def build_canonical_tabular_canary_route(
         "router_enabled": router_enabled,
         "functional_switch_enabled": functional_switch_enabled,
         "fail_open_enabled": fail_open_enabled,
+        "legacy_runtime_enabled": legacy_enabled,
+        "legacy_retired": retire_legacy,
         "eligible": eligible,
         "file_extension": file_extension,
         "traffic_percent": traffic_percent,

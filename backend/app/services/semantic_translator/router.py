@@ -89,6 +89,15 @@ def route_prompt_with_semantic_router(
     Si el usuario pide "graficar X pero ordenar por Y", usa plot_metric=X y ranking_metric=Y.
     Si el usuario excluye valores, usa negative_filters con operator="not_in" o "!=".
 
+    INSTRUCCIÓN CRÍTICA — ANÁLISIS DIMENSIONAL CON CONTEXTO TEMPORAL:
+    Si el prompt menciona una dimensión (ej: "por región", "por categoría", "por producto")
+    junto con un contexto temporal (ej: "del 2025", "este año", "mensual", "evolución",
+    "tendencia", "a lo largo de"), usa intent="trend", series_mode="split",
+    dimension=<la dimensión mencionada>, y time_axis=<la columna temporal del dataset>.
+    NO uses intent="descriptive" para estos casos: un análisis "por región del 2025"
+    es una evolución temporal con una línea por región, no un total estático por barra.
+    Solo usa intent="descriptive" cuando el usuario pide un KPI puntual sin desglose temporal.
+
     INSTRUCCIÓN CRÍTICA — MULTI-AGREGACIÓN:
     Si el usuario pide "máximo Y mínimo" o "mínimo Y máximo" o "mayor Y menor"
     o dos agregaciones distintas sobre la MISMA métrica, usa route="COMPLEJO".

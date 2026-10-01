@@ -136,50 +136,54 @@ def record_llm_call(
     if trace_id:
         trace_context = {"trace_id": str(trace_id)}
 
+    observation_ctx = None
     try:
-        with lf_client.start_as_current_observation(
+        observation_ctx = lf_client.start_as_current_observation(
             trace_context=trace_context,
             name=trace_name or span_name,
             as_type="generation",
             input=[{"role": "user", "content": prompt[:15_000]}],
             model=model_name,
             metadata=metadata or {},
-        ) as generation:
-            try:
-                yield result
-            except Exception as call_exc:
-                # La llamada a Gemini falló — registrar el error en Langfuse
-                try:
-                    lf_client.update_current_generation(
-                        level="ERROR",
-                        status_message=str(call_exc)[:500],
-                    )
-                except Exception:
-                    pass
-                raise  # re-raise para no silenciar el error real
-            else:
-                # Llamada exitosa — registrar output via update_current_generation
-                try:
-                    lf_client.update_current_generation(
-                        output=str(result.get("output", ""))[:15_000],
-                    )
-                except Exception as end_exc:
-                    emit_structured_log(
-                        "langfuse_span_close_failed",
-                        level="warning",
-                        span=span_name,
-                        error=str(end_exc)[:500],
-                    )
+        )
     except Exception as setup_exc:
-        # Si falla el setup de Langfuse, el análisis sigue funcionando
         emit_structured_log(
             "langfuse_span_setup_failed",
             level="warning",
             span=span_name,
             error=str(setup_exc)[:500],
         )
+
+    if observation_ctx is None:
         yield result
         return
+
+    with observation_ctx as generation:
+        try:
+            yield result
+        except Exception as call_exc:
+            # La llamada al LLM falló — registrar el error en Langfuse
+            try:
+                lf_client.update_current_generation(
+                    level="ERROR",
+                    status_message=str(call_exc)[:500],
+                )
+            except Exception:
+                pass
+            raise  # re-raise para no silenciar el error real hacia el llamador
+        else:
+            # Llamada exitosa — registrar output via update_current_generation
+            try:
+                lf_client.update_current_generation(
+                    output=str(result.get("output", ""))[:15_000],
+                )
+            except Exception as end_exc:
+                emit_structured_log(
+                    "langfuse_span_close_failed",
+                    level="warning",
+                    span=span_name,
+                    error=str(end_exc)[:500],
+                )
 
 
 # ---------------------------------------------------------------------------

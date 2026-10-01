@@ -311,7 +311,9 @@ def test_T4_big_data_shield_threshold():
     _separator("T4 — Big Data Shield umbral empírico = 100,000 filas")
     import ast
 
-    shield_file = os.path.join(os.path.dirname(__file__), "app", "tasks", "analysis_tasks.py")
+    # [P0-4 TEST-ROT FIX 2026-07-25] analysis_tasks.py fue modularizado a
+    # app/tasks/analysis_pipeline/; el Big Data Shield vive en orchestrator.py:828.
+    shield_file = os.path.join(os.path.dirname(__file__), "app", "tasks", "analysis_pipeline", "orchestrator.py")
     try:
         with open(shield_file, "r") as f:
             source = f.read()
@@ -327,7 +329,7 @@ def test_T4_big_data_shield_threshold():
                     PASS if ok else FAIL,
                     f"Valor en código: {threshold:,}")
         else:
-            _record("T4.1", "_LEGACY_SHIELD_ROW_THRESHOLD presente en analysis_tasks.py",
+            _record("T4.1", "_LEGACY_SHIELD_ROW_THRESHOLD presente en orchestrator.py",
                     FAIL, "Constante no encontrada en el código fuente")
 
         # Verificar que el shield excluye empty_result

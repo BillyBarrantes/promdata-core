@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.core.analytical_contract import AnalyticalContract
 from app.core.canonical_artifacts import (
     CanonicalAnalyticalCandidate,
     CanonicalAnalyticalContractBundle,
@@ -318,6 +319,11 @@ def _build_candidate_for_table(
         temporal_report=temporal_report,
         shadow_metric_gate=shadow_metric_gate,
     )
+
+    analytical_contract = AnalyticalContract.from_legacy_dict(
+        dataset_contract=dataset_contract,
+    )
+    working_df.attrs['analytical_contract'] = analytical_contract
 
     candidate = CanonicalAnalyticalCandidate(
         candidate_id=table_name,

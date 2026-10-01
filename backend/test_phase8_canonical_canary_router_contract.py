@@ -81,3 +81,57 @@ def test_canary_router_fails_open_to_legacy_when_health_gate_blocks(monkeypatch)
     assert route["requested_runtime"] == "universal_tabular"
     assert route["effective_runtime"] == "legacy"
     assert route["decision_reason"] == "health_gate_blocked_fail_open"
+
+
+def _route(health_ready: bool):
+    return build_canonical_tabular_canary_route(
+        task_id="task-retire",
+        file_id="file-retire",
+        file_name="datos.xlsx",
+        user_id="user-r",
+        team_id="team-r",
+        prompt="analiza el stock",
+        health_summary={
+            "status": "ready" if health_ready else "blocked",
+            "ready_for_functional_canary": health_ready,
+        },
+    )
+
+
+def test_canary_router_retires_legacy_when_kill_switch_off(monkeypatch):
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ROUTER_ENABLED", True)
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_FUNCTIONAL_SWITCH_ENABLED", True)
+    monkeypatch.setattr(settings, "LEGACY_ANALYSIS_RUNTIME_ENABLED", False)
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_TRAFFIC_PERCENT", 0)
+
+    route = _route(health_ready=True)
+
+    assert route["requested_runtime"] == "universal_tabular"
+    assert route["effective_runtime"] == "universal_tabular"
+    assert route["decision_mode"] == "legacy_retired"
+    assert route["decision_reason"] == "legacy_runtime_retired"
+    assert route["legacy_retired"] is True
+
+
+def test_canary_router_retire_keeps_legacy_as_emergency_when_health_blocks(monkeypatch):
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ROUTER_ENABLED", True)
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_FUNCTIONAL_SWITCH_ENABLED", True)
+    monkeypatch.setattr(settings, "LEGACY_ANALYSIS_RUNTIME_ENABLED", False)
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_FAIL_OPEN_ENABLED", True)
+
+    route = _route(health_ready=False)
+
+    assert route["requested_runtime"] == "universal_tabular"
+    assert route["effective_runtime"] == "legacy"
+    assert route["decision_reason"] == "legacy_runtime_retired_health_hold"
+
+
+def test_canary_router_retire_is_noop_without_router(monkeypatch):
+    monkeypatch.setattr(settings, "CANONICAL_TABULAR_CANARY_ROUTER_ENABLED", False)
+    monkeypatch.setattr(settings, "LEGACY_ANALYSIS_RUNTIME_ENABLED", False)
+
+    route = _route(health_ready=True)
+
+    assert route["effective_runtime"] == "legacy"
+    assert route["decision_mode"] == "router_disabled"
+    assert route["legacy_retired"] is False

@@ -27,12 +27,23 @@ def _get_fernet() -> Fernet | None:
         return None
 
 
+def _reset_fernet_cache() -> None:
+    """Utilidad para pruebas: limpia la caché en memoria del objeto Fernet."""
+    global _FERNET_CACHE
+    _FERNET_CACHE = None
+
+
 def encrypt_token(plaintext: str) -> str | None:
     if not plaintext:
         return None
     fernet = _get_fernet()
     if not fernet:
-        return plaintext
+        emit_structured_log(
+            "oauth_encryption_disabled_fail_closed",
+            level="error",
+            message="OAUTH_TOKEN_ENCRYPTION_KEY no configurado: cifrado fail-closed activado (token rechazado).",
+        )
+        return None
     try:
         return b64encode(fernet.encrypt(plaintext.encode())).decode()
     except Exception as exc:
@@ -49,7 +60,12 @@ def decrypt_token(ciphertext: str) -> str | None:
         return None
     fernet = _get_fernet()
     if not fernet:
-        return ciphertext
+        emit_structured_log(
+            "oauth_decryption_disabled_fail_closed",
+            level="error",
+            message="OAUTH_TOKEN_ENCRYPTION_KEY no configurado: descifrado rechazado.",
+        )
+        return None
     try:
         return fernet.decrypt(b64decode(ciphertext.encode())).decode()
     except InvalidToken:
@@ -65,3 +81,4 @@ def decrypt_token(ciphertext: str) -> str | None:
             error=str(exc)[:180],
         )
         return None
+

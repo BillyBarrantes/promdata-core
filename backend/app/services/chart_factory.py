@@ -19,9 +19,7 @@ class ChartFactory:
         Cerebro Polimórfico V2 (Con Espía y Búsqueda Profunda).
         """
         # 🕵️ ESPÍA: Ayuda a ver en logs qué llega realmente
-        try:
-            print(f"🕵️ [CHART FACTORY] Input Raw: {str(data)[:100]}...")
-        except: pass
+        print(f"🕵️ [CHART FACTORY] Input Raw: {str(data)[:100]}...")
 
         normalized = []
         if not data: return []
@@ -36,14 +34,14 @@ class ChartFactory:
                     try:
                         val = float(item)
                         normalized.append({"name": str(val), "value": val})
-                    except: continue
+                    except Exception: continue
                 
                 # B. Diccionario / Objeto
                 elif isinstance(item, dict):
                     # B.1 Formato ECharts Perfecto
                     if 'value' in item:
                         try: val = float(item['value'])
-                        except: val = 0
+                        except Exception: val = 0
                         entry = {"value": val, "name": str(item.get('name', 'N/A'))}
                         if 'itemStyle' in item: entry['itemStyle'] = item['itemStyle']
                         if 'label' in item: entry['label'] = item['label']
@@ -174,7 +172,7 @@ class ChartFactory:
         for key in ['value', 'valor', 'total', 'cantidad', 'stock', 'monto', 'qty', 'count']:
             if key in item:
                 try: val = float(item[key])
-                except: val = 0
+                except Exception: val = 0
                 val_found_key = key
                 break
         
@@ -271,7 +269,7 @@ class ChartFactory:
     # --- GRÁFICOS BÁSICOS ---
 
     @staticmethod
-    def build_bar_chart(title, data, horizontal=True, currency_meta=None, barmode=None):
+    def build_bar_chart(title, data, horizontal=True, currency_meta=None, barmode=None, y_label=None):
         """Barras Inteligentes (Acepta todo). Soporta multi-dimension (apiladas/lado-a-lado)."""
         if not data: return ChartFactory._get_base_option(title)
         
@@ -308,9 +306,9 @@ class ChartFactory:
                 for d in data:
                     try:
                         s_data.append(float(d.get(s_name, 0)))
-                    except:
+                    except Exception:
                         s_data.append(0.0)
-                        
+
                 serie_def = {
                     "name": str(s_name),
                     "type": "bar",
@@ -345,6 +343,27 @@ class ChartFactory:
         if len(clean_data) > 0 and 'extra_info' in clean_data[0]:
             unit_suffix = clean_data[0]['extra_info'].get('unit_suffix', '')
 
+        # [Fase 3 2026-09] Consume share/rank (orphans del engine): se aplanan a
+        # campos de dato y se exponen en el tooltip vía `{@campo}` de ECharts.
+        # Fail-closed: solo cuando están presentes.
+        _has_share = False
+        _has_rank = False
+        for item in clean_data:
+            extra = item.get('extra_info') if isinstance(item.get('extra_info'), dict) else {}
+            if extra.get('share') is not None:
+                item['share'] = extra['share']
+                _has_share = True
+            if extra.get('rank') is not None:
+                item['rank'] = extra['rank']
+                _has_rank = True
+        if _has_share or _has_rank:
+            _parts = ["{b}: {c}"]
+            if _has_share:
+                _parts.append("({@share})")
+            if _has_rank:
+                _parts.append("{@rank}")
+            option["tooltip"]["formatter"] = " ".join(_parts)
+
         if horizontal:
             option["xAxis"] = {"type": "value"}
             option["yAxis"] = {"type": "category", "data": categories, "axisLabel": {"interval": 0}}
@@ -361,7 +380,7 @@ class ChartFactory:
                  option["yAxis"]["axisLabel"] = {"formatter": f"{{value}}{unit_suffix}"}
 
         option["series"] = [{
-            "name": title,
+            "name": y_label or title,
             "type": "bar",
             "data": clean_data,
             "label": {"show": True, "position": "right" if horizontal else "top"}
@@ -379,7 +398,7 @@ class ChartFactory:
         return ChartFactory._sanitize_for_json(option)
 
     @staticmethod
-    def build_line_chart(title, data, currency_meta=None, area=False, barmode=None):
+    def build_line_chart(title, data, currency_meta=None, area=False, barmode=None, y_label=None):
         """Líneas Inteligentes (Soporte Forecast + Anomalías + Multi-Serie)."""
         if not data: return ChartFactory._get_base_option(title)
         
@@ -408,7 +427,7 @@ class ChartFactory:
                 for d in data:
                     try:
                         s_data.append(float(d.get(s_name, 0)))
-                    except:
+                    except Exception:
                         s_data.append(0.0)
                         
                 serie_def = {
@@ -457,13 +476,15 @@ class ChartFactory:
         for d in clean_data:
             extra = d.get('extra_info', {})
             if extra and extra.get('is_anomaly'):
+                _score = extra.get('score')
+                _mark_label = f"⚠ {_score}" if _score is not None else "⚠"
                 anomaly_marks.append({
                     'name': '⚠ Anomalía',
                     'coord': [d['name'], d['value']],
                     'itemStyle': {'color': '#ef4444'},
                     'symbol': 'pin',
                     'symbolSize': 40,
-                    'label': {'show': True, 'formatter': '⚠'}
+                    'label': {'show': True, 'formatter': _mark_label}
                 })
         
         series_list = []
@@ -492,7 +513,7 @@ class ChartFactory:
         else:
              # Modo Clásico (Una sola serie)
              main_series = {
-                 "name": title, "type": "line", 
+                 "name": y_label or title, "type": "line", 
                  "data": [d['value'] for d in clean_data],
                  "smooth": True,
                  "connectNulls": True,
@@ -576,9 +597,9 @@ class ChartFactory:
             barmode = barmode or 'stacked'
 
         factory = ChartFactory()
-        if chart_type == 'bar': return factory.build_bar_chart(title, data, currency_meta=currency_meta, barmode=barmode)
-        elif chart_type == 'line': return factory.build_line_chart(title, data, currency_meta=currency_meta, barmode=barmode)
-        elif chart_type == 'pie': return factory.build_pie_chart(title, data, currency_meta=currency_meta)
+        if chart_type == 'bar': return factory.build_bar_chart(title, data, currency_meta=currency_meta, barmode=barmode, y_label=y_label)
+        elif chart_type == 'line': return factory.build_line_chart(title, data, currency_meta=currency_meta, barmode=barmode, y_label=y_label)
+        elif chart_type == 'pie': return factory.build_pie_chart(title, data, currency_meta=currency_meta, y_label=y_label)
         elif chart_type == 'heatmap': return factory._build_heatmap_chart(title, data, x_label, y_label)
         elif chart_type == 'waterfall': return factory._build_waterfall_chart(title, data)
         elif chart_type == 'funnel': return factory.build_funnel_chart(title, data)
@@ -586,7 +607,8 @@ class ChartFactory:
         elif chart_type == 'scatter': return factory._build_scatter_chart(title, data, x_label, y_label)
         elif chart_type == 'bubble': return factory.build_bubble_chart(title, data, x_label, y_label)
         elif chart_type == 'combo': return factory.build_combo_chart(title, data, currency_meta=currency_meta, x_label=x_label, y_label=y_label)
-        elif chart_type == 'treemap': return factory._build_treemap_chart(title, data)
+        elif chart_type == 'pareto': return factory.build_pareto_chart(title, data, currency_meta=currency_meta)
+        elif chart_type == 'treemap': return factory._build_treemap_chart(title, data, y_label=y_label)
         elif chart_type == 'boxplot': return factory.build_boxplot(title, data)
         elif chart_type == 'gantt': return factory.build_gantt_chart(title, data)
         elif chart_type == 'histogram': return factory.build_histogram_chart(title, data)
@@ -595,7 +617,7 @@ class ChartFactory:
 
     # --- REFACTOR PIE CHART (TOP 5 + OTROS) ---
     @staticmethod
-    def build_pie_chart(title, data, currency_meta=None):
+    def build_pie_chart(title, data, currency_meta=None, y_label=None):
         """Donut Inteligente (Top 5 + Otros)."""
         clean_data = ChartFactory._normalize_data_polymorphic(data, limit=50) 
         
@@ -612,7 +634,7 @@ class ChartFactory:
         option = ChartFactory._get_base_option(title)
         option["tooltip"]["trigger"] = "item"
         option["series"] = [{
-            "name": title,
+            "name": y_label or title,
             "type": "pie",
             "radius": ["40%", "70%"],
             "avoidLabelOverlap": True,
@@ -726,7 +748,7 @@ class ChartFactory:
                     x_idx = x_cats.index(x_val)
                     y_idx = y_cats.index(y_val)
                     echarts_data.append([x_idx, y_idx, val])
-            except: continue
+            except Exception: continue
             
         option = ChartFactory._get_base_option(title)
         option['grid']['top'] = '15%'
@@ -766,6 +788,7 @@ class ChartFactory:
         """Scatter Plot (Correlación)."""
         clean_data = []
         grouped_series = {}
+        _has_score = False
         x_label_key = str(x_label or "").strip().lower()
         y_label_key = str(y_label or "").strip().lower()
 
@@ -793,6 +816,15 @@ class ChartFactory:
                             "raw_name": point_name,
                             "value": [float(x_numeric), float(y_numeric)],
                         }
+                        # [Fase 3 2026-09] Consume `score`/`is_anomaly` (orphans del
+                        # path predictivo): se aplanan al punto y se exponen en el
+                        # tooltip vía `{@score}`. Fail-closed: solo si existen.
+                        _extra = item.get('extra_info') if isinstance(item.get('extra_info'), dict) else {}
+                        if _extra.get('score') is not None:
+                            point_payload['score'] = _extra['score']
+                            _has_score = True
+                        if _extra.get('is_anomaly'):
+                            point_payload['is_anomaly'] = True
                         series_name = record.get('series') or record.get('category')
                         if isinstance(series_name, str) and series_name.strip():
                             grouped_series.setdefault(series_name.strip(), []).append(point_payload)
@@ -847,6 +879,8 @@ class ChartFactory:
                 'type': 'scatter',
                 'itemStyle': {'color': ChartFactory.COLORS[0]}
             }]
+        if _has_score:
+            option['tooltip']['formatter'] = "{b}: ({@score})"
         return ChartFactory._sanitize_for_json(option)
 
     @staticmethod
@@ -1006,7 +1040,7 @@ class ChartFactory:
         ]
         return ChartFactory._sanitize_for_json(option)
 
-    def _build_treemap_chart(self, title, data):
+    def _build_treemap_chart(self, title, data, y_label=None):
         """Treemap (Jerarquías)."""
         # data = [{name: 'A', value: 100}, ...]
         clean_data = ChartFactory._normalize_data_polymorphic(data, limit=20)
@@ -1016,7 +1050,7 @@ class ChartFactory:
         
         option['series'] = [{
             'type': 'treemap',
-            'name': title,
+            'name': y_label or title,
             'data': clean_data,
             'breadcrumb': {'show': False},
             'itemStyle': {'borderColor': '#fff'}
@@ -1158,6 +1192,37 @@ class ChartFactory:
         return match_count >= len(vals) * 0.5
 
     @staticmethod
+    def _order_temporal_categories(data, name_key='name'):
+        """[P2 2026-09] Ordena categorías de período cronológicamente.
+
+        Usa la autoridad temporal (`core.temporal_axis`) en vez de inferir de
+        etiquetas "peladas": cubre "Mayo 2021", "ene-2021", "2021-07",
+        "2021-W30", "Q3 2021" y años. Domain-agnostic (solo vocabulario
+        temporal). Devuelve `(is_temporal, ordered_data)`; si menos de la mitad
+        de las categorías son períodos parseables, no reordena (fail-closed).
+        """
+        if not data or not isinstance(data, list) or len(data) < 2:
+            return False, data
+        try:
+            from app.core.temporal_axis import parse_period_key
+        except Exception:
+            return False, data
+        keyed = []
+        parseable = 0
+        for index, item in enumerate(data):
+            raw = item.get(name_key, '') if isinstance(item, dict) else ''
+            key = parse_period_key(raw)
+            if key is not None:
+                parseable += 1
+                keyed.append((key, index, item))
+            else:
+                keyed.append(((10**9, 0, 0, index), index, item))
+        if parseable < max(2, int(round(len(data) * 0.5))):
+            return False, data
+        ordered = [item for _, _, item in sorted(keyed, key=lambda entry: entry[0])]
+        return True, ordered
+
+    @staticmethod
     def build_combo_chart(title, data, currency_meta=None, x_label=None, y_label=None):
         """
         Combo Chart (Dual Axis): Barras para metrica primaria + Linea para metrica secundaria.
@@ -1184,11 +1249,12 @@ class ChartFactory:
         primary_metric = metric_keys[0]
         secondary_metric = metric_keys[1]
 
-        # [V2.5] Preservar orden cronologico si la dimension son meses.
-        # Solo re-ordenar por valor si NO son meses.
-        is_months = ChartFactory._is_month_category(data)
-        if is_months:
-            sorted_data = list(data)
+        # [P2 2026-09] Preservar el orden cronológico si las categorías son
+        # períodos (mes, "Mayo 2021", ISO, trimestre, año). Solo se ordena por
+        # valor descendente cuando el eje NO es temporal.
+        is_temporal, ordered_data = ChartFactory._order_temporal_categories(data)
+        if is_temporal:
+            sorted_data = ordered_data
             categories = [str(d.get("name", "N/A")) for d in sorted_data]
         else:
             sorted_data = sorted(data, key=lambda d: float(d.get(primary_metric, 0)), reverse=True)
@@ -1249,18 +1315,29 @@ class ChartFactory:
         if not clean_data: return ChartFactory._get_base_option(title)
         
         # 2. Calculate Cumulative Percentage
+        # [Fase 3 2026-09] Consume el orphan `extra_info.cumulative` del engine
+        # cuando está presente (ya viene calculado sobre el orden del motor);
+        # si no, se recalcula. Fail-closed: valor no numérico → recalcula.
         total_val = sum(d['value'] for d in clean_data)
         cumulative = 0
-        
+
         x_data = []
         bar_data = []
         line_data = []
-        
+
         for item in clean_data:
             val = item['value']
             cumulative += val
             percentage = (cumulative / total_val) * 100 if total_val > 0 else 0
-            
+            declared = (item.get('extra_info') or {}).get('cumulative') if isinstance(item.get('extra_info'), dict) else None
+            if isinstance(declared, str) and declared.endswith('%'):
+                try:
+                    percentage = float(declared[:-1])
+                except (TypeError, ValueError):
+                    pass
+            elif isinstance(declared, (int, float)):
+                percentage = float(declared)
+
             x_data.append(item['name'])
             bar_data.append(val)
             line_data.append(round(percentage, 1))
@@ -1356,13 +1433,33 @@ class ChartFactory:
         option['legend']['show'] = len(clean_data) <= 8
         
         # Formateadores
+        # [Fase 3 2026-09] Consume `extra_info.conversion` (orphan del engine):
+        # el % real de conversión por etapa se aplana al dato y se expone con
+        # `{@conversion}`. Fail-closed: sin conversión declarada, se usa `{d}%`.
+        has_conversion = any(
+            isinstance(item.get('extra_info'), dict) and item['extra_info'].get('conversion')
+            for item in clean_data
+        )
+        if has_conversion:
+            for item in clean_data:
+                extra = item.get('extra_info') if isinstance(item.get('extra_info'), dict) else {}
+                if extra.get('conversion') is not None:
+                    item['conversion'] = extra['conversion']
+
         tooltip_fmt = "{b}: {c} ({d}%)"
         label_fmt = "{b}: {c}"
-        
+        if has_conversion:
+            tooltip_fmt = "{b}: {c} ({@conversion})"
+            label_fmt = "{b}: {c} ({@conversion})"
+
         if currency_meta:
             symbol = currency_meta.get('symbol', '$')
-            tooltip_fmt = f"{{b}}: {symbol} {{c}} ({{d}}%)"
-            label_fmt = f"{{b}}: {symbol} {{c}}"
+            if has_conversion:
+                tooltip_fmt = f"{{b}}: {symbol} {{c}} ({{@conversion}})"
+                label_fmt = f"{{b}}: {symbol} {{c}} ({{@conversion}})"
+            else:
+                tooltip_fmt = f"{{b}}: {symbol} {{c}} ({{d}}%)"
+                label_fmt = f"{{b}}: {symbol} {{c}}"
             
         option['tooltip']['trigger'] = 'item'
         option['tooltip']['formatter'] = tooltip_fmt
@@ -1413,7 +1510,7 @@ class ChartFactory:
         if isinstance(value, list) and value: _, value = ChartFactory._get_smart_keys(value[0])
         
         try: value = float(value)
-        except: value = 0
+        except Exception: value = 0
 
         option = ChartFactory._get_base_option(title)
         option["series"] = [{
@@ -1519,7 +1616,7 @@ class ChartFactory:
                 start = row['start_date'].timestamp() * 1000
                 end = row['end_date'].timestamp() * 1000
                 series_data.append([cat_idx, start, end, row['category']])
-            except: continue
+            except Exception: continue
 
         option = ChartFactory._get_base_option(title)
         option['tooltip']['formatter'] = "Detalle: <br/>{b}"

@@ -24,6 +24,8 @@ from app.services.semantic_translator.validator import (
     normalize_router_semantic_contract,
     infer_default_metric_column,
     resolve_contract_column,
+    resolve_contract_column_resolution,
+    build_query_analytical_contract,
     normalize_router_filters,
     finalize_plans,
     apply_direction_guard_to_distribution_plans,
@@ -57,6 +59,12 @@ from app.services.semantic_translator.core import (
     has_meaningful_temporal_axis,
     looks_self_contained_visual_request,
     apply_top_n_rollup_mode_to_plans,
+)
+from app.services.semantic_translator.metric_archetype import (
+    build_metric_coverage_metadata,
+    classify_metric_families,
+    compute_metric_features,
+    select_metrics_for_broad_analysis,
 )
 from app.services.semantic_translator.planner import (
     select_default_distribution_visual,
@@ -104,6 +112,8 @@ class SemanticTranslator:
     _contains_analysis_language = staticmethod(contains_analysis_language)
     _infer_default_metric_column = staticmethod(infer_default_metric_column)
     _resolve_contract_column = staticmethod(resolve_contract_column)
+    _resolve_contract_column_resolution = staticmethod(resolve_contract_column_resolution)
+    _build_query_analytical_contract = staticmethod(build_query_analytical_contract)
     _normalize_router_filters = staticmethod(normalize_router_filters)
     _build_plan_from_router_contract = staticmethod(build_plan_from_router_contract)
     _select_default_distribution_visual = staticmethod(select_default_distribution_visual)
@@ -121,6 +131,10 @@ class SemanticTranslator:
     _build_explicit_trend_plan = staticmethod(build_explicit_trend_plan)
     _build_explicit_distribution_plan = staticmethod(build_explicit_distribution_plan)
     _build_deterministic_visual_plan = staticmethod(build_deterministic_visual_plan)
+    _compute_metric_features = staticmethod(compute_metric_features)
+    _classify_metric_families = staticmethod(classify_metric_families)
+    _select_metrics_for_broad_analysis = staticmethod(select_metrics_for_broad_analysis)
+    _build_metric_coverage_metadata = staticmethod(build_metric_coverage_metadata)
     _apply_top_n_rollup_mode_to_plans = staticmethod(apply_top_n_rollup_mode_to_plans)
     _detect_prompt_complexity = staticmethod(detect_prompt_complexity)
     _fast_path_unresolved_constraints = staticmethod(fast_path_unresolved_constraints)

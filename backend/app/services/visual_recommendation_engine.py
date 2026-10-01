@@ -220,6 +220,16 @@ def _intent_type(plan: Any) -> str:
     return str(getattr(getattr(plan, "main_intent", None), "type", "") or "").strip().lower()
 
 
+def _ranking_requested(plan: Any) -> bool:
+    """[P4 2026-09] El usuario pidió un ranking explícito ("top N", "mejores"...).
+
+    El planner marca `ranking_metric` solo cuando hay intención de ordenación
+    explícita; usarlo como señal evita hardcodear vocabulario del prompt.
+    """
+    intent = getattr(plan, "main_intent", None)
+    return bool(getattr(intent, "ranking_metric", None))
+
+
 def _has_temporal_axis(plan: Any) -> bool:
     intent = getattr(plan, "main_intent", None)
     return bool(getattr(intent, "date_column", None)) or _intent_type(plan) in {"trend", "predictive"}
@@ -388,13 +398,21 @@ def _build_allowed_replacements(plan: Any, ibis_output: dict[str, Any]) -> list[
         return allowed
 
     if rows <= 6:
-        allowed = ["bar_chart", "pie_chart", "treemap"]
+        allowed = ["bar_chart", "treemap"]
+        if not has_temporal and not _has_negative_values(ibis_output):
+            allowed.append("pie_chart")
         if multiseries:
             allowed.append("stacked_bar_chart")
         return allowed
 
     if rows <= 20:
         allowed = ["bar_chart", "treemap", "smart_table"]
+        # [P4 2026-09] Un ranking top-N (pocas filas, intención distributiva)
+        # también se lee mejor como Pareto (barras + acumulado).
+        if intent_type in {"distribution", "descriptive"} and rows >= 6:
+            allowed.insert(0, "pareto_chart")
+        if not has_temporal and not _has_negative_values(ibis_output):
+            allowed.append("pie_chart")
         if multiseries:
             allowed.append("stacked_bar_chart")
         if histogram_ready:
@@ -423,6 +441,21 @@ def _has_negative_values(ibis_output: dict[str, Any]) -> bool:
     return False
 
 
+def _pareto_concentration(ibis_output: dict[str, Any]) -> float | None:
+    """[Fase 3 2026-09] Fracción del total aportada por el top-3 (concentración 80/20)."""
+    values: list[float] = []
+    for row in _rows(ibis_output)[:60]:
+        if isinstance(row, dict) and isinstance(row.get("value"), (int, float)):
+            values.append(float(row["value"]))
+    if len(values) < 6:
+        return None
+    total = sum(values)
+    if total <= 0:
+        return None
+    ordered = sorted(values, reverse=True)
+    return sum(ordered[:3]) / total
+
+
 def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tuple[bool, str | None]:
     intent_type = _intent_type(plan)
     has_temporal = _has_temporal_axis(plan)
@@ -438,8 +471,8 @@ def _is_visual_valid(visual: str, plan: Any, ibis_output: dict[str, Any]) -> tup
         return False, "Stacked Bar requiere multiples series comparables por categoria."
     if visual == "pie_chart" and has_temporal:
         return False, "Donut no es recomendable para series temporales."
-    if visual == "pie_chart" and rows > 6:
-        return False, "Donut pierde claridad cuando hay mas de 6 categorias."
+    if visual == "pie_chart" and rows > 20:
+        return False, "Donut pierde claridad cuando hay mas de 20 categorias."
     if visual == "pie_chart" and _has_negative_values(ibis_output):
         return False, "Donut no puede representar deltas o variaciones negativas."
     if visual == "treemap" and has_temporal:
@@ -524,6 +557,16 @@ def _recommend_visual(plan: Any, ibis_output: dict[str, Any]) -> tuple[str, str]
         return "bar_chart", "La salida diagnostica disponible no expone dos metricas numericas por punto; Bar preserva una lectura valida."
     if is_percentage and rows == 1:
         return "gauge_chart", "Una sola metrica porcentual se comunica mejor con Gauge."
+    concentration = _pareto_concentration(ibis_output)
+    if (
+        intent_type in {"distribution", "descriptive"}
+        and 6 <= rows <= 40
+        and (
+            (concentration is not None and concentration >= 0.8)
+            or _ranking_requested(plan)
+        )
+    ):
+        return "pareto_chart", "La concentracion alta (Pareto 80/20) se lee mejor con Barras + Acumulado."
     if rows <= 6 and not _has_negative_values(ibis_output):
         return "pie_chart", "Hay pocas categorías y la composición se lee bien con Donut."
     if rows <= 20 and not _has_negative_values(ibis_output):

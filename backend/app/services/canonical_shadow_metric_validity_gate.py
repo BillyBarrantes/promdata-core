@@ -49,6 +49,7 @@ _TRUSTED_METRIC_FRAGMENTS = {
     "margin",
     "margen",
     "monto",
+    "multa",
     "pct",
     "percent",
     "porcentaje",
@@ -158,10 +159,17 @@ def _refresh_profile_stats(info: dict[str, Any], series: pd.Series, *, total_row
     return refreshed
 
 
-def _downgraded_role(column_name: str, info: dict[str, Any]) -> tuple[str, str]:
+def _downgraded_role(column_name: str, info: dict[str, Any], series: pd.Series | None = None) -> tuple[str, str]:
     cardinality_ratio = float(info.get("cardinality_ratio") or 0.0)
     if _looks_suspicious_metric(column_name) or cardinality_ratio >= 0.95:
         return "identifier", "id"
+    # Trusted numeric metrics (ej. multas_s, total_ingresos) son metricas
+    # legitimas aunque tengan cardinalidad baja. No deben degradarse a
+    # dimension/identifier porque entonces entran al pool de join keys y
+    # causan many-to-many.
+    if _looks_trusted_metric(column_name) and series is not None:
+        if pd.api.types.is_numeric_dtype(series):
+            return "metric", "numeric"
     return "dimension", "categorical"
 
 
@@ -249,7 +257,7 @@ def apply_canonical_shadow_metric_validity_gate(
             continue
 
         if role == "metric":
-            downgraded_role, downgraded_type = _downgraded_role(column_name, info)
+            downgraded_role, downgraded_type = _downgraded_role(column_name, info, series)
             updated_info = _refresh_profile_stats(info, series, total_rows=total_rows)
             updated_info["role"] = downgraded_role
             updated_info["type"] = downgraded_type

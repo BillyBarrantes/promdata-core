@@ -3,13 +3,14 @@ Script de estrés E2E - Mide el tiempo de respuesta real de Vertex AI con Pollin
 """
 from __future__ import annotations
 import asyncio
+import os
 import uuid
 from dataclasses import dataclass
 from time import perf_counter
 import httpx
 
-# 1. CAPTURA TU NUEVO TOKEN DE LA WEB Y PÉGALO AQUÍ
-TOKEN_SEGURIDAD = "eyJhbGciOiJIUzI1NiIsImtpZCI6IjBiTUpicU12am1rNmRCWG4iLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2R4bGtlanNydnVrbnVhamtsdHdtLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzMGFlYWRhYS00OTc3LTQxNzMtOGM2NS1kZTEyMTQwYmEzNTMiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgyMzMzNTY0LCJpYXQiOjE3ODIzMjk5NjQsImVtYWlsIjoibGJhcnJhbnRlc2R1QGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZ29vZ2xlIiwicHJvdmlkZXJzIjpbImdvb2dsZSJdfSwidXNlcl9tZXRhZGF0YSI6eyJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTEw5ZHNZTFRZMVdLMTdsMV9ub3lqd3E2Q291V1dxWUxqeDZva2FNbkRUemhNd2dRPXM5Ni1jIiwiZW1haWwiOiJsYmFycmFudGVzZHVAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZ1bGxfbmFtZSI6Ikx1aWxseSBCYXJyYW50ZXMiLCJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYW1lIjoiTHVpbGx5IEJhcnJhbnRlcyIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xMOWRzWUxUWTFXSzE3bDFfbm95andxNkNvdVdXcVlMang2b2thTW5EVHpoTXdnUT1zOTYtYyIsInByb3ZpZGVyX2lkIjoiMTEzNDM1MjE4MzQ5NjUwMDM4MDUzIiwic3ViIjoiMTEzNDM1MjE4MzQ5NjUwMDM4MDUzIn0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoib2F1dGgiLCJ0aW1lc3RhbXAiOjE3ODIzMjk5NjR9XSwic2Vzc2lvbl9pZCI6IjM0ZjNmMjRmLWI0NTUtNDNkOS05NjcyLTMzOGQ3NzBjZmEwZCIsImlzX2Fub255bW91cyI6ZmFsc2V9.gPz9kO4mwWC76xt61cjeBRsIgWxrw-uOCYr5d5GSXqY"
+# Define SUPABASE_TEST_TOKEN in the environment before running this manual test.
+TOKEN_SEGURIDAD = os.getenv("SUPABASE_TEST_TOKEN", "")
 
 BASE_URL = "https://promdata-backend-698138140658.us-east4.run.app/api/v1"
 ENDPOINT_ANALYZE = f"{BASE_URL}/analyze"
@@ -96,8 +97,8 @@ async def check_task_status(client: httpx.AsyncClient, tracker: TaskTracker):
         pass # Silencioso en polling para no saturar la pantalla
 
 async def main() -> None:
-    if TOKEN_SEGURIDAD == "PEGA_AQUI_TU_NUEVO_TOKEN":
-        print("❌ ERROR: Por favor, pega tu nuevo token de Supabase en la variable TOKEN_SEGURIDAD.")
+    if not TOKEN_SEGURIDAD:
+        print("❌ ERROR: Define SUPABASE_TEST_TOKEN en el entorno antes de ejecutar la prueba.")
         return
 
     headers = {"Authorization": f"Bearer {TOKEN_SEGURIDAD}", "Content-Type": "application/json"}

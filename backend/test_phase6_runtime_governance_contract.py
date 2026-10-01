@@ -15,6 +15,9 @@ def _set_runtime(monkeypatch, **overrides) -> None:
         "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
         "SUPABASE_ANON_KEY": "anon-key",
         "SUPABASE_JWT_SECRET": "jwt-secret",
+        # Proveedor de análisis activo (DeepSeek) + Gemini para embeddings.
+        "LLM_PROVIDER": "deepseek",
+        "DEEPSEEK_API_KEY": "deepseek-key",
         "GEMINI_API_KEY": "gemini-key",
         "GEMINI_VERTEX_PROJECT": "promdata-enterprise",
         "CELERY_BROKER_URL": "redis://redis:6379/0",
@@ -57,10 +60,10 @@ def test_runtime_governance_reports_hardened_production_profile(monkeypatch) -> 
         APP_RELEASE_CHANNEL="stable",
         APP_BUILD_VERSION="1.4.2",
         APP_BUILD_SHA="a1b2c3d4",
-        BACKEND_PUBLIC_URL="https://api.promdata.com",
-        FRONTEND_APP_URL="https://app.promdata.com",
+        BACKEND_PUBLIC_URL="https://app.example.com",
+        FRONTEND_APP_URL="https://app.example.com",
         CONNECTOR_WATCHDOG_ENABLED="true",
-        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://api.promdata.com/api/v1/connectors/google-drive/webhook",
+        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://app.example.com/api/v1/connectors/google-drive/webhook",
     )
 
     payload = get_runtime_governance_payload()
@@ -80,8 +83,8 @@ def test_runtime_governance_flags_insecure_production_webhook(monkeypatch) -> No
         APP_RELEASE_CHANNEL="stable",
         APP_BUILD_VERSION="1.4.2",
         APP_BUILD_SHA="a1b2c3d4",
-        BACKEND_PUBLIC_URL="https://api.promdata.com",
-        FRONTEND_APP_URL="https://app.promdata.com",
+        BACKEND_PUBLIC_URL="https://app.example.com",
+        FRONTEND_APP_URL="https://app.example.com",
         CONNECTOR_WATCHDOG_ENABLED="true",
         GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="http://localhost:8000/api/v1/connectors/google-drive/webhook",
     )
@@ -112,10 +115,10 @@ def test_runtime_governance_warns_when_prod_lacks_supabase_jwt_secret(monkeypatc
         APP_RELEASE_CHANNEL="stable",
         APP_BUILD_VERSION="1.4.2",
         APP_BUILD_SHA="a1b2c3d4",
-        BACKEND_PUBLIC_URL="https://api.promdata.com",
-        FRONTEND_APP_URL="https://app.promdata.com",
+        BACKEND_PUBLIC_URL="https://app.example.com",
+        FRONTEND_APP_URL="https://app.example.com",
         CONNECTOR_WATCHDOG_ENABLED="true",
-        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://api.promdata.com/api/v1/connectors/google-drive/webhook",
+        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://app.example.com/api/v1/connectors/google-drive/webhook",
         SUPABASE_JWT_SECRET="",
     )
 
@@ -136,10 +139,10 @@ def test_runtime_governance_warns_when_prod_lacks_release_metadata(monkeypatch) 
         APP_RELEASE_CHANNEL="stable",
         APP_BUILD_VERSION="0.1.0",
         APP_BUILD_SHA="local",
-        BACKEND_PUBLIC_URL="https://api.promdata.com",
-        FRONTEND_APP_URL="https://app.promdata.com",
+        BACKEND_PUBLIC_URL="https://app.example.com",
+        FRONTEND_APP_URL="https://app.example.com",
         CONNECTOR_WATCHDOG_ENABLED="true",
-        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://api.promdata.com/api/v1/connectors/google-drive/webhook",
+        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://app.example.com/api/v1/connectors/google-drive/webhook",
     )
 
     payload = get_runtime_governance_payload()
@@ -159,11 +162,11 @@ def test_runtime_governance_warns_when_prod_relies_on_implicit_service_role(monk
         APP_RELEASE_CHANNEL="stable",
         APP_BUILD_VERSION="1.4.2",
         APP_BUILD_SHA="a1b2c3d4",
-        BACKEND_PUBLIC_URL="https://api.promdata.com",
-        FRONTEND_APP_URL="https://app.promdata.com",
+        BACKEND_PUBLIC_URL="https://app.example.com",
+        FRONTEND_APP_URL="https://app.example.com",
         SUPABASE_SERVICE_ROLE_KEY="",
         CONNECTOR_WATCHDOG_ENABLED="true",
-        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://api.promdata.com/api/v1/connectors/google-drive/webhook",
+        GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL="https://app.example.com/api/v1/connectors/google-drive/webhook",
     )
 
     payload = get_runtime_governance_payload()

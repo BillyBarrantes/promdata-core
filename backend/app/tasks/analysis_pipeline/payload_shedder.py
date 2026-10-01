@@ -2,10 +2,10 @@
 """Payload shedding functions — extracted from analysis_tasks.py."""
 
 from typing import Any
-import json
+import hashlib
 
 from app.core.structured_logging import emit_structured_log
-from app.core.serializers import CustomEncoder
+from app.core.serializers import dumps_safe
 from app.core.config import settings
 
 
@@ -24,7 +24,7 @@ def _strip_payload_fields(final_struct: dict[str, Any], fields: tuple[str, ...])
 
 
 def _apply_progressive_soft_shedding(final_struct: dict[str, Any], soft_limit_bytes: int) -> tuple[str, int, list[str]]:
-    original_json = json.dumps(final_struct, cls=CustomEncoder)
+    original_json = dumps_safe(final_struct)
     original_bytes = len(original_json)
     if not soft_limit_bytes or original_bytes <= soft_limit_bytes:
         return original_json, original_bytes, []
@@ -33,7 +33,7 @@ def _apply_progressive_soft_shedding(final_struct: dict[str, Any], soft_limit_by
     json_output = original_json
     for fields in (("granular_arrow",), ("arrow_data",), ("snapshot_arrow",)):
         stripped.extend(_strip_payload_fields(final_struct, fields))
-        json_output = json.dumps(final_struct, cls=CustomEncoder)
+        json_output = dumps_safe(final_struct)
         if len(json_output) <= soft_limit_bytes:
             break
     return json_output, original_bytes, stripped
@@ -54,8 +54,19 @@ def save_analysis_with_payload_shedding(sb, task_id: str, runtime_result: Any) -
             resulting_bytes=len(json_output),
             stripped_fields=sorted(set(stripped)),
         )
+    final_struct = runtime_result.final_struct if hasattr(runtime_result, 'final_struct') else runtime_result.get('final_struct', {})
+    status = runtime_result.status if hasattr(runtime_result, 'status') else runtime_result.get('status', 'completed')
+    chart_count = len(final_struct.get("chart_options", []) or [])
+    payload_checksum = hashlib.sha256(json_output.encode()).hexdigest()[:16]
+    emit_structured_log(
+        "analysis_result_persisting",
+        task_id=task_id,
+        status=status,
+        chart_count=chart_count,
+        payload_bytes=len(json_output),
+        payload_checksum=payload_checksum,
+    )
     try:
-        status = runtime_result.status if hasattr(runtime_result, 'status') else runtime_result.get('status', 'completed')
         sb.table('analysis_tasks').update(
             {'status': status, 'results_json': json_output}
         ).eq('id', task_id).execute()
@@ -68,7 +79,7 @@ def save_analysis_with_payload_shedding(sb, task_id: str, runtime_result: Any) -
         )
         if not _stripped:
             raise
-        json_output = json.dumps(final_struct, cls=CustomEncoder)
+        json_output = dumps_safe(final_struct)
         status = runtime_result.status if hasattr(runtime_result, 'status') else runtime_result.get('status', 'completed')
         sb.table('analysis_tasks').update(
             {'status': status, 'results_json': json_output}

@@ -73,6 +73,39 @@ def _is_identifier_like(column_name: str) -> bool:
     return bool(_ID_TOKEN_PATTERN.search(normalized))
 
 
+def _is_numeric_column(frame: CanonicalTabularFrame, col_name: str) -> bool:
+    """Detecta si una columna es predominantemente numérica usando sample_rows.
+
+    La detección usa parseo float sobre valores de muestra; si >50% de los
+    valores parsean como número, la columna se trata como métrica numérica
+    (no válida como join_key categórica).
+
+    Los IDs numéricos se salvan via _is_identifier_like() upstream.
+    """
+    col_idx = _header_index(frame).get(col_name)
+    if col_idx is None:
+        return False
+    rows = _sample_rows(frame)
+    numeric_count = 0
+    total_count = 0
+    for row in rows:
+        if col_idx < len(row):
+            val = str(row[col_idx] or "").strip()
+            if val:
+                total_count += 1
+                val_clean = val.replace(",", "").replace(
+                    "$", ""
+                ).replace("S/", "").replace("€", "").replace("%", "")
+                try:
+                    float(val_clean)
+                    numeric_count += 1
+                except ValueError:
+                    pass
+    if total_count == 0:
+        return False
+    return numeric_count / total_count > 0.5
+
+
 def _build_join_relation(
     *,
     left: CanonicalTabularFrame,
@@ -81,8 +114,17 @@ def _build_join_relation(
 ) -> CanonicalFrameRelation | None:
     if not shared_keys:
         return None
+
+    candidate_keys = [
+        k
+        for k in shared_keys
+        if not _is_numeric_column(left, k) or _is_identifier_like(k)
+    ]
+    if not candidate_keys:
+        return None
+
     scored_keys: list[tuple[str, float, bool, int]] = []
-    for key in shared_keys:
+    for key in candidate_keys:
         overlap = _value_overlap_ratio(left, right, shared_key=key)
         left_idx = _header_index(left).get(key)
         right_idx = _header_index(right).get(key)
@@ -99,7 +141,16 @@ def _build_join_relation(
                 if right_idx < len(row) and str(row[right_idx] or "").strip()
             }
             total_unique = len(left_vals | right_vals)
+        # --- Cardinality filter: skip keys with <3 unique values in sample ---
+        # _sample_rows() returns 5-20 metadata rows (or fewer in test fixtures).
+        # If a column has <3 distinct values in the combined sample, its real
+        # cardinality is too low for JOIN (would cause many-to-many explosion).
+        # This is the earliest guard, applied before the key reaches ibis_engine.
+        if total_unique < 3:
+            continue
         scored_keys.append((key, overlap, _is_identifier_like(key), total_unique))
+    if not scored_keys:
+        return None
     scored_keys.sort(key=lambda item: (item[1], item[2], item[3]), reverse=True)
     best_key, best_overlap, identifier_like, _ = scored_keys[0]
     if best_overlap <= 0:

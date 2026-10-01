@@ -89,6 +89,11 @@ def execute_plans(
                 "smart_table": False,
             }
 
+            # [F1] Linaje temporal: propagar la traza aditiva del plan, si existe.
+            _temporal_trace = ibis_output.get("temporal_filter_trace")
+            if isinstance(_temporal_trace, dict):
+                execution_summary["temporal_filter_trace"] = _temporal_trace
+
             prompt_lower = plan.title.lower() if plan.title else ""
             is_predictive = 'predictive' in str(plan.main_intent.type) or any(
                 x in prompt_lower for x in ['proyecci', 'futuro', 'pronostic', 'predicci', 'tendencia futura']

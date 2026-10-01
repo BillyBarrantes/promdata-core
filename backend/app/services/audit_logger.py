@@ -49,7 +49,7 @@ def _audit_worker() -> None:
             emit_structured_log(
                 "audit_log_write_failed",
                 level="warning",
-                event=entry.get("event"),
+                audit_event=entry.get("event"),
                 error=str(exc)[:180],
             )
 

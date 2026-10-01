@@ -8,6 +8,10 @@ TRACEABILITY_SCHEMA_VERSION = "1.0"
 INTERPRETATION_ENGINE_VERSION = "semantic_translator_v1"
 ANALYSIS_PIPELINE_VERSION = "ibis_titanium_v1"
 
+# [F1.6] Ranking de autoridad temporal para resumir análisis multi-plan:
+# la autoridad reportada es la MÁS FUERTE del conjunto, no la del primer plan.
+_TEMPORAL_AUTHORITY_RANK = {"explicit": 2, "inferred": 1, "unknown": 0}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -296,6 +300,25 @@ def summarize_history_item(*, task_row: dict[str, Any], result_payload: dict[str
         if isinstance(filter_item, dict)
     ])
 
+    # [F1] Resumen de linaje temporal (aditivo, opcional).
+    temporal_filters = (
+        traceability.get("temporal_filters")
+        if isinstance(traceability.get("temporal_filters"), list)
+        else []
+    )
+    temporal_cut_applied = bool(traceability.get("temporal_cut_applied")) if temporal_filters else False
+    temporal_authority = None
+    if temporal_filters:
+        temporal_authority = max(
+            (
+                str(trace.get("authority") or "unknown")
+                for trace in temporal_filters
+                if isinstance(trace, dict)
+            ),
+            key=lambda value: _TEMPORAL_AUTHORITY_RANK.get(value, 0),
+            default=None,
+        )
+
     return {
         "task_id": str(task_row.get("id") or ""),
         "file_id": task_row.get("file_id"),
@@ -311,4 +334,6 @@ def summarize_history_item(*, task_row: dict[str, Any], result_payload: dict[str
         "recommendation_count": int(outputs.get("recommendation_count") or 0),
         "format_override": (request.get("format_override") or {}).get("renderer") if isinstance(request.get("format_override"), dict) else None,
         "traceability_available": bool(traceability),
+        "temporal_cut_applied": temporal_cut_applied,
+        "temporal_authority": temporal_authority,
     }

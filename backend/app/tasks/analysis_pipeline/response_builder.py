@@ -11,7 +11,7 @@ from app.core.arrow_utils import (
     records_to_arrow_base64,
     dataframe_to_arrow_base64,
 )
-from app.core.serializers import CustomEncoder, convert_keys_to_str
+from app.core.serializers import dumps_safe, json_safe, convert_keys_to_str
 from app.core.structured_logging import emit_structured_log
 from app.services.analysis_traceability import build_traceability_payload
 from app.services.analysis_memory_context import build_result_semantic_context
@@ -176,8 +176,23 @@ def build_final_response_struct(
             error_message=final_error_message,
         )
 
-        json_output = json.dumps(final_struct, cls=CustomEncoder)
-    except Exception:
-        json_output = json.dumps({"analysis": str(response)}, default=str)
+        json_output = dumps_safe(final_struct)
+    except Exception as build_error:
+        # [TIER 1 2026-09] Nunca reemplazar todo el payload por un repr: se
+        # pierden charts, métricas y trazabilidad. Se conserva lo disponible.
+        emit_structured_log(
+            "response_payload_build_failed",
+            level="error",
+            error_type=type(build_error).__name__,
+            error=str(build_error)[:300],
+            had_charts=bool(final_struct.get("chart_options")),
+        )
+        try:
+            json_output = dumps_safe(json_safe(final_struct))
+        except Exception:
+            json_output = json.dumps(
+                {"analysis": final_struct.get("analysis") or str(response)},
+                default=str,
+            )
 
     return status, json_output, final_struct

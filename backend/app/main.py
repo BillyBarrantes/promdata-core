@@ -18,12 +18,14 @@ from app.services.audit_middleware import audit_middleware
 from app.services.canonical_canary_health import build_canonical_tabular_canary_health
 from app.services.ip_restriction import ip_restriction_middleware
 from app.services.runtime_governance import get_runtime_governance_payload
+from app.core.ibis_sqlglot_patch import apply_ibis_sqlglot_patch
 
 # ---------------------------------------------------------------------------
 # Sentry: inicializar ANTES que cualquier middleware o router.
 # Si SENTRY_DSN no está configurado, es un no-op silencioso.
 # ---------------------------------------------------------------------------
 init_sentry()
+apply_ibis_sqlglot_patch()
 
 # [FIX 2026-06-08] Log de versiones y timeouts de dependencias externas al startup.
 # Cuando algo se rompe en prod, estos logs son el primer punto de referencia
@@ -64,8 +66,8 @@ app = FastAPI(title="PromData API")
 # Si ninguno está configurado, se permite * como fallback de emergencia.
 #
 # Configura en Cloud Run:
-#   ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat
-#   FRONTEND_APP_URL=https://livion.lat
+#   ALLOWED_ORIGINS=https://<APP_DOMAIN>
+#   FRONTEND_APP_URL=https://<APP_DOMAIN>
 # ---------------------------------------------------------------------------
 def _normalize_origin(raw: str) -> str:
     value = str(raw or "").strip().strip("'").strip('"')
@@ -177,6 +179,54 @@ async def _sanitize_http_errors(request: FastAPIRequest, exc: StarletteHTTPExcep
     )
 
 
+@app.exception_handler(Exception)
+async def _handle_unexpected_exception(request: FastAPIRequest, exc: Exception) -> JSONResponse:
+    """Excepción no controlada → 500 JSON con headers CORS manuales.
+
+    Starlette genera la respuesta de `ServerErrorMiddleware` FUERA del
+    `CORSMiddleware`, así que un `Exception` no manejado sale sin
+    `Access-Control-Allow-Origin`. El navegador lo reporta como
+    `TypeError: Failed to fetch` — indistinguible de una caída de red — y el
+    frontend agota su deadline reportando un falso timeout.
+
+    Este handler (a) deja evidencia estructurada del error real, (b) dispara la
+    alerta de 500 y (c) devuelve el error con los headers CORS correctos para
+    que el cliente pueda reaccionar al status real. No altera el status ni el
+    cuerpo de los errores ya manejados por `_sanitize_http_errors`.
+    """
+    emit_structured_log(
+        "api_unhandled_exception",
+        level="error",
+        method=request.method,
+        path=str(request.url.path),
+        error_type=type(exc).__name__,
+        error=str(exc)[:500],
+    )
+    from app.services.alert_dispatcher import dispatch_500
+    try:
+        await dispatch_500(
+            path=str(request.url.path),
+            method=request.method,
+            status_code=500,
+        )
+    except Exception:
+        pass
+
+    origin = request.headers.get("origin")
+    cors_headers: dict[str, str] = {}
+    if origin and origin in origins:
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor. Por favor, inténtelo de nuevo."},
+        headers=cors_headers or None,
+    )
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 
@@ -194,6 +244,20 @@ def _log_runtime_governance_snapshot() -> None:
         warnings=governance["warnings"],
         criticals=governance["criticals"],
     )
+
+
+@app.on_event("startup")
+def _cleanup_stale_concurrency_slots() -> None:
+    try:
+        redis_client = get_redis_client(purpose="rate_limit")
+        if redis_client is not None:
+            keys = redis_client.keys("concurrency:user:*")
+            if keys:
+                redis_client.delete(*keys)
+                emit_structured_log("concurrency_startup_cleanup", cleared_count=len(keys))
+    except Exception as exc:
+        emit_structured_log("concurrency_startup_cleanup_failed", level="warning", error=str(exc))
+
 
 
 _HEALTHCHECK_PING_CACHE: dict[str, tuple[float, bool, str | None]] = {}
@@ -404,3 +468,10 @@ def health_canary():
         "probe": "canonical_tabular_canary",
         **payload,
     }
+
+
+@app.get("/health/release-candidate", summary="Release Candidate V1 Pre-flight Readiness Probe")
+def health_release_candidate():
+    """Diagnóstico integral de pre-vuelo para despliegue de PromData V1 en VPS Hetzner."""
+    from app.services.release_readiness import audit_release_candidate_readiness
+    return audit_release_candidate_readiness()

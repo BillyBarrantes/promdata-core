@@ -142,15 +142,25 @@ class PredictiveEngine:
                 })
                 
             # Pronóstico
+            is_experimental = len(series) < 12
             for i, (date, val) in enumerate(forecast.items()):
-                 uncertainty = 0.05 * (i + 1)
-                 output.append({
+                uncertainty = 0.05 * (i + 1)
+                if is_experimental:
+                    uncertainty *= 1.5
+                fc_item = {
                     "date": date.strftime("%Y-%m-%d"),
                     "value": round(val, 2),
                     "type": "forecast",
                     "lower_ci": round(val * (1 - uncertainty), 2),
-                    "upper_ci": round(val * (1 + uncertainty), 2)
-                })
+                    "upper_ci": round(val * (1 + uncertainty), 2),
+                    "is_experimental": is_experimental,
+                    "confidence_level": "baja" if is_experimental else "alta",
+                    "method": "Holt-Winters (Exponential Smoothing)",
+                    "observations_count": len(series),
+                }
+                if is_experimental:
+                    fc_item["warning"] = "Muestra histórica reducida (< 12 períodos). Pronóstico experimental con alta incertidumbre."
+                output.append(fc_item)
                 
             return output
 
@@ -163,7 +173,8 @@ class PredictiveEngine:
     def detect_anomalies(df: pd.DataFrame, value_col: str, contamination: float = 0.05) -> pd.DataFrame:
         """
         Detecta anomalías en una columna numérica usando Isolation Forest.
-        Retorna el DataFrame original con una columna extra 'is_anomaly' (bool).
+        Retorna el DataFrame original con columnas extra: 'is_anomaly', 'anomaly_score',
+        'anomaly_method' y 'anomaly_median_ratio'.
         """
         if not PredictiveEngine.is_available() or df.empty or value_col not in df.columns:
             return df
@@ -183,6 +194,12 @@ class PredictiveEngine:
             
             pdf['is_anomaly'] = preds == -1
             pdf['anomaly_score'] = iso.decision_function(data_to_fit)
+            pdf['anomaly_method'] = 'IsolationForest'
+            col_median = float(pdf[value_col].median() or 1.0)
+            if abs(col_median) > 1e-6:
+                pdf['anomaly_median_ratio'] = (pdf[value_col] / col_median).round(2)
+            else:
+                pdf['anomaly_median_ratio'] = 0.0
             
             return pdf
 

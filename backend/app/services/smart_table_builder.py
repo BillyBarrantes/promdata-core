@@ -92,7 +92,17 @@ def should_use_smart_table(chart_option: dict[str, Any], *, chart_type: str | No
         if axis.get('type') != 'category':
             return False
         categories = axis.get('data', [])
-        return len(categories) >= DENSITY_THRESHOLD
+        if len(categories) < DENSITY_THRESHOLD:
+            return False
+        # [P3 2026-09] Un eje temporal denso ES una serie (trend), no una tabla.
+        # Un combo/dual-axis con muchos períodos (mes+año, ISO...) es legible como
+        # evolución; degradarlo a Smart Table oculta la serie. Domain-agnostic:
+        # solo se inspeccionan las etiquetas.
+        sample = categories[:40]
+        temporal = sum(1 for value in sample if _looks_temporal_label(value))
+        if temporal >= max(2, int(len(sample) * 0.5)):
+            return False
+        return True
 
     # Caso 1: Bar chart vertical (xAxis es category)
     if _check_axis(x_axis):

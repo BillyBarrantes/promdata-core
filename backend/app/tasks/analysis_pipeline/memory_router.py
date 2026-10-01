@@ -7,6 +7,9 @@ import json
 import re
 import unicodedata
 
+from app.core.structured_logging import emit_structured_log
+from app.core.supabase_client import get_supabase_user_client
+
 
 def get_embedding(text: str) -> list | None:
     """Genera embedding para memoria vectorial (Modelo moderno)."""
@@ -23,24 +26,59 @@ def get_embedding(text: str) -> list | None:
         return None
 
 
-def guardar_insight_aprendido(supabase: Any, user_id: str, description: str, code_snippet: str, data_dna: dict) -> None:
+def guardar_insight_aprendido(
+    supabase: Any,
+    user_id: str,
+    description: str,
+    code_snippet: str,
+    data_dna: dict,
+    *,
+    user_access_token: str | None = None,
+) -> None:
+    """Persist an insight through the user's RLS-scoped Supabase session.
+
+    `supabase` remains in the signature for compatibility with existing callers,
+    but is deliberately not used for this write because the worker's service-role
+    client bypasses row-level security.
+    """
+    if not user_id or not user_access_token:
+        emit_structured_log(
+            "historical_insight_write_skipped",
+            level="warning",
+            reason="missing_user_id_or_access_token",
+        )
+        return
+
     try:
         emb = get_embedding(description)
-        if emb:
-            data = {
-                "user_id": user_id,
-                "description": description,
-                "sql_snippet": code_snippet,
-                "embedding": emb,
-                "created_at": datetime.now().isoformat(),
-                "metadata": json.dumps(data_dna)
-            }
-            try:
-                supabase.table('historical_insights').insert(data).execute()
-            except Exception as db_e:
-                pass
-    except Exception as e:
-        pass
+    except Exception as embedding_error:
+        emit_structured_log(
+            "historical_insight_embedding_failed",
+            level="warning",
+            error=str(embedding_error)[:240],
+        )
+        return
+
+    if not emb:
+        return
+
+    data = {
+        "user_id": user_id,
+        "description": description,
+        "sql_snippet": code_snippet,
+        "embedding": emb,
+        "created_at": datetime.now().isoformat(),
+        "metadata": json.dumps(data_dna),
+    }
+    try:
+        user_client = get_supabase_user_client(user_access_token)
+        user_client.table("historical_insights").insert(data).execute()
+    except Exception as db_error:
+        emit_structured_log(
+            "historical_insight_write_failed",
+            level="warning",
+            error=str(db_error)[:240],
+        )
 
 
 def _fetch_institutional_knowledge_context(*, supabase_client: Any, user_id: str | None, query: str) -> str:
@@ -273,13 +311,29 @@ def _force_markdown_action_block(text: str, mandated_action: str) -> str:
     return f"{content}\n{action_line}"
 
 
-def resolve_memory_for_task(supabase: Any, user_id: str | None, file_id: str, prompt: str, parent_context: str | None, dfs: dict, adn: dict) -> tuple:
+def resolve_memory_for_task(
+    supabase: Any,
+    user_id: str | None,
+    file_id: str,
+    prompt: str,
+    parent_context: str | None,
+    dfs: dict,
+    adn: dict,
+    user_access_token: str | None = None,
+) -> tuple:
     """Wrapper que orquesta memoria, glosario, reglas institucionales."""
     glossary_map = {}
     institutional_rules = []
 
     try:
-        insight = guardar_insight_aprendido(supabase, user_id, prompt, "", adn)
+        guardar_insight_aprendido(
+            supabase,
+            user_id,
+            prompt,
+            "",
+            adn,
+            user_access_token=user_access_token,
+        )
     except Exception:
         pass
 

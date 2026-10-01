@@ -15,6 +15,7 @@ from app.api.schemas import (
     CloudWatchdogPollResponse, FilePreviewResponse, KnowledgeDocumentListResponse,
     KnowledgeDocumentUploadResponse, KnowledgeQueryRequest, KnowledgeQueryResponse,
     KnowledgeAskRequest, KnowledgeAskResponse, EnterpriseTelemetrySummaryResponse,
+    InteractionEvaluateRequest, InteractionEvaluateResponse,
 )
 from typing import Any, Optional
 from app.tasks.analysis_tasks import (
@@ -24,8 +25,15 @@ from app.tasks.analysis_tasks import (
 from app.tasks.cloud_sync_tasks import perform_cloud_sync_job_task
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.core.rate_limit import enforce_rate_limit, enforce_burst_limit, acquire_concurrency_slot
+from app.core.rate_limit import (
+    check_rate_limits_batch,
+    enforce_rate_limit,
+    enforce_burst_limit,
+    acquire_concurrency_slot,
+    release_concurrency_slot,
+)
 from app.core.structured_logging import emit_structured_log
+from app.core.serializers import dumps_safe, has_non_finite, json_safe
 from app.services.cloud_connectors import get_cloud_connector_catalog, get_watchdog_runtime_status
 from app.services.prompt_sanitizer import detect_prompt_injection
 from app.services.cloud_oauth import (
@@ -100,7 +108,8 @@ from app.api.sse_progress import router as sse_router
 from supabase import create_client, Client
 import uuid
 import time
-import json # <-- Aseguramos que la importación está aquí
+import json # <-- Aseguramos que la importaci├│n est├í aqu├¡
+import hashlib
 
 router = APIRouter()
 router.include_router(sse_router)
@@ -463,24 +472,35 @@ def start_analysis(
     request_body: AnalysisRequest,
     token: str = Depends(oauth2_scheme)
 ):
-    print(f"🕵️\u200d♂️ [ESPÍA BACKEND] Petición POST recibida en el endpoint | {__import__('datetime').datetime.utcnow().isoformat()}Z")
+    emit_structured_log(
+        "api_analysis_request_received",
+        level="info",
+        path=request.url.path,
+        method=request.method,
+    )
+    slot_acquired = False
+    current_user_id = None
+    fallback_user_id = None
     try:
-        enforce_rate_limit(
+        allowed, limit_info = check_rate_limits_batch(
             request=request,
             token=token,
             scope="analyze",
-            limit=settings.RATE_LIMIT_ANALYZE_LIMIT,
-            window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+            rate_limit=settings.RATE_LIMIT_ANALYZE_LIMIT,
+            rate_window=settings.RATE_LIMIT_WINDOW_SECONDS,
+            burst_limit=settings.RATE_LIMIT_BURST_ANALYZE_LIMIT,
+            burst_window=settings.RATE_LIMIT_BURST_WINDOW_SECONDS,
+            max_concurrent=settings.CONCURRENT_TASKS_PER_USER,
+            concurrency_ttl=settings.CONCURRENT_TASKS_TTL_SECONDS,
         )
-        
-        # Burst Limit Protection
-        enforce_burst_limit(
-            request=request,
-            token=token,
-            scope="analyze",
-            limit=settings.RATE_LIMIT_BURST_ANALYZE_LIMIT,
-            window_seconds=settings.RATE_LIMIT_BURST_WINDOW_SECONDS,
-        )
+        if not allowed:
+            raise HTTPException(
+                status_code=limit_info.get("status_code", 429),
+                detail=limit_info.get("error", "Límite de solicitudes excedido."),
+                headers={"Retry-After": str(limit_info.get("retry_after", 5))},
+            )
+        slot_acquired = bool(limit_info.get("slot_acquired", False))
+        fallback_user_id = limit_info.get("user_id")
 
         supabase: Client = get_supabase_user_client(token)
         user_response = supabase.auth.get_user()
@@ -488,13 +508,6 @@ def start_analysis(
 
         if not current_user_id:
             raise HTTPException(status_code=401, detail="Token de usuario inválido o expirado.")
-
-        # Concurrency Limit Protection
-        if not acquire_concurrency_slot(token, settings.CONCURRENT_TASKS_PER_USER, settings.CONCURRENT_TASKS_TTL_SECONDS):
-            raise HTTPException(
-                status_code=429,
-                detail="Tienes demasiados análisis en curso. Por favor, espera a que terminen antes de solicitar uno nuevo.",
-            )
 
         team_id = resolve_user_team_scope(user_id=current_user_id, service_client=supabase)
         uploaded_file_row = get_user_uploaded_file_scope_or_404(
@@ -596,8 +609,14 @@ def start_analysis(
         return AnalysisTaskResponse(task_id=str(new_task_id))
 
     except HTTPException:
+        target_user = current_user_id or fallback_user_id
+        if slot_acquired and target_user:
+            release_concurrency_slot(target_user)
         raise
     except Exception as e:
+        target_user = current_user_id or fallback_user_id
+        if slot_acquired and target_user:
+            release_concurrency_slot(target_user)
         print(f"Error al iniciar el análisis: {e}")
         emit_structured_log(
             "api_analysis_task_error",
@@ -629,6 +648,28 @@ def start_analysis(
                 detail="El servicio de base de datos está temporalmente no disponible. Por favor, inténtalo de nuevo en unos minutos.",
             )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/concurrency/reset")
+def reset_user_concurrency(token: str = Depends(oauth2_scheme)):
+    """Libera manualmente cualquier slot de concurrencia atascado del usuario autenticado."""
+    try:
+        supabase: Client = get_supabase_user_client(token)
+        user_response = supabase.auth.get_user()
+        user_id = user_response.user.id if user_response and user_response.user else None
+        if user_id:
+            release_concurrency_slot(user_id)
+            from app.core.redis_client import get_redis_client
+            rc = get_redis_client("rate_limit")
+            if rc:
+                rc.delete(f"concurrency:user:{user_id}")
+            return {"status": "ok", "message": "Slots de concurrencia restablecidos correctamente."}
+        raise HTTPException(status_code=401, detail="Token de usuario no válido.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
     
 # (Removed ReportSaveRequest class definition from here)
 
@@ -646,13 +687,35 @@ def get_task_status(task_id: str, token: str = Depends(oauth2_scheme)):
             if isinstance(results_payload, str):
                 results_payload = json.loads(results_payload)
 
-            print(f"DIAGNÓSTICO API: Tipo de dato enviado al frontend -> {type(results_payload)}")
+            # [FIX 2026-09] Frontera de respuesta: payloads legacy pueden contener
+            # NaN/Infinity (escritos antes del saneamiento en persistencia). Starlette
+            # serializa con allow_nan=False → 500 sin CORS → "Failed to fetch" en el
+            # navegador. Se normaliza a None antes de loguear/responder.
+            non_finite_sanitized = has_non_finite(results_payload)
+            results_payload = json_safe(results_payload)
+            if non_finite_sanitized:
+                emit_structured_log(
+                    "api_task_status_non_finite_sanitized",
+                    level="warning",
+                    task_id=task_id,
+                    hint="payload legacy con NaN/Infinity normalizado a null en la respuesta",
+                )
+
+            raw_json = dumps_safe(results_payload)
+            chart_count = len(results_payload.get("chart_options", []) or []) if isinstance(results_payload, dict) else 0
+            payload_checksum = hashlib.sha256(raw_json.encode()).hexdigest()[:16]
+
+            print(f"DIAGNOSTICO API: Tipo de dato enviado al frontend -> {type(results_payload)}")
             emit_structured_log(
                 "api_task_status_resolved",
                 task_id=task_id,
                 status=response.data['status'],
                 result_type=type(results_payload).__name__,
                 has_result=results_payload is not None,
+                chart_count=chart_count,
+                payload_bytes=len(raw_json),
+                payload_checksum=payload_checksum,
+                non_finite_sanitized=non_finite_sanitized,
             )
 
             return {
@@ -746,15 +809,27 @@ def get_analysis_history(
 def cancel_task(task_id: str, token: str = Depends(oauth2_scheme)):
     """Cancela una tarea en ejecución (Celery y Supabase)."""
     try:
-        # 1. Detener en Celery (Kill signal)
+        # La tarea debe pertenecer al usuario autenticado antes de enviar una
+        # señal global a Celery; de lo contrario, conocer un task_id bastaría
+        # para interrumpir el trabajo de otra persona.
+        supabase, user = _get_authenticated_user(token)
+        task_response = supabase.table('analysis_tasks') \
+            .select('id') \
+            .eq('id', task_id) \
+            .eq('user_id', user.id) \
+            .limit(1) \
+            .execute()
+        if not task_response.data:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # La consulta de actualización conserva el mismo alcance de usuario
+        # para proteger también frente a cambios concurrentes en la fila.
         celery_app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-        
-        # 2. Actualizar estado en Supabase
-        supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-        supabase.auth.set_session(access_token=token, refresh_token=token)
-        
-        supabase.table('analysis_tasks').update({'status': 'cancelled'}).eq('id', task_id).execute()
-        emit_structured_log("api_task_cancelled", task_id=task_id)
+        supabase.table('analysis_tasks').update({'status': 'cancelled'}) \
+            .eq('id', task_id) \
+            .eq('user_id', user.id) \
+            .execute()
+        emit_structured_log("api_task_cancelled", task_id=task_id, user_id=user.id)
         
         return {"status": "cancelled", "message": f"Tarea {task_id} detenida permanentemente."}
         
@@ -822,6 +897,46 @@ def get_uploaded_file_preview(
             error=str(e),
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/interaction/evaluate", response_model=InteractionEvaluateResponse)
+def evaluate_interaction_endpoint(
+    request_body: InteractionEvaluateRequest,
+    token: str = Depends(oauth2_scheme),
+):
+    """
+    Evalúa la política de interacción y refiltrado dinámico (local vs backend_required),
+    reconciliando base_filters y active_filters con verificación de snapshot.
+    """
+    from app.services.interaction_engine import (
+        evaluate_interaction_policy,
+        reconcile_interaction_filters,
+    )
+    supabase, user = _get_authenticated_user(token)
+    team_id = resolve_user_team_scope(user_id=user.id, service_client=supabase)
+    get_user_uploaded_file_scope_or_404(
+        user_id=user.id,
+        team_id=team_id,
+        file_id=request_body.file_id,
+        service_client=supabase,
+    )
+
+    contract = evaluate_interaction_policy(
+        base_filters=request_body.base_filters,
+        active_filters=request_body.active_filters,
+        requested_changes=request_body.requested_changes,
+        evidence_id=request_body.evidence_id,
+    )
+    merged_filters = reconcile_interaction_filters(
+        request_body.base_filters,
+        request_body.active_filters,
+    )
+
+    return InteractionEvaluateResponse(
+        contract=contract,
+        merged_filters=merged_filters,
+        is_valid=True,
+    )
 
 
 @router.get("/telemetry/summary", response_model=EnterpriseTelemetrySummaryResponse)

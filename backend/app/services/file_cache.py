@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import threading
@@ -175,8 +176,12 @@ def build_file_cache_key(file_id: str, prompt: str, parent_context: Any = None) 
 
 
 def _json_safe(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, int, bool)):
         return value
+    if isinstance(value, float):
+        # NaN/Infinity no son JSON válido: se normalizan a None para que el
+        # payload cacheado nunca rompa la serialización estricta (allow_nan=False).
+        return value if math.isfinite(value) else None
     if isinstance(value, dict):
         return {str(k): _json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple, set)):
@@ -431,22 +436,42 @@ def set_cached_analysis(
 def invalidate_file_cache(file_id: str, prompt: str | None = None) -> None:
     prompt_hash = build_file_cache_key(file_id, prompt or "")
     redis_key = _build_redis_key(file_id, prompt_hash)
+    file_key_prefix = f"{_CACHE_PREFIX}:{_CACHE_KEY_SCHEMA_VERSION}:{file_id}:"
     redis_client = _get_redis()
     if redis_client is not None:
         try:
             if prompt:
                 redis_client.delete(redis_key)
             else:
-                for key in redis_client.scan_iter(f"{_CACHE_PREFIX}:{_CACHE_KEY_SCHEMA_VERSION}:{file_id}:*"):
+                for key in redis_client.scan_iter(f"{file_key_prefix}*"):
                     redis_client.delete(key)
-        except RedisError:
-            pass
+        except RedisError as error:
+            emit_structured_log(
+                "file_cache_invalidation_redis_error",
+                level="warning",
+                file_id=file_id,
+                error=str(error)[:240],
+            )
     if _HAS_PARQUET:
-        parq_path = _parquet_path(file_id, prompt_hash)
-        if os.path.isfile(parq_path):
+        parquet_paths = [_parquet_path(file_id, prompt_hash)] if prompt else [
+            os.path.join(_parquet_dir(file_id), entry)
+            for entry in os.listdir(_parquet_dir(file_id))
+        ] if os.path.isdir(_parquet_dir(file_id)) else []
+        for parquet_path in parquet_paths:
+            if not parquet_path.endswith(".parquet") or not os.path.isfile(parquet_path):
+                continue
             try:
-                os.remove(parq_path)
-            except OSError:
-                pass
+                os.remove(parquet_path)
+            except OSError as error:
+                emit_structured_log(
+                    "file_cache_invalidation_parquet_error",
+                    level="warning",
+                    file_id=file_id,
+                    error=str(error)[:240],
+                )
     with _MEMORY_LOCK:
-        _MEMORY_CACHE.pop(redis_key, None)
+        if prompt:
+            _MEMORY_CACHE.pop(redis_key, None)
+        else:
+            for key in [key for key in _MEMORY_CACHE if key.startswith(file_key_prefix)]:
+                _MEMORY_CACHE.pop(key, None)

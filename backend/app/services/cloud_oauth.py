@@ -45,10 +45,44 @@ def _sanitize_return_to_url(raw_url: str | None) -> str:
     default_url = get_default_connector_return_to()
     if not raw_url:
         return default_url
-    parsed = urlparse(str(raw_url).strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    candidate = str(raw_url).strip()
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in candidate):
         return default_url
-    return str(raw_url).strip()
+    try:
+        parsed = urlparse(candidate)
+        trusted = urlparse(default_url)
+        parsed_hostname = parsed.hostname
+        trusted_hostname = trusted.hostname
+        parsed_port = parsed.port
+        trusted_port = trusted.port
+    except ValueError:
+        return default_url
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or trusted.scheme.lower() not in {"http", "https"}
+        or not parsed.netloc
+        or not trusted.netloc
+        or not parsed_hostname
+        or not trusted_hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        return default_url
+
+    default_ports = {"http": 80, "https": 443}
+    parsed_origin = (
+        parsed.scheme.lower(),
+        parsed_hostname.lower(),
+        parsed_port if parsed_port is not None else default_ports.get(parsed.scheme.lower()),
+    )
+    trusted_origin = (
+        trusted.scheme.lower(),
+        trusted_hostname.lower(),
+        trusted_port if trusted_port is not None else default_ports.get(trusted.scheme.lower()),
+    )
+    if parsed_origin != trusted_origin:
+        return default_url
+    return candidate
 
 
 def get_default_connector_return_to() -> str:

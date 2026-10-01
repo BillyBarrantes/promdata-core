@@ -4,6 +4,12 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.core.config import settings
+from app.core.llm_providers.readiness import (
+    active_llm_model,
+    active_llm_provider,
+    embeddings_provider_ready,
+    llm_provider_ready,
+)
 from app.services.canonical_canary_health import build_canonical_tabular_canary_health
 
 
@@ -120,22 +126,34 @@ def get_runtime_governance_payload() -> dict[str, Any]:
             jwt_secret_configured=supabase_jwt_ready,
         )
 
-    gemini_ready = bool(
-        str(settings.GEMINI_API_KEY or "").strip()
-        or str(settings.GEMINI_VERTEX_PROJECT or "").strip()
+    # El proveedor de análisis es dinámico (LLM_PROVIDER). DeepSeek es el default
+    # actual; Gemini/openai siguen soportados por el gateway. La credencial que
+    # manda es la del proveedor ACTIVO, no la de Gemini.
+    llm_provider_name = active_llm_provider()
+    llm_ready = llm_provider_ready()
+    checks["llm_provider"] = _build_check(
+        "healthy" if llm_ready else "critical",
+        f"Proveedor de análisis '{llm_provider_name}' configurado." if llm_ready
+        else f"Falta la API key del proveedor de análisis '{llm_provider_name}'.",
+        configured=llm_ready,
+        provider=llm_provider_name,
+        model_name=active_llm_model(),
     )
-    gemini_provider = str(getattr(settings, "GEMINI_CLIENT_PROVIDER", "genai") or "genai").strip().lower()
-    gemini_auth_mode = "api_key" if str(settings.GEMINI_API_KEY or "").strip() else "vertex_ai_enterprise"
-    checks["gemini"] = _build_check(
-        "healthy" if gemini_ready else "critical",
-        "Modelo generativo configurado." if gemini_ready else "Falta GEMINI_API_KEY o GEMINI_VERTEX_PROJECT.",
-        configured=gemini_ready,
-        model_name=str(settings.AI_MODEL_NAME or "").strip(),
-        provider=gemini_provider,
-        auth_mode=gemini_auth_mode,
+    if not llm_ready:
+        criticals.append("llm_missing_credentials")
+
+    # Embeddings: el gateway los delega SIEMPRE a Gemini (Knowledge/RAG + memoria).
+    # Su ausencia degrada esas capacidades auxiliares, pero NO bloquea el análisis.
+    embeddings_ready = embeddings_provider_ready()
+    checks["embeddings"] = _build_check(
+        "healthy" if embeddings_ready else "warning",
+        "Proveedor de embeddings configurado." if embeddings_ready
+        else "Sin embeddings (Gemini): Knowledge/RAG y memoria de sesión se degradan.",
+        configured=embeddings_ready,
+        provider="gemini",
     )
-    if not gemini_ready:
-        criticals.append("gemini_missing_credentials")
+    if not embeddings_ready:
+        warnings.append("embeddings_disabled")
 
     broker_ready = bool(str(settings.CELERY_BROKER_URL or "").strip())
     result_backend_ready = bool(str(settings.CELERY_RESULT_BACKEND or "").strip())

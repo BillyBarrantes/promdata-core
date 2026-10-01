@@ -38,22 +38,31 @@ log_result("T1.2", has_skip_msg,
 
 
 # ═══════════════════════════════════════════════════════════════
-# T2 — V1: Guard IN/not_in en Analysis Tasks
+# T2 — V1: Guard IN/not_in en pipeline legacy (post-refactor: legacy_codegen.py)
+# [P0-4 TEST-ROT FIX 2026-07-25] analysis_tasks.py fue modularizado a
+# app/tasks/analysis_pipeline/; la lógica legacy vive en legacy_codegen.py.
 # ═══════════════════════════════════════════════════════════════
 print("\n" + "═" * 60)
-print("  T2 — V1: Guard multi-valor en Analysis Tasks")
+print("  T2 — V1: Guard multi-valor en pipeline legacy (legacy_codegen)")
 print("═" * 60 + "\n")
 
-with open("app/tasks/analysis_tasks.py", "r") as f:
+import re as _re
+
+with open("app/tasks/analysis_pipeline/legacy_codegen.py", "r") as f:
     source_tasks = f.read()
 
 has_in_guard_tasks = 'gemini_op in {"in", "not_in"} and isinstance(gemini_filter.value, list)' in source_tasks
-has_skip_tasks = "Filtro multi-valor preservado" in source_tasks
+# En el path legacy la preservación es un pass-through explícito del branch
+# guard (el filtro multi-valor NO se reemplaza por el literal filter).
+has_skip_tasks = bool(_re.search(
+    r'gemini_op in \{"in", "not_in"\} and isinstance\(gemini_filter\.value, list\):\s*\n\s*pass',
+    source_tasks,
+))
 
 log_result("T2.1", has_in_guard_tasks,
-           f"Guard IN/not_in presente en analysis_tasks (found={has_in_guard_tasks})")
+           f"Guard IN/not_in presente en legacy_codegen (found={has_in_guard_tasks})")
 log_result("T2.2", has_skip_tasks,
-           f"Mensaje SKIP multi-valor presente (found={has_skip_tasks})")
+           f"Branch pass-through preserva filtro multi-valor (found={has_skip_tasks})")
 
 
 # ═══════════════════════════════════════════════════════════════

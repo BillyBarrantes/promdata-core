@@ -15,6 +15,7 @@ from app.services.canonical_shadow_query_runner import (
 )
 from app.services.chart_factory import ChartFactory
 from app.services.dashboard_narrative import generate_dashboard_executive_summary
+from app.services.evidence_bundle import build_evidence_bundle
 from app.services.smart_table_builder import should_use_smart_table, echarts_to_smart_table, build_smart_table_from_records
 from app.services.visual_recommendation_engine import build_visual_governance, normalize_visual_id
 
@@ -50,13 +51,36 @@ def _normalize_chart_type(value: Any) -> str:
         "donut_chart": "pie",
         "treemap": "treemap",
         "scatter_plot": "scatter",
+        "bubble_chart": "bubble",
         "funnel_chart": "funnel",
         "kpi_card": "gauge",
         "combo_chart": "combo",
         "dual_axis_chart": "combo",
+        "pareto_chart": "pareto",
         "smart_table": "smart_table",
     }
     return mapping.get(normalized, normalized or "bar")
+
+
+_PREMIUM_VISUALS = {"combo_chart", "dual_axis_chart", "smart_table", "pareto_chart", "bubble_chart"}
+_BASE_PROMOTABLE_VISUALS = {"bar_chart", "line_chart", "area_chart", "pie_chart", "treemap"}
+
+
+def _premium_promotion_allowed(applied_visual: str | None, recommended_visual: str | None) -> bool:
+    """[P5-A 2026-09] ¿Se permite promover al visual premium recomendado?
+
+    Solo desde un visual BASE (bar/line/area/pie/treemap). Un visual
+    especializado ya válido (scatter/boxplot/heatmap/histogram) NO se pisa:
+    hacerlo generaba dos gráficos idénticos y perdía el boxplot del plan
+    diagnóstico. Domain-agnostic.
+    """
+    rec = normalize_visual_id(recommended_visual) if recommended_visual else None
+    app = normalize_visual_id(applied_visual) if applied_visual else None
+    if not rec or rec not in _PREMIUM_VISUALS:
+        return False
+    if rec == app:
+        return False
+    return app in _BASE_PROMOTABLE_VISUALS
 
 
 def _candidate_attrs(execution: CanonicalShadowQueryExecution) -> dict[str, Any]:
@@ -201,7 +225,18 @@ def _build_widget_facts(title: str, result_payload: dict[str, Any]) -> list[str]
     hard_facts = _safe_dict(result_payload.get("hard_facts"))
     
     # Defensive initialization - extract chart_data early to avoid UnboundLocalError
-    chart_data = _safe_list(result_payload.get("data"))
+    raw_data = result_payload.get("data")
+    chart_data = _safe_list(raw_data)
+
+    # [C-KPI 2026-09] KPI solitario/comparativo: `data` es un dict {metrica: valor},
+    # no una lista. Exponemos sus valores como facts para que la narrativa cite
+    # cifras reales. SIN return temprano: un KPI de comparación debe seguir
+    # procesando hard_facts["comparison"] más abajo (coexistencia).
+    if isinstance(raw_data, dict) and raw_data:
+        for _kpi_metric, _kpi_value in list(raw_data.items())[:3]:
+            if _kpi_value is None:
+                continue
+            facts.append(f"{title}: {_kpi_metric} = {_kpi_value}.")
 
     if hard_facts.get("top_1_name") is not None and hard_facts.get("top_1_val") is not None:
         share_text = f" ({hard_facts.get('top_1_share')}% del total)" if hard_facts.get("top_1_share") is not None else ""
@@ -363,8 +398,16 @@ def _format_executive_summary(summary: dict[str, Any]) -> str:
     return "\n\n".join(blocks).strip()
 
 
-def _extract_direction_notes(plans: list) -> str | None:
+def _extract_direction_notes(plans: list, schema_profile: dict | None = None) -> str | None:
     """Extract flow-direction context from plans for the dashboard narrative."""
+    # Consult the DirectionGuard's real decision before injecting notes.
+    # Previously, any group_by/split_dimension triggered the caveat even for
+    # non-financial datasets (e.g. 'departamento' in HR data).
+    from app.services.direction_detector import should_split_by_flow_direction
+    decision = should_split_by_flow_direction(schema_profile or {})
+    if not decision.get("should_split"):
+        return None
+
     direction_cols: set[str] = set()
     for plan in plans:
         intent = getattr(plan, "main_intent", None)
@@ -388,6 +431,122 @@ def _extract_direction_notes(plans: list) -> str | None:
         "Para cualquier otra métrica estándar del dataset que no sea un flujo "
         "opuesto, las reglas normales de agregación y suma total son válidas."
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# [FIX A+ 2026-09 / Stage 1] Invariante query↔arrow.
+# El query solo colapsa a un corte temporal si (a) snapshot puro, (b) el
+# snapshot guard se aplicó, o (c) el plan llevó un filtro 'latest' explícito
+# en una columna FECHA. El arrow debe reflejar exactamente eso; todo lo demás
+# = dataset completo (un hybrid de flujo NO debe colapsar).
+# ═══════════════════════════════════════════════════════════════════════
+_LATEST_FILTER_TOKENS = {"latest", "last", "ultimo", "último", "actual", "recent", "hoy"}
+
+
+def _plan_latest_date_columns(
+    plans: list | None,
+    date_columns: set[str],
+) -> dict[str, str]:
+    """Filtros temporales simbólicos ('latest'/'actual'/'último'...) SOLO sobre
+    columnas fecha — paridad con `ibis_engine._build_filter_expression`, que
+    resuelve simbólicamente únicamente si la columna es date/timestamp.
+
+    Devuelve {nombre_canónico_columna: valor}. Vacío si no hay colapso explícito.
+    Evita el falso positivo en columnas categóricas (p. ej. estado='actual')."""
+    date_map = {str(c).strip().lower(): str(c).strip() for c in (date_columns or set())}
+    found: dict[str, str] = {}
+    for plan in plans or []:
+        intent = getattr(plan, "main_intent", plan)
+        for f in (getattr(intent, "filters", None) or []):
+            col = str(getattr(f, "column", "")).strip()
+            val = str(getattr(f, "value", "")).strip().lower()
+            if col.lower() in date_map and val in _LATEST_FILTER_TOKENS:
+                found[date_map[col.lower()]] = val
+    return found
+
+
+def _query_collapsed_to_temporal_slice(
+    *,
+    dataset_is_snapshot: bool,
+    guard_applied: bool,
+    plan_has_latest: bool,
+) -> bool:
+    """¿El query colapsó a un único corte temporal? Fuente de verdad del arrow."""
+    return bool(dataset_is_snapshot or guard_applied or plan_has_latest)
+
+
+def _build_cross_filter_meta(
+    series_list: list[dict[str, Any]],
+    title: str,
+    query_contract: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """
+    Determina programáticamente qué representa cada serie del chart:
+    - 'metric': el nombre de la serie coincide con una métrica del contrato
+    - 'decorative': el nombre de la serie es el título del chart o un label hardcodeado
+    - 'dimension_value': el nombre de la serie es un valor de split dimension (filtrable)
+    - 'unknown': no se pudo determinar
+
+    Esta función es el reemplazo estructural de la heurística keyword-based
+    que existía en el frontend. Usa el query_contract (derivado del plan)
+    y el title (derivado del payload) para clasificar series[].name sin
+    listas de palabras clave.
+    """
+    if not series_list or not isinstance(series_list, list):
+        return {"series_kind": "unknown", "series_name": "", "metrics": [], "dimensions": []}
+
+    metrics_set = set()
+    dims_set = set()
+    if query_contract:
+        raw_metrics = query_contract.get("metrics") or []
+        single_metric = query_contract.get("metric")
+        if single_metric:
+            raw_metrics = [single_metric] + list(raw_metrics)
+        metrics_set = {str(m) for m in raw_metrics if m}
+        raw_dims = query_contract.get("dimensions") or []
+        single_dim = query_contract.get("dimension")
+        if single_dim:
+            raw_dims = [single_dim] + list(raw_dims)
+        dims_set = {str(d) for d in raw_dims if d}
+
+    series_names = []
+    for s in series_list:
+        s_name = str(s.get("name", "")) if isinstance(s, dict) else ""
+        if s_name:
+            series_names.append(s_name)
+
+    if not series_names:
+        return {
+            "series_kind": "unknown",
+            "series_name": "",
+            "metrics": sorted(metrics_set),
+            "dimensions": sorted(dims_set),
+        }
+
+    first_name = series_names[0]
+
+    if len(series_names) == 1:
+        if first_name in metrics_set:
+            kind = "metric"
+        elif first_name == title:
+            kind = "decorative"
+        elif first_name.lower() in ("historia", "proyección", "valor", "acumulado %", "volumen", "variación"):
+            kind = "decorative"
+        else:
+            kind = "metric"
+    else:
+        metric_count = sum(1 for n in series_names if n in metrics_set)
+        if metric_count > len(series_names) // 2:
+            kind = "metric"
+        else:
+            kind = "dimension_value"
+
+    return {
+        "series_kind": kind,
+        "series_name": first_name,
+        "metrics": sorted(metrics_set),
+        "dimensions": sorted(dims_set),
+    }
 
 
 def _build_chart_option(
@@ -425,14 +584,12 @@ def _build_chart_option(
     _eng_ct = result_payload.get("chart_type")
 
     # [V2.2] PREMIUM VISUALS OVERRIDE: Si governance recomienda un
-    # visual premium (combo_chart, dual_axis_chart, smart_table),
+    # visual premium (combo_chart, dual_axis_chart, smart_table, pareto_chart),
     # forzar el override incluso si el engine no hizo fallback.
     # El UX premium gana sobre la timidez del motor.
     # [V2.3] TEMP-001: No forzar smart_table sobre line_chart para trends.
     #   Un trend+split con 101 registros es normal; smart_table degrada el UX.
-    PREMIUM_VISUALS = {"combo_chart", "dual_axis_chart", "smart_table"}
-    if (_rec_visual and _rec_visual in PREMIUM_VISUALS
-        and _rec_visual != ui_chart_type):
+    if _premium_promotion_allowed(ui_chart_type, _rec_visual):
         _skip_smart_table = (
             _rec_visual == "smart_table"
             and (
@@ -547,6 +704,22 @@ def _build_chart_option(
                             _metrics_list = getattr(plan.main_intent, "metrics", None) or []
                             if len(_metrics_list) >= 2 and _metrics_list[1]:
                                 _sec_metric_name = _metrics_list[1]
+                            else:
+                                # [#5 2026-09] El trend no tiene `metrics`; su 2ª
+                                # métrica vive en `secondary_value_column`.
+                                _sec_col = getattr(
+                                    plan.main_intent, "secondary_value_column", None
+                                )
+                                if isinstance(_sec_col, str) and _sec_col:
+                                    _sec_metric_name = _sec_col
+                                else:
+                                    # [Fase 1.3 2026-09] Serie derivada MoM: nombre
+                                    # canónico para que el eje derecho se etiquete.
+                                    _derived = getattr(
+                                        plan.main_intent, "derived_secondary", None
+                                    )
+                                    if _derived in ("mom_pct", "variation_pct"):
+                                        _sec_metric_name = "mom_pct"
                         _rec[_sec_metric_name] = float(_xtra["secondary_value"])
 
     # [V2.5] Dual-axis derivation: si el chart_type final es combo (dual_axis_chart
@@ -611,6 +784,19 @@ def _build_chart_option(
 
     print(f"🔍 [VISUAL TYPE] Original: {original_ui_chart_type}, Applied: {_applied_type}")
 
+    # [Fase 0.2 2026-09] Telemetría de degradación silenciosa: si el visual
+    # solicitado (engine/prompt) no es el aplicado, se registra para no perder
+    # la señal en la ruta productiva.
+    _requested_visual = visual_governance.get("requested_visual")
+    if _requested_visual and _applied_type and _requested_visual != _applied_type:
+        emit_structured_log(
+            "visual_downgraded",
+            level="warning",
+            requested_visual=_requested_visual,
+            applied_visual=_applied_type,
+            reason=visual_governance.get("blocked_reason"),
+        )
+
     option["visual_source_payload"] = {
         "title": title,
         "chart_type": _applied_type,
@@ -627,12 +813,26 @@ def _build_chart_option(
     if query_contract:
         option["query_contract"] = query_contract
 
+    # [FIX 2026-07-28] Metadatos estructurales para interacciones cross-filter.
+    # El frontend usa _cross_filter_meta para determinar programáticamente si
+    # un valor de click es: métrica (no filtrable), decorativo (chart title,
+    # no filtrable), o valor de dimensión (sí filtrable).
+    # Esto reemplaza la heurística anterior de keyword-matching con validación
+    # estructural basada en el contrato semántico del plan.
+    option["_cross_filter_meta"] = _build_cross_filter_meta(
+        option.get("series", []), title, query_contract
+    )
+
     # [FIX 2026-06-08] Inyectar los filtros base del plan (e.g. "Tipo Movimiento = Ingreso")
     # en el chart_option para que el frontend los pueda combinar con el clic del
     # usuario en "Filtrar aquí". Sin esto, DuckDB solo filtra por el clic y la
     # tabla resultante incluye TODOS los registros (ej. Ingresos + Egresos).
     # Solo se extraen filtros con formato column+value; operadores !=
     # se serializan como "op value" para que el frontend los pueda parsear.
+    # [FIX 2026-07-28] Role guard: columnas con role=metric o role=numeric
+    # se excluyen de chart_base_filters porque NO son dimensiones filtrables.
+    # Sin este guard, métricas como "multas_s" contaminan el cross-filter
+    # generando WHERE multas_s = '0' que siempre retorna 0 filas.
     plan_filters: dict[str, str] = {}
     intent = getattr(plan, "main_intent", None)
     if intent is not None:
@@ -641,6 +841,10 @@ def _build_chart_option(
             val = getattr(f, "value", None)
             op = str(getattr(f, "operator", "==") or "==").strip()
             if not col or val is None:
+                continue
+            # Role guard: solo dimensiones, fechas e identificadores son filtrables
+            col_role = schema_profile.get(col, {}).get("role", "") if schema_profile else ""
+            if col_role in ("metric", "numeric"):
                 continue
             val_str = str(val)
             op_lower = op.lower()
@@ -657,19 +861,15 @@ def _build_chart_option(
             # Standard: equals without prefix, other operators with prefix
             plan_filters[col] = f"{op} {val_str}" if op != "==" else val_str
 
-    # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2)
-    # El frontend resuelve filtros contra columnas físicas de DuckDB.
-    # is_latest_snapshot es un flag booleano virtual que no siempre
-    # sobrevive la serialización Arrow → el frontend lo descarta.
-    # En su lugar inyectamos la columna de fecha real + valor resuelto
-    # (ej. fecha_de_stock = '2021-07-31') que SÍ es columna física
-    # en snapshot_arrow y el frontend matchea vía L1 sin degradación.
-    resolved_date = _snapshot_resolved_date or result_payload.get("_snapshot_resolved_date")
-    if resolved_date:
-        date_col = resolved_date.get("column")
-        date_val = resolved_date.get("value")
-        if date_col and date_val and date_col not in plan_filters:
-            plan_filters[date_col] = date_val
+    # [FIX 2026-07-28] Eliminado: _snapshot_resolved_date NO se inyecta en
+    # chart_base_filters. El snapshot_arrow enviado al frontend YA está
+    # pre-filtrado a is_latest_snapshot=true por el Ibis engine (líneas
+    # 994-1016). Inyectar la fecha exacta como filtro adicional (ej.
+    # fecha_operacion = '2023-12-31') es redundante y causa que el
+    # cross-filter retorne 0 filas cuando se combina con filtros de
+    # dimensión del usuario, porque la igualdad exacta solo matchea
+    # un subconjunto del período completo.
+    # Ver: AGENTS.md §14.3, Fix D (2026-07-28)
 
     if plan_filters:
         option["chart_base_filters"] = plan_filters
@@ -720,39 +920,79 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
     # [FIX 2026-06] Extraer _snapshot_resolved_date del primer result_payload
     # + cómputo directo desde candidate_df como fallback con blindaje cronológico.
     # Se ejecuta ANTES del loop de chart options porque _build_chart_option
-    # necesita este valor para inyectar chart_base_filters.
+    # necesita este valor para filtrar snapshot_arrow (líneas 994-1016, 1070-1084).
+    # NOTA (2026-07-28): Ya NO se inyecta en chart_base_filters — el snapshot_arrow
+    # enviado al frontend YA está pre-filtrado a is_latest_snapshot=true en backend.
     _snapshot_resolved_date = next(
         (rp["_snapshot_resolved_date"] for rp in execution.execution_results
          if isinstance(rp, dict) and rp.get("_snapshot_resolved_date")),
         None
     )
-    if _snapshot_resolved_date is None and dataset_contract.get("snapshot_guard_allowed"):
-        time_axis = str(dataset_contract.get("time_axis") or "").strip()
-        if time_axis and isinstance(candidate_df, pd.DataFrame) and not candidate_df.empty and time_axis in candidate_df.columns:
-            try:
-                series_dt = pd.to_datetime(candidate_df[time_axis], errors='coerce')
-                if not series_dt.dropna().empty:
-                    max_date = series_dt.max()
-                    date_str = max_date.strftime('%Y-%m-%d')
-                else:
-                    max_date = candidate_df[time_axis].max()
-                    date_str = max_date.strftime('%Y-%m-%d') if hasattr(max_date, 'strftime') else str(max_date)
-                if date_str:
-                    _snapshot_resolved_date = {"column": time_axis, "value": date_str}
-                    print(f"📸 [SNAPSHOT-RESOLVED-DIRECT] Fecha máxima cronológica: '{time_axis}' = '{date_str}'")
-            except Exception as e:
-                print(f"⚠️ [SNAPSHOT-RESOLVED-DIRECT] Error en parsing cronológico: {e}")
+    # [FIX A+ 2026-09 / Stage 1] Invariante query↔arrow: derivar el colapso de
+    # la causa real (snapshot puro, snapshot guard aplicado, o filtro 'latest'
+    # explícito) en vez del proxy `dataset_mode`. Un hybrid de flujo NO colapsa.
+    _dataset_is_snapshot = dataset_contract.get("dataset_mode") == "snapshot"
+    _guard_applied = any(
+        isinstance(rp, dict) and rp.get("_snapshot_guard_applied")
+        for rp in execution.execution_results
+    )
+    _contract_date_cols = {
+        str(c).strip() for c in (dataset_contract.get("date_columns") or []) if str(c).strip()
+    }
+    if str(dataset_contract.get("time_axis") or "").strip():
+        _contract_date_cols.add(str(dataset_contract.get("time_axis")).strip())
+    _latest_cols = _plan_latest_date_columns(execution.plans, _contract_date_cols)
+    _query_collapsed = _query_collapsed_to_temporal_slice(
+        dataset_is_snapshot=_dataset_is_snapshot,
+        guard_applied=_guard_applied,
+        plan_has_latest=bool(_latest_cols),
+    )
+    # [FIX A+ 2026-09 / Stage 1] Log forense SIEMPRE (colapse o no): permite
+    # confirmar al instante por qué el Arrow tomó o no la ruta de corte.
+    print(
+        "📸 [ARROW-SLICE] "
+        f"snapshot={_dataset_is_snapshot} guard={_guard_applied} "
+        f"latest={list(_latest_cols) or False} collapse={_query_collapsed}"
+    )
+
+    if _snapshot_resolved_date is None and _query_collapsed:
+        if _dataset_is_snapshot or _guard_applied:
+            _slice_col = str(dataset_contract.get("time_axis") or "").strip()
+        else:
+            # Colapso por filtro 'latest' explícito → resolver sobre ESA columna.
+            _slice_col = next(iter(_latest_cols))
+        if _slice_col and isinstance(candidate_df, pd.DataFrame) and not candidate_df.empty:
+            _col_lookup = {str(c).lower(): c for c in candidate_df.columns}
+            _slice_col_actual = _col_lookup.get(_slice_col.lower(), _slice_col)
+            if _slice_col_actual in candidate_df.columns:
+                try:
+                    series_dt = pd.to_datetime(candidate_df[_slice_col_actual], errors='coerce')
+                    if not series_dt.dropna().empty:
+                        max_date = series_dt.max()
+                        date_str = max_date.strftime('%Y-%m-%d')
+                    else:
+                        max_date = candidate_df[_slice_col_actual].max()
+                        date_str = max_date.strftime('%Y-%m-%d') if hasattr(max_date, 'strftime') else str(max_date)
+                    if date_str:
+                        _snapshot_resolved_date = {"column": _slice_col_actual, "value": date_str}
+                        print(f"📸 [SNAPSHOT-RESOLVED-DIRECT] Fecha máxima cronológica: '{_slice_col_actual}' = '{date_str}'")
+                except Exception as e:
+                    print(f"⚠️ [SNAPSHOT-RESOLVED-DIRECT] Error en parsing cronológico: {e}")
 
     analysis_blocks: list[str] = []
     _primary_plan_failed = False
     _primary_plan_error = None
+    _applied_visual_seen: dict[str, int] = {}
     for plan_idx, (plan, result_payload) in enumerate(zip(execution.plans, execution.execution_results)):
         if not isinstance(result_payload, dict):
             result_payload = {}
-        if result_payload.get("error"):
+        error_type = result_payload.get("error")
+        if error_type:
+            if error_type == "empty_result":
+                continue
             if plan_idx == 0:
                 _primary_plan_failed = True
-                _primary_plan_error = str(result_payload.get("error"))
+                _primary_plan_error = str(error_type)
                 emit_structured_log(
                     "primary_plan_failed",
                     plan_idx=0,
@@ -768,9 +1008,29 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
     for plan, result_payload in zip(execution.plans, execution.execution_results):
         if not isinstance(result_payload, dict):
             continue
-        if result_payload.get("error"):
+        error_type = result_payload.get("error")
+        if error_type and error_type != "empty_result":
             continue
         title = _normalize_text(result_payload.get("title")) or plan.title or "Resultado"
+
+        if error_type == "empty_result":
+            empty_message = result_payload.get("message") or "No se encontraron datos con los filtros aplicados."
+            filters_applied = result_payload.get("filters_applied") or []
+            final_struct["chart_options"].append({
+                "title": title,
+                "type": "empty_result",
+                "description": empty_message,
+                "filters_applied": filters_applied,
+            })
+            analysis_blocks.append(f"### {title}\n\n{empty_message}")
+            final_struct["explainability"].append({
+                "title": title,
+                "intent_type": getattr(plan.main_intent, "type", None),
+                "empty_result": True,
+                "message": empty_message,
+            })
+            continue
+
         result_type = _normalize_text(result_payload.get("type")).lower()
         hard_facts = _safe_dict(result_payload.get("hard_facts"))
 
@@ -795,7 +1055,36 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                 _snapshot_resolved_date=_snapshot_resolved_date,
             )
             if option:
+                # [F2-D6] Adjuntar el EvidenceBundle al chart para el Evidence Drawer
+                # del frontend. Trazabilidad determinista (no altera el render).
+                try:
+                    evidence = build_evidence_bundle(plan, result_payload)
+                    option["evidence_bundle"] = evidence.model_dump(mode="json")
+                except Exception as exc:
+                    emit_structured_log(
+                        "evidence_bundle_build_error",
+                        level="warning",
+                        error=str(exc)[:160],
+                    )
                 final_struct["chart_options"].append(option)
+                # [P5-A 2026-09] Telemetría de duplicación de visual aplicado:
+                # dos intents distintos no deberían colapsar al mismo gráfico
+                # (síntoma de override agresivo). No destructivo.
+                try:
+                    _applied_visual = str(
+                        (option.get("visual_source_payload") or {}).get("chart_type") or ""
+                    ).strip()
+                    if _applied_visual:
+                        _applied_visual_seen[_applied_visual] = _applied_visual_seen.get(_applied_visual, 0) + 1
+                        if _applied_visual_seen[_applied_visual] == 2 and len(execution.plans) > 1:
+                            emit_structured_log(
+                                "visual_duplicate_applied",
+                                level="warning",
+                                visual=_applied_visual,
+                                plan_count=len(execution.plans),
+                            )
+                except Exception:
+                    pass
             # [FIX 2026-06-08] data_by_chart: poblar SIEMPRE los records de cada chart
             # para que el frontend pueda usar cross-filter sobre cualquier chart,
             # no solo sobre el primero. data se mantiene para el primer chart
@@ -838,7 +1127,27 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
             print(f"🔄 [PRIMARY RECOVERY] Reetiquetando chart '{exitosos[0].get('title', '?')}' como primary_replacement")
 
     if not analysis_blocks:
-        raise RuntimeError(f"canonical_canary_empty_result:{execution.metadata.get('shadow_query_status')}")
+        empty_results = [
+            r for r in execution.execution_results
+            if isinstance(r, dict) and r.get("error") == "empty_result"
+        ]
+        if empty_results:
+            final_struct["analysis"] = (
+                "## Análisis Completado\n\n"
+                "El análisis se ejecutó correctamente, pero no se encontraron datos "
+                "que coincidan con los filtros aplicados.\n\n"
+                "**Sugerencias:**\n"
+                "- Verifica que los valores de los filtros existan en tus datos\n"
+                "- Intenta con filtros menos restrictivos\n"
+                "- Revisa que las columnas de filtro tengan los valores esperados"
+            )
+            final_struct["chart_options"] = []
+            final_struct["data"] = []
+        else:
+            raise RuntimeError(
+                f"canonical_canary_all_plans_failed:"
+                f"{execution.metadata.get('shadow_query_status')}"
+            )
 
     if final_struct["data"]:
         arrow_data = _try_records_to_arrow_base64(_safe_list(final_struct["data"]))
@@ -856,7 +1165,10 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
 
     if isinstance(candidate_df, pd.DataFrame) and not candidate_df.empty:
         snapshot_df = candidate_df
-        if "is_latest_snapshot" in candidate_df.columns:
+        # [FIX A+ 2026-09 / Stage 1] Solo se filtra por la bandera virtual si el
+        # query realmente la aplicó (snapshot puro o guard aplicado). hybrid de
+        # flujo: snapshot_df = candidate_df completo → Big Data Shield trunca a 10k.
+        if (_dataset_is_snapshot or _guard_applied) and "is_latest_snapshot" in candidate_df.columns:
             latest_mask = candidate_df["is_latest_snapshot"] == True
             if bool(latest_mask.any()):
                 snapshot_df = candidate_df[latest_mask]
@@ -932,7 +1244,9 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
                     except Exception:
                         continue
         if snapshot_df is not None and not snapshot_df.empty:
-            if "is_latest_snapshot" in snapshot_df.columns:
+            # [FIX A+ 2026-09 / Stage 1] Mismo gate que el bloque principal:
+            # cierra la asimetría 1089↔1165.
+            if (_dataset_is_snapshot or _guard_applied) and "is_latest_snapshot" in snapshot_df.columns:
                 latest_mask = snapshot_df["is_latest_snapshot"] == True
                 if bool(latest_mask.any()):
                     snapshot_df = snapshot_df[latest_mask]
@@ -981,6 +1295,21 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
         schema_profile=_safe_dict(attrs.get("schema_profile")),
     )
 
+    # [F1] Linaje temporal: agregar las trazas aditivas de cada plan ejecutado.
+    # Es un resumen de metadatos (conteos y predicados del plan); no altera
+    # chart_base_filters, Arrow ni Grid.
+    _temporal_traces = [
+        result_payload.get("temporal_filter_trace")
+        for result_payload in execution.execution_results
+        if isinstance(result_payload, dict)
+        and isinstance(result_payload.get("temporal_filter_trace"), dict)
+    ]
+    if _temporal_traces:
+        final_struct["traceability"]["temporal_filters"] = _temporal_traces
+        final_struct["traceability"]["temporal_cut_applied"] = any(
+            bool(trace.get("cut_applied")) for trace in _temporal_traces
+        )
+
     # V6.5: Extract literal filters from ALL plans to inject into narrative context.
     # Previously global_filters={} was hardcoded, causing Gemini to write
     # "sin filtros activos" even when DuckDB had applied strict filters.
@@ -1000,11 +1329,28 @@ def _build_final_struct(execution: CanonicalShadowQueryExecution) -> tuple[dict[
         presentation_name="Analisis Universal",
         global_filters=extracted_filters,
         widgets=summary_widgets,
-        data_notes=_extract_direction_notes(list(execution.plans or [])),
+        data_notes=_extract_direction_notes(
+            list(execution.plans or []),
+            schema_profile=_safe_dict(attrs.get("schema_profile")),
+        ),
     )
     narrative_text = _format_executive_summary(executive_summary)
     final_struct["analysis"] = narrative_text or "\n\n".join(analysis_blocks)
     final_struct["traceability"]["narrative_source"] = "dashboard_executive_summary"
+
+    # [P6 2026-09] Divulgación honesta de cobertura: si el usuario nombró una
+    # medida inexistente, se antepone a la narrativa y se expone estructurada.
+    # No altera datos, gráficos ni filtros.
+    _coverage_notes: list[str] = []
+    for _plan in (execution.plans or []):
+        _note = getattr(_plan, "coverage_disclosure", None)
+        if isinstance(_note, str) and _note and _note not in _coverage_notes:
+            _coverage_notes.append(_note)
+    if _coverage_notes:
+        final_struct["coverage_disclosure"] = _coverage_notes
+        _base_analysis = final_struct.get("analysis") or ""
+        final_struct["analysis"] = ("\n\n".join(_coverage_notes) + "\n\n" + _base_analysis).strip()
+
     return final_struct, dataset_contract, cleaning_notes
 
 

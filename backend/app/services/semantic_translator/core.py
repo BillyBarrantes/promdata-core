@@ -109,12 +109,24 @@ def should_default_to_latest_snapshot(
     if not time_axis and not date_columns:
         return False
 
+    # [FIX A+ 2026-09] hybrid gate ANTES de snapshot_guard_allowed.
+    # Un empate 3-3 (hybrid) no es evidencia suficiente para forzar latest.
+    # Solo snapshot puro colapsa al corte actual.
+    dataset_mode = str(dataset_contract.get("dataset_mode") or "").strip().lower()
+    # F0: ausencia de autoridad contractual nunca se convierte en un corte implícito.
+    contract_state = str(dataset_contract.get("contract_state") or "").strip().lower()
+    if dataset_mode == "unknown" or (dataset_mode == "undetermined" and contract_state == "unknown"):
+        return False
+    if dataset_mode == "hybrid":
+        return False
+
     if bool(dataset_contract.get("snapshot_guard_allowed")):
         return True
 
-    dataset_mode = str(dataset_contract.get("dataset_mode") or "").strip().lower()
-    if dataset_mode in {"snapshot", "hybrid"}:
+    if dataset_mode == "snapshot":
         return True
+    if dataset_mode == "flow":
+        return False
 
     if time_axis:
         cardinality = int(schema_profile.get(time_axis, {}).get("cardinality") or 0)
@@ -498,6 +510,101 @@ def pick_best_dimension_column(
     return ranked[0][1] if ranked else None
 
 
+_CONCRETE_TEMPORAL_PATTERNS = (
+    re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b"),   # 2021-07-31
+    re.compile(r"\b\d{4}-w\d{1,2}\b"),          # 2021-w30
+    re.compile(r"\bw\d{1,2}\b"),                # w30
+    re.compile(r"\bsemana\s*\d{1,2}\b"),        # semana 30 / semana30
+    re.compile(r"\bquincena\b"),                # primera quincena de julio
+    re.compile(r"\b(?:ano|anio|year)\s*\d{4}\b"),   # año 2021 / year 2021
+    re.compile(
+        r"\b\d{1,3}\s*(dias|dia|day|days|semana|semanas|week|weeks|mes|meses|month|months)\b"
+    ),
+    re.compile(r"\b\d{4}-\d{1,2}\b"),           # 2021-07
+    re.compile(r"\bq[1-4]\b"),                  # q1..q4
+    re.compile(r"\btrimestre\s*\d?\b"),
+)
+
+
+def contains_concrete_temporal_specifier(surface_prompt: str) -> bool:
+    """True si el prompt fija un periodo/fecha concreta (no análisis genérico).
+
+    Evita que el fast-path macro (0 tokens) intercepte consultas como
+    "stock correspondiente a 2021-W30" que requieren extracción determinista
+    de filtros por el traductor semántico. Agnóstico al dominio.
+    """
+    if not surface_prompt:
+        return False
+    return any(pattern.search(surface_prompt) for pattern in _CONCRETE_TEMPORAL_PATTERNS)
+
+
+# [P0.1 2026-09] Léxico genérico de análisis (domain-agnostic).
+# NO son nombres de columnas ni vocabulario de un cliente: son las palabras que
+# puede usar cualquier usuario para pedir un panorama SIN nombrar un concepto de
+# negocio. El gate del macro bypass es por RESIDUO: si el prompt aporta algún
+# token de dominio fuera de este léxico, NO es broad y lo resuelve el traductor
+# semántico (LLM), que entiende sinónimos, typos y jerga por país.
+_GENERIC_PROMPT_TOKENS: frozenset[str] = frozenset(
+    # Verbos/pedidos de análisis
+    {
+        "analisis", "analiza", "analizar", "analice", "analizen", "analysis", "analyze",
+        "overview", "dashboard", "resumen", "summary", "reporte", "report", "informe",
+        "detalle", "detalles", "desglose", "comportamiento", "resultado", "resultados",
+        "performance", "desempeno", "diagnostico", "evaluacion", "evaluar", "evalua",
+        "panorama", "vision", "vista", "abarcar", "cubre", "cubrir",
+        # Pedidos/relleno (imperativos y fórmulas de cortesía)
+        "dame", "da", "denme", "muestra", "muestrame", "muestre", "realiza",
+        "realizar", "haz", "hazme", "hace", "hacer", "puedes", "podrias",
+        "quiero", "necesito", "gustaria", "favor", "ayudame", "prepara", "preparar",
+        "construye", "construir", "genera", "generar", "elabora", "elaborar", "dime",
+        "indicame", "entregame", "revisa", "revisar", "comenta", "explica", "explicame",
+        "ver", "mira", "mirar",
+        # Alcance / adjetivos genéricos (denotan tipo de lectura o audiencia,
+        # NO un concepto de negocio del dataset).
+        "general", "generales", "global", "globales", "completo", "completa",
+        "completos", "completas", "integral", "integrales", "consolidado",
+        "consolidada", "amplio", "amplia", "macro", "breve", "sencillo", "basico",
+        "rapido", "rapida", "gerencial", "gerenciales", "gerencia", "ejecutivo",
+        "ejecutiva", "ejecutivos", "ejecutivas", "directivo", "directiva",
+        # Sustantivos genéricos de contexto
+        "dato", "datos", "data", "informacion", "tabla", "tablas", "archivo",
+        "archivos", "base", "bases", "registro", "registros", "dataset", "excel",
+        "planilla", "fuente", "fuentes", "numero", "numeros",
+        # Tiempo (el especificador temporal concreto ya se valida aparte)
+        "tiempo", "temporal", "periodo", "periodos", "fecha", "fechas", "dia", "dias",
+        "semana", "semanas", "mes", "meses", "anio", "anos", "ano", "trimestre",
+        "quincena", "actual", "actuales", "ultimo", "ultima", "ultimos", "ultimas",
+        "reciente", "recientes", "historico", "historica", "historial", "evolucion",
+        "tendencia", "variacion", "comparacion", "comparar", "compara",
+        # Preposiciones / artículos / conectores / pronombres
+        "a", "al", "ante", "bajo", "con", "contra", "de", "del", "desde", "e", "el",
+        "ella", "ellas", "ellos", "en", "entre", "es", "esa", "ese", "eso", "esta",
+        "este", "esto", "estos", "estas", "hacia", "hasta", "la", "las", "le", "les",
+        "lo", "los", "me", "mi", "mis", "mucho", "mucha", "muy", "no", "nos", "o",
+        "para", "pero", "por", "que", "se", "segun", "sin", "sobre", "son", "su",
+        "sus", "te", "tu", "tus", "u", "una", "uno", "un", "unos", "unas", "y", "ya",
+        "como", "cual", "cuales", "donde", "mas", "menos", "todo", "toda", "todos",
+        "todas", "otro", "otra", "otros", "otras", "mismo", "misma", "ser", "estan",
+        "hay", "tiene", "tienen",
+    }
+)
+
+
+def extract_domain_residue(prompt: str) -> list[str]:
+    """Tokens del prompt que NO pertenecen al léxico genérico de análisis.
+
+    Un residuo no vacío significa que el usuario nombró algún concepto de
+    negocio (dimensión, métrica, entidad) → requiere traducción semántica real.
+    Es la comprobación domain-agnostic que reemplaza cualquier lista de
+    sinónimos o nombres de columna hardcodeados.
+    """
+    surface_prompt = normalize_surface_text(prompt)
+    if not surface_prompt:
+        return []
+    tokens = re.findall(r"[a-z0-9]+", surface_prompt)
+    return [token for token in tokens if token not in _GENERIC_PROMPT_TOKENS]
+
+
 def looks_broad_analysis_request(prompt: str) -> bool:
     surface_prompt = normalize_surface_text(prompt)
     if not surface_prompt:
@@ -536,6 +643,20 @@ def looks_broad_analysis_request(prompt: str) -> bool:
     )
     padded_prompt = f" {surface_prompt} "
     if any(marker in padded_prompt for marker in structural_markers):
+        return False
+
+    # Un periodo/fecha concreta (2021-W30, "semana 30", "2021-07-31", "60 dias")
+    # exige traducción semántica: NO es un pedido broad/genérico.
+    if contains_concrete_temporal_specifier(surface_prompt):
+        return False
+
+    # [P0.1 2026-09] Gate por residuo de dominio. Si el prompt nombra CUALQUIER
+    # concepto de negocio (token fuera del léxico genérico), NO es broad: lo
+    # resuelve el traductor semántico (LLM), que entiende sinónimos, typos y
+    # jerga por país sin listas rígidas. Esto protege prompts cortos y concretos
+    # como "analiza la forma de pago" o "ventas de combustible", que antes eran
+    # secuestrados por la regla de ≤ 8 tokens y respondidos con un bundle genérico.
+    if extract_domain_residue(surface_prompt):
         return False
 
     if not contains_analysis_language(surface_prompt):

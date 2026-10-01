@@ -13,19 +13,67 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def resolve_user_team_scope(*, user_id: str, service_client: Any) -> str | None:
+def resolve_user_team_scope(
+    *,
+    user_id: str,
+    service_client: Any,
+    explicit_team_id: str | None = None,
+) -> str | None:
+    """Resuelve de forma unívoca el equipo activo del usuario sin ambigüedades.
+
+    Reglas de gobernanza multi-tenant:
+    1. Si explicit_team_id está definido: valida que el usuario pertenezca a ese equipo.
+       Si no pertenece, lanza HTTPException(403).
+    2. Si explicit_team_id es None:
+       - Si el usuario pertenece a 0 equipos: Retorna None (ámbito individual / B2C estándar).
+       - Si el usuario pertenece a 1 equipo: Retorna dicho team_id.
+       - Si el usuario pertenece a 2 o más equipos: Lanza HTTPException(400) exigiendo
+         que la petición especifique explícitamente el team_id (elimina el riesgo de fuga
+         por selección ciega de .limit(1)).
+    """
+    if explicit_team_id:
+        try:
+            resp = service_client.table("team_members") \
+                .select("team_id") \
+                .eq("user_id", user_id) \
+                .eq("team_id", explicit_team_id) \
+                .limit(1) \
+                .execute()
+            if not resp.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"El usuario no pertenece al equipo especificado '{explicit_team_id}'.",
+                )
+            return explicit_team_id
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error validando pertenencia a equipo: {str(exc)[:120]}",
+            )
+
     try:
         response = service_client.table("team_members") \
             .select("team_id") \
             .eq("user_id", user_id) \
-            .limit(1) \
+            .limit(2) \
             .execute()
-        if not response.data:
+        rows = response.data or []
+        if not rows:
             return None
-        team_id = response.data[0].get("team_id")
+        if len(rows) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Alcance de equipo ambiguo: el usuario pertenece a múltiples equipos y la petición no especificó 'team_id'.",
+            )
+        team_id = rows[0].get("team_id")
         return str(team_id) if team_id else None
+    except HTTPException:
+        raise
     except Exception:
         return None
+
 
 
 def get_user_uploaded_file_scope_or_404(

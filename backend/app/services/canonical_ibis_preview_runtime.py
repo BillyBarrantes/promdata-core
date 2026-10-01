@@ -35,7 +35,14 @@ class CanonicalIbisPreviewRuntime:
 
 def _load_ibis_module() -> Any | None:
     try:
-        return importlib.import_module("ibis")
+        module = importlib.import_module("ibis")
+        try:
+            from app.core.ibis_sqlglot_patch import apply_ibis_sqlglot_patch
+
+            apply_ibis_sqlglot_patch()
+        except Exception:
+            pass
+        return module
     except Exception:
         return None
 

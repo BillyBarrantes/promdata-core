@@ -74,6 +74,7 @@ from app.services.semantic_translator.core import (
     build_default_latest_snapshot_filters,
     contains_explicit_continuity_marker,
     extract_axis_segment,
+    extract_domain_residue,
     extract_primary_dimension_segment,
     extract_top_limit,
     has_meaningful_temporal_axis,
@@ -90,6 +91,17 @@ from app.services.semantic_translator.core import (
     should_default_to_latest_snapshot,
 )
 from app.services.semantic_translator.router import route_prompt_with_semantic_router
+from app.services.semantic_translator.metric_archetype import (
+    build_metric_coverage_metadata,
+    classify_metric_families,
+    compute_metric_features,
+    count_metric_features,
+    cumulative_aggregation,
+    has_accumulation_lexicon,
+    is_cumulative_metric,
+    is_non_additive,
+    select_metrics_for_broad_analysis,
+)
 from app.services.semantic_translator.validator import (
     apply_direction_guard_to_distribution_plans,
     detect_prompt_complexity,
@@ -124,10 +136,10 @@ def select_alternate_distribution_visual(
     schema_profile = schema_profile or {}
     cardinality = int(schema_profile.get(dimension_column, {}).get("cardinality") or 0)
     preferred = ["pie_chart", "bar_chart", "treemap"]
-    if cardinality > 6:
-        preferred = ["bar_chart", "treemap", "pie_chart"]
-    elif cardinality > 12:
+    if cardinality > 12:
         preferred = ["treemap", "bar_chart", "pie_chart"]
+    elif cardinality > 6:
+        preferred = ["bar_chart", "treemap", "pie_chart"]
 
     for candidate in preferred:
         if candidate != primary_visual:
@@ -266,6 +278,69 @@ def _build_trend_from_distribution_contract(
     ]
 
 
+_MAX_MULTI_SERIES_CARDINALITY = 15
+_FALLBACK_MULTI_SERIES_LIMIT = 5
+
+
+def _resolve_multi_series_limit(
+    dimension_column: str,
+    schema_profile: dict[str, Any],
+    candidate_df: pd.DataFrame | None = None,
+    requested_limit: int | None = None,
+) -> int:
+    """Return a bounded, data-driven series limit for dimensional visuals.
+
+    A requested Top-N is authoritative. Otherwise the schema cardinality is
+    used so a low-cardinality dimension (for example, five regions) retains
+    every requested comparison series. The bounded fallback prevents an
+    unknown/high-cardinality identifier from producing an unreadable chart.
+    """
+    if isinstance(requested_limit, int) and requested_limit > 0:
+        return max(2, min(requested_limit, _MAX_MULTI_SERIES_CARDINALITY))
+
+    cardinality = int(schema_profile.get(dimension_column, {}).get("cardinality") or 0)
+    if cardinality < 2 and candidate_df is not None and dimension_column in candidate_df.columns:
+        cardinality = int(candidate_df[dimension_column].nunique(dropna=True) or 0)
+
+    if cardinality >= 2:
+        return min(cardinality, _MAX_MULTI_SERIES_CARDINALITY)
+    return _FALLBACK_MULTI_SERIES_LIMIT
+
+
+def _resolve_contract_trend_split(
+    contract: dict[str, Any],
+    columns: list[str],
+    schema_profile: dict[str, Any],
+    candidate_df: pd.DataFrame | None = None,
+    requested_limit: int | None = None,
+) -> tuple[str | None, int | None]:
+    """Map a semantic ``split`` contract to a safe Ibis trend projection.
+
+    ``series_mode=split`` is an explicit user-facing contract, independent of
+    Top-N. Requiring Top-N here collapses valid requests such as "one line per
+    region" into a total. ``sum`` intentionally remains a single aggregate
+    unless it includes a Top-N selection.
+    """
+    if str(contract.get("series_mode") or "none") != "split":
+        return None, None
+
+    split_dimension = resolve_contract_column(
+        contract.get("dimension"),
+        columns,
+        schema_profile=schema_profile,
+        allowed_roles={"dimension", "identifier"},
+    )
+    if not split_dimension:
+        return None, None
+
+    return split_dimension, _resolve_multi_series_limit(
+        split_dimension,
+        schema_profile,
+        candidate_df=candidate_df,
+        requested_limit=requested_limit,
+    )
+
+
 def build_plan_from_router_contract(
     router_decision: dict[str, Any],
     columns: list[str],
@@ -360,16 +435,26 @@ def build_plan_from_router_contract(
                     print(f"🔄 [SPLIT INFERENCE] top_n inferido de filtro IN: {pf.get('column')} IN {pf_val} → top_n={top_n}")
                     break
 
-        split_dimension: str | None = None
-        split_limit: int | None = None
-        if top_n and series_mode in {"split", "sum"}:
+        split_dimension, split_limit = _resolve_contract_trend_split(
+            contract,
+            columns,
+            schema_profile,
+            candidate_df=candidate_df,
+            requested_limit=top_n if isinstance(top_n, int) else None,
+        )
+        if top_n and series_mode == "sum":
             split_dimension = resolve_contract_column(
                 contract.get("dimension"), columns,
                 schema_profile=schema_profile, allowed_roles={"dimension", "identifier"},
             )
             if not split_dimension:
                 return None
-            split_limit = max(2, min(int(top_n), 15))
+            split_limit = _resolve_multi_series_limit(
+                split_dimension,
+                schema_profile,
+                candidate_df=candidate_df,
+                requested_limit=int(top_n),
+            )
 
         visual_protocol = VisualProtocol.AREA if contract.get("visual_protocol") == "area_chart" else VisualProtocol.LINE
         date_label = humanize_column_alias(date_column)
@@ -467,6 +552,36 @@ def build_plan_from_router_contract(
         return apply_direction_guard_to_distribution_plans(plans, schema_profile)
 
     if intent == "descriptive":
+        # [V2.3] Redirect: descriptive + requires_time + dimension → trend with split.
+        # Mirror of the distribution redirect (line ~487). When the LLM router
+        # classifies a dimensional+temporal prompt as "descriptive" (e.g.
+        # "análisis por región del 2025"), the temporal signal (requires_time)
+        # combined with a resolved dimension indicates the user wants an
+        # evolution chart with one line per category, not a static bar total.
+        # This redirect is schema-agnostic: it works for any dataset, any
+        # dimension column, any metric — no hardcoded names or keywords.
+        _descriptive_has_temporal = bool(
+            contract.get("requires_time") or contract.get("time_axis")
+        )
+        _descriptive_dimension_hint = contract.get("dimension")
+        if _descriptive_has_temporal and _descriptive_dimension_hint:
+            _resolved_dim = resolve_contract_column(
+                _descriptive_dimension_hint, columns,
+                schema_profile=schema_profile, allowed_roles={"dimension", "identifier"},
+            )
+            if _resolved_dim:
+                print(
+                    f"🔄 [DESCRIPTIVE→TREND] Redirigiendo descriptive con tiempo a trend+split "
+                    f"(dimension={_descriptive_dimension_hint}, "
+                    f"time_axis={contract.get('time_axis')}, "
+                    f"requires_time={contract.get('requires_time')})"
+                )
+                return _build_trend_from_distribution_contract(
+                    contract, columns, positive_filters, negative_filters,
+                    metric_column, ranking_metric_column, ranking_direction,
+                    metric_unit, metric_label, schema_profile,
+                )
+
         dimension_column = resolve_contract_column(
             contract.get("dimension"), columns,
             schema_profile=schema_profile, allowed_roles={"dimension", "identifier", "date"},
@@ -575,9 +690,28 @@ def build_dimension_analysis_bundle(
     if not dimension_candidates:
         return None
 
-    primary_dimension = dimension_candidates[0]
+    if len(dimension_candidates) == 1:
+        primary_dimension = dimension_candidates[0]
+    else:
+        norm_segment = (dimension_segment or "").strip().lower().replace("_", " ")
+        exact = [
+            c for c in dimension_candidates
+            if c.strip().lower() == norm_segment or c.strip().lower().replace("_", " ") == norm_segment
+        ]
+        if len(exact) == 1:
+            primary_dimension = exact[0]
+        else:
+            dim_roles = [c for c in dimension_candidates if schema_profile.get(c, {}).get("role") == "dimension"]
+            if len(dim_roles) == 1:
+                primary_dimension = dim_roles[0]
+            else:
+                primary_dimension = dimension_candidates[0] if dimension_segment else None
+
+    if not primary_dimension:
+        return None
     if int(schema_profile.get(primary_dimension, {}).get("cardinality") or 0) <= 1:
         return None
+
 
     metric_column = infer_default_metric_column(surface_prompt, columns, schema_profile=schema_profile)
     if not metric_column:
@@ -661,7 +795,10 @@ def build_dimension_analysis_bundle(
 
     if len(plans) < 3:
         kpi_title = f"{metric_label} Total"
-        if dataset_contract.get("snapshot_guard_allowed"):
+        # [FIX C-A 2026-09] El sufijo debe reflejar el filtro REALMENTE inyectado.
+        # hybrid tiene snapshot_guard_allowed=True pero NO recibe filtro latest
+        # (A+ L1) → su KPI es histórico, no un corte.
+        if default_snapshot_filters:
             kpi_title += " (Corte Actual)"
         plans.append(
             AnalysisPlan(
@@ -696,6 +833,7 @@ def build_macro_analysis_bundle(
     columns: list[str],
     schema_profile: dict | None = None,
     dataset_contract: dict[str, Any] | None = None,
+    candidate_df: pd.DataFrame | None = None,
 ) -> Optional[List[AnalysisPlan]]:
     if not settings.DETERMINISTIC_VISUAL_FASTPATH_ENABLED:
         return None
@@ -710,30 +848,152 @@ def build_macro_analysis_bundle(
         dataset_contract=dataset_contract, schema_profile=schema_profile,
     )
 
-    metric_column = infer_default_metric_column(surface_prompt, columns, schema_profile=schema_profile)
-    if not metric_column:
-        return None
+    # [FIX B2 2026-09] Un trend sobre el eje de periodo describe la EVOLUCIÓN
+    # entre cortes: NO debe recibir el filtro 'latest' (colapsaría la serie a un
+    # único punto). El snapshot guard del Ibis engine ya omite el auto-filtro
+    # para trends sobre el time_axis (ADR-TEMPORAL-001 / T4). El KPI y la
+    # distribución sí conservan el corte actual.
+    trend_filters: list = []
 
-    metric_unit = infer_metric_unit_from_column_name(metric_column)
-    metric_label = humanize_column_alias(metric_column)
+    metric_cols = [
+        col for col in columns
+        if schema_profile.get(col, {}).get("role") == "metric"
+    ]
+
+    coverage_meta: dict[str, Any] | None = None
+    selected_metrics: list[str] = []
+    features: dict[str, Any] = {}
+
+    # Candidatos a clave de documento: identificadores de alta cardinalidad
+    # (cabecera↔detalle) usados para confirmar no aditividad estructural.
+    identifier_cols = [
+        col for col in columns
+        if col in (candidate_df.columns if candidate_df is not None else [])
+        and (
+            schema_profile.get(col, {}).get("role") == "identifier"
+            or float(schema_profile.get(col, {}).get("cardinality_ratio") or 0.0) >= 0.5
+        )
+    ]
+
+    if candidate_df is not None and not candidate_df.empty:
+        # [#4 2026-09] Eje temporal primario para evaluar monotonía (señal de
+        # acumulado). Domain-agnostic: se resuelve por contrato/schema, no por nombre.
+        _cumulative_time_col = pick_primary_date_column(
+            columns, schema_profile=schema_profile, dataset_contract=dataset_contract,
+        )
+        features = compute_metric_features(
+            candidate_df, metric_cols,
+            identifier_cols=identifier_cols,
+            time_col=_cumulative_time_col,
+        )
+        families = classify_metric_families(features)
+        selected_metrics = select_metrics_for_broad_analysis(
+            metric_cols, features, families, surface_prompt,
+        )
+        # [P1.4 2026-09] No aditividad estructural: si la métrica preferida por
+        # relevancia es a nivel documento y existe otra claramente aditiva,
+        # promovemos la aditiva al KPI (evita el ~N× de inflación por re-conteo).
+        non_additive_signals = {
+            m: count_signals
+            for m, count_signals in count_metric_features(features).items()
+            if is_non_additive(features.get(m))
+        }
+
+        # [#4 2026-09] Métricas acumuladas: dos señales fail-closed (monotonía
+        # temporal AND léxico genérico de acumulación en nombre o prompt).
+        # La corrección de la agregación (sum→max/min) la aplica el guard de
+        # ejecución del production executor (cubre TODAS las rutas); aquí solo
+        # se exponen para cobertura y se emite telemetría de la clase.
+        _cumulative_signals = {
+            m: count_signals
+            for m, count_signals in count_metric_features(features).items()
+            if is_cumulative_metric(features.get(m), m, prompt)
+        }
+        _structural_only = [
+            m for m, feat in features.items()
+            if feat.get("cumulative_monotonic_direction") in ("inc", "dec")
+            and m not in _cumulative_signals
+        ]
+        if _structural_only:
+            emit_structured_log(
+                "semantic_cumulative_signal_insufficient",
+                prompt=prompt[:160],
+                structural_only_metrics=[
+                    {
+                        "metric": m,
+                        "direction": features[m].get("cumulative_monotonic_direction"),
+                        "lexicon": has_accumulation_lexicon(m),
+                    }
+                    for m in _structural_only[:5]
+                ],
+            )
+        if len(selected_metrics) >= 2 and is_non_additive(features.get(selected_metrics[0])):
+            additive_alt = next(
+                (m for m in selected_metrics[1:] if not is_non_additive(features.get(m))),
+                None,
+            )
+            if additive_alt:
+                emit_structured_log(
+                    "semantic_translator_non_additive_metric_deprioritized",
+                    prompt=prompt[:160],
+                    deprioritized_metric=selected_metrics[0],
+                    promoted_metric=additive_alt,
+                    signals=non_additive_signals.get(selected_metrics[0], {}),
+                )
+                selected_metrics = [additive_alt] + [
+                    m for m in selected_metrics if m != additive_alt
+                ]
+        coverage_meta = build_metric_coverage_metadata(
+            selected_metrics, metric_cols, families,
+            non_additive_metrics=non_additive_signals,
+            cumulative_metrics=_cumulative_signals,
+        )
+    else:
+        single = infer_default_metric_column(surface_prompt, columns, schema_profile=schema_profile)
+        if single:
+            selected_metrics = [single]
+    if not selected_metrics:
+        emit_structured_log(
+            "semantic_translator_macro_empty",
+            prompt=prompt[:200],
+            reason="no_metric_columns",
+        )
+        return []
+
+    primary_metric = selected_metrics[0]
+    primary_is_non_additive = is_non_additive(features.get(primary_metric))
+    # [TIER 0 2026-09] 'mean' no existe en el Literal de DescriptiveIntent.
+    # El valor canónico es 'avg'. Además el canonicalizador de semantic_grammar
+    # protege la frontera, pero aquí mantenemos la coherencia semántica.
+    primary_aggregation = "avg" if primary_is_non_additive else "sum"
+    metric_unit = infer_metric_unit_from_column_name(primary_metric)
+    primary_label = humanize_column_alias(primary_metric)
     plans: list[AnalysisPlan] = []
-    aliases = {metric_column: metric_label}
+    primary_aliases = {primary_metric: primary_label}
 
-    descriptive_title = f"{metric_label} Total"
-    if dataset_contract.get("snapshot_guard_allowed"):
+    descriptive_title = f"{primary_label} Total"
+    if primary_is_non_additive:
+        # Degradación honesta: no hay métrica aditiva alternativa.
+        descriptive_title = f"{primary_label} (promedio por registro)"
+    # [FIX C-A 2026-09] Fiel al filtro real: hybrid no recibe corte → sin sufijo.
+    if default_snapshot_filters:
         descriptive_title += " (Corte Actual)"
     plans.append(
         AnalysisPlan(
             main_intent=DescriptiveIntent(
-                rationale="Priorizo un KPI global para abrir el análisis con la magnitud base más representativa del dataset.",
+                rationale=(
+                    "Priorizo un KPI global para abrir el análisis con la magnitud base más representativa del dataset."
+                    if not primary_is_non_additive
+                    else "La métrica principal es un atributo a nivel documento (valor repetido): se promedia en vez de sumar para evitar el re-conteo."
+                ),
                 filters=default_snapshot_filters,
-                metrics=[metric_column],
+                metrics=[primary_metric],
                 metric_unit=metric_unit if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER,
-                aggregation="sum",
+                aggregation=primary_aggregation,
                 visual_protocol=VisualProtocol.KPI,
             ),
             title=descriptive_title,
-            column_aliases=aliases.copy(),
+            column_aliases=primary_aliases.copy(),
             metric_polarity=MetricPolarity.NEUTRAL,
         )
     )
@@ -741,21 +1001,78 @@ def build_macro_analysis_bundle(
     date_column = pick_primary_date_column(
         columns, schema_profile=schema_profile, dataset_contract=dataset_contract,
     )
-    if has_meaningful_temporal_axis(date_column, schema_profile=schema_profile):
+    has_date = has_meaningful_temporal_axis(date_column, schema_profile=schema_profile)
+
+    # [FIX 2026-09 coherencia] El trend del dashboard macro describe SIEMPRE una
+    # métrica cuyo total reconcilia con el KPI. Se usa la métrica secundaria SOLO
+    # si es aditiva (una segunda familia legítima). Si la secundaria es a nivel
+    # documento (no aditiva, p.ej. un monto repetido en cada línea), graficarla
+    # produciría una "evolución" de promedios que no cuadra con nada → colapsa a
+    # la métrica primaria.
+    trend_metric = primary_metric
+    trend_aggregation = primary_aggregation
+    if len(selected_metrics) > 1 and has_date:
+        second_candidate = selected_metrics[1]
+        if not is_non_additive(features.get(second_candidate)):
+            trend_metric = second_candidate
+            trend_aggregation = "sum"
+
+    if has_date:
         date_label = humanize_column_alias(date_column)
-        trend_aliases = aliases.copy()
-        trend_aliases[date_column] = date_label
+        trend_label = humanize_column_alias(trend_metric)
+        trend_unit = infer_metric_unit_from_column_name(trend_metric)
+        trend_who = (
+            "una segunda familia métrica aditiva"
+            if trend_metric != primary_metric
+            else "la métrica principal"
+        )
+        trend_title = f"Evolución de {trend_label} por {date_label}"
+        if trend_aggregation == "avg":
+            # Divulgación honesta: no se está sumando, se promedia (métrica de documento).
+            trend_title += " (promedio por registro)"
         plans.append(
             AnalysisPlan(
                 main_intent=TimeTrendIntent(
-                    rationale="Agrego una lectura temporal para revelar tendencia y cambio cuando el dataset ofrece un eje cronológico real.",
+                    rationale=(
+                        f"Agrego una lectura temporal de {trend_who} para revelar "
+                        "tendencia y cambio cuando el dataset ofrece un eje cronológico real."
+                    ),
                     date_column=date_column,
-                    value_column=metric_column,
-                    metric_unit=metric_unit if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER,
+                    value_column=trend_metric,
+                    metric_unit=trend_unit if isinstance(trend_unit, MetricUnit) else MetricUnit.NUMBER,
+                    aggregation=trend_aggregation,
                     visual_protocol=VisualProtocol.LINE,
+                    filters=trend_filters,
                 ),
-                title=f"Evolución de {metric_label} por {date_label}",
-                column_aliases=trend_aliases,
+                title=trend_title,
+                column_aliases={trend_metric: trend_label, date_column: date_label},
+                metric_polarity=MetricPolarity.NEUTRAL,
+            )
+        )
+
+    if len(selected_metrics) > 2:
+        third_metric = selected_metrics[2]
+        third_unit = infer_metric_unit_from_column_name(third_metric)
+        third_label = humanize_column_alias(third_metric)
+        third_aliases = {third_metric: third_label}
+        third_is_non_additive = is_non_additive(features.get(third_metric))
+        third_title = (
+            f"{third_label} (promedio por registro)"
+            if third_is_non_additive
+            else f"{third_label} Total"
+        )
+        plans.append(
+            AnalysisPlan(
+                main_intent=DescriptiveIntent(
+                    rationale="Incluyo un KPI adicional de una tercera familia métrica para maximizar la cobertura del análisis broad.",
+                    filters=default_snapshot_filters,
+                    metrics=[third_metric],
+                    metric_unit=third_unit if isinstance(third_unit, MetricUnit) else MetricUnit.NUMBER,
+                    aggregation="avg" if third_is_non_additive else "sum",
+                    visual_protocol=VisualProtocol.KPI,
+                ),
+                title=third_title,
+                column_aliases=third_aliases,
                 metric_polarity=MetricPolarity.NEUTRAL,
             )
         )
@@ -763,12 +1080,12 @@ def build_macro_analysis_bundle(
     primary_dimension = pick_best_dimension_column(
         surface_prompt, columns, schema_profile=schema_profile,
     )
-    if primary_dimension:
+    if primary_dimension and len(plans) < 3:
         primary_visual = select_default_distribution_visual(primary_dimension, schema_profile=schema_profile)
         dimension_label = humanize_column_alias(primary_dimension)
         dimension_cardinality = int(schema_profile.get(primary_dimension, {}).get("cardinality") or 0)
         limit = dimension_cardinality if 0 < dimension_cardinality <= 12 else 10
-        dist_aliases = aliases.copy()
+        dist_aliases = primary_aliases.copy()
         dist_aliases[primary_dimension] = dimension_label
         plans.append(
             AnalysisPlan(
@@ -776,64 +1093,40 @@ def build_macro_analysis_bundle(
                     rationale="Incluyo una vista de concentración para identificar qué categorías explican el peso operativo dominante.",
                     filters=default_snapshot_filters,
                     dimension=primary_dimension,
-                    metric=metric_column,
+                    metric=primary_metric,
                     limit=limit,
                     metric_unit=metric_unit if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER,
                     visual_protocol=VisualProtocol(primary_visual),
                 ),
-                title=f"{metric_label} por {dimension_label}",
+                title=f"{primary_label} por {dimension_label}",
                 column_aliases=dist_aliases,
                 metric_polarity=MetricPolarity.NEUTRAL,
             )
         )
-    else:
-        primary_visual = None
-
-    if len(plans) < 3:
-        secondary_dimension = pick_best_dimension_column(
-            surface_prompt, columns,
-            schema_profile=schema_profile,
-            exclude={primary_dimension} if primary_dimension else set(),
-        )
-        if secondary_dimension:
-            secondary_visual = select_alternate_distribution_visual(
-                secondary_dimension, primary_visual, schema_profile=schema_profile,
-            )
-            secondary_label = humanize_column_alias(secondary_dimension)
-            secondary_cardinality = int(schema_profile.get(secondary_dimension, {}).get("cardinality") or 0)
-            secondary_limit = secondary_cardinality if 0 < secondary_cardinality <= 12 else 10
-            secondary_aliases = aliases.copy()
-            secondary_aliases[secondary_dimension] = secondary_label
-            plans.append(
-                AnalysisPlan(
-                    main_intent=DistributionIntent(
-                        rationale="Completo el paquete con una segunda vista categórica para aportar otra dimensión explicativa sin depender del planner generativo.",
-                        filters=default_snapshot_filters,
-                        dimension=secondary_dimension,
-                        metric=metric_column,
-                        limit=secondary_limit,
-                        metric_unit=metric_unit if isinstance(metric_unit, MetricUnit) else MetricUnit.NUMBER,
-                        visual_protocol=VisualProtocol(secondary_visual),
-                    ),
-                    title=f"Top {secondary_limit} {secondary_label} por {metric_label}",
-                    column_aliases=secondary_aliases,
-                    metric_polarity=MetricPolarity.NEUTRAL,
-                )
-            )
 
     if not plans:
-        return None
+        emit_structured_log(
+            "semantic_translator_macro_empty",
+            prompt=prompt[:200],
+            reason="no_plans_built",
+        )
+        return []
+
+    bounded = plans[:3]
+    if coverage_meta and bounded:
+        bounded[0].coverage_metadata = coverage_meta
 
     emit_structured_log(
         "semantic_translator_macro_fast_path_hit",
         prompt=prompt[:200],
-        plan_count=len(plans),
-        metric=metric_column,
+        plan_count=len(bounded),
+        metrics=selected_metrics,
+        families_found=(coverage_meta or {}).get("families_found", 0),
         date_column=date_column,
         primary_dimension=primary_dimension,
         dataset_mode=dataset_contract.get("dataset_mode"),
     )
-    return plans[:3]
+    return bounded
 
 
 def build_explicit_scatter_plan(
@@ -1215,6 +1508,227 @@ def build_deterministic_visual_plan(
     return None
 
 
+_CORTE_FILTER_TOKENS = {"latest", "last", "ultimo", "último", "actual", "recent", "hoy"}
+
+
+def _filters_contain_corte(filters: Any, dataset_contract: dict[str, Any] | None) -> bool:
+    """[C-A 2026-09] ¿Los filtros del plan aplican un corte temporal real?
+
+    Solo cuenta un token de corte sobre una columna temporal (o el flag
+    `is_latest_snapshot`). Evita marcar '(Corte Actual)' por filtros categóricos
+    de valor 'actual' y por datasets hybrid que no reciben corte (A+ L1)."""
+    contract = dataset_contract or {}
+    date_cols = {str(c).strip().lower() for c in (contract.get("date_columns") or []) if str(c).strip()}
+    if str(contract.get("time_axis") or "").strip():
+        date_cols.add(str(contract.get("time_axis")).strip().lower())
+    date_cols.add("is_latest_snapshot")
+    for f in (filters or []):
+        if isinstance(f, dict):
+            col = str(f.get("column") or "").strip().lower()
+            value = f.get("value")
+        else:
+            col = str(getattr(f, "column", "") or "").strip().lower()
+            value = getattr(f, "value", None)
+        if col in date_cols and str(value or "").strip().lower() in _CORTE_FILTER_TOKENS:
+            return True
+    return False
+
+
+def _build_complementary_dashboard_plans(
+    primary_plans: list[AnalysisPlan],
+    router_decision: dict[str, Any],
+    columns: list[str],
+    schema_profile: dict[str, Any],
+    dataset_contract: dict[str, Any],
+) -> list[AnalysisPlan]:
+    """[V2.3] Enrich a SIMPLE-path primary plan into a complete dashboard.
+
+    Implements the Triple Vista contract for deterministic plans:
+
+    +-------------------+-------------------------------+-------------------------+
+    | Primary type      | Complementary (Plan 2)        | Diagnostic (Plan 3)     |
+    +-------------------+-------------------------------+-------------------------+
+    | trend             | distribution by dimension     | KPI: metric total       |
+    | distribution      | trend over time               | KPI: metric total       |
+    +-------------------+-------------------------------+-------------------------+
+
+    Schema-agnostic: uses column roles from ``schema_profile``, not names.
+    Does NOT enrich simple KPIs or plans that already have ≥ 3 items.
+    """
+    if len(primary_plans) >= 3:
+        return primary_plans[:3]
+
+    contract = router_decision.get("semantic_contract") or {}
+
+    # ── Extract primary plan metadata ───────────────────────────────────
+    primary_intent = primary_plans[0].main_intent
+    if isinstance(primary_intent, dict):
+        primary_type = primary_intent.get("type", "")
+        primary_metric = (
+            primary_intent.get("value_column")
+            or primary_intent.get("metric")
+            or primary_intent.get("plot_metric")
+        )
+        primary_dimension = (
+            primary_intent.get("split_dimension")
+            or primary_intent.get("dimension")
+        )
+        primary_date = primary_intent.get("date_column")
+        plan_filters = (
+            primary_intent.get("filters")
+            or primary_intent.get("positive_filters")
+            or []
+        )
+    else:
+        primary_type = getattr(primary_intent, "type", "")
+        primary_metric = (
+            getattr(primary_intent, "value_column", None)
+            or getattr(primary_intent, "metric", None)
+        )
+        primary_dimension = (
+            getattr(primary_intent, "split_dimension", None)
+            or getattr(primary_intent, "dimension", None)
+        )
+        primary_date = getattr(primary_intent, "date_column", None)
+        plan_filters = getattr(primary_intent, "filters", None) or []
+
+    # ── Guard: don't enrich simple KPIs or unresolvable plans ───────────
+    if primary_type == "descriptive" and not primary_dimension:
+        return primary_plans
+    if not primary_metric:
+        return primary_plans
+
+    metric_unit = infer_metric_unit_from_column_name(primary_metric)
+    metric_label = humanize_column_alias(primary_metric)
+    enriched: list[AnalysisPlan] = list(primary_plans)
+
+    # ── Plan 2: Complementary view ──────────────────────────────────────
+    if primary_type == "trend":
+        # Trend primary → complement with distribution by dimension
+        dim_hint = primary_dimension or contract.get("dimension")
+        resolved_dim = None
+        if dim_hint:
+            resolved_dim = resolve_contract_column(
+                dim_hint, columns,
+                schema_profile=schema_profile,
+                allowed_roles={"dimension", "identifier"},
+            )
+        if not resolved_dim:
+            resolved_dim = pick_best_dimension_column(
+                "", columns, schema_profile=schema_profile,
+            )
+        if resolved_dim:
+            dim_label = humanize_column_alias(resolved_dim)
+            cardinality = int(
+                schema_profile.get(resolved_dim, {}).get("cardinality") or 0
+            )
+            limit = cardinality if 0 < cardinality <= 12 else 10
+            dist_visual = select_default_distribution_visual(
+                resolved_dim, schema_profile=schema_profile,
+            )
+            enriched.append(
+                AnalysisPlan(
+                    main_intent=DistributionIntent(
+                        rationale=(
+                            "Concentración por dimensión: muestra qué categorías "
+                            "explican la mayor parte de la magnitud operativa."
+                        ),
+                        filters=plan_filters,
+                        dimension=resolved_dim,
+                        metric=primary_metric,
+                        limit=limit,
+                        metric_unit=(
+                            metric_unit
+                            if isinstance(metric_unit, MetricUnit)
+                            else MetricUnit.NUMBER
+                        ),
+                        visual_protocol=VisualProtocol(dist_visual),
+                    ),
+                    title=f"{metric_label} por {dim_label}",
+                    column_aliases={
+                        primary_metric: metric_label,
+                        resolved_dim: dim_label,
+                    },
+                    metric_polarity=MetricPolarity.NEUTRAL,
+                )
+            )
+
+    elif primary_type == "distribution":
+        # Distribution primary → complement with trend over time
+        date_column = primary_date or pick_primary_date_column(
+            columns,
+            schema_profile=schema_profile,
+            dataset_contract=dataset_contract,
+        )
+        if date_column and has_meaningful_temporal_axis(
+            date_column, schema_profile=schema_profile,
+        ):
+            date_label = humanize_column_alias(date_column)
+            enriched.append(
+                AnalysisPlan(
+                    main_intent=TimeTrendIntent(
+                        rationale=(
+                            "Evolución temporal: revela tendencias y estacionalidad "
+                            "detrás de la distribución estática."
+                        ),
+                        date_column=date_column,
+                        value_column=primary_metric,
+                        metric_unit=(
+                            metric_unit
+                            if isinstance(metric_unit, MetricUnit)
+                            else MetricUnit.NUMBER
+                        ),
+                        visual_protocol=VisualProtocol.LINE,
+                        filters=plan_filters,
+                    ),
+                    title=f"Evolución de {metric_label} por {date_label}",
+                    column_aliases={
+                        primary_metric: metric_label,
+                        date_column: date_label,
+                    },
+                    metric_polarity=MetricPolarity.NEUTRAL,
+                )
+            )
+
+    # ── Plan 3: KPI diagnostic ──────────────────────────────────────────
+    if len(enriched) < 3:
+        kpi_title = f"{metric_label} Total"
+        # [FIX C-A 2026-09] Fiel al filtro real del plan: hybrid no recibe corte → sin sufijo.
+        if _filters_contain_corte(plan_filters, dataset_contract):
+            kpi_title += " (Corte Actual)"
+        enriched.append(
+            AnalysisPlan(
+                main_intent=DescriptiveIntent(
+                    rationale=(
+                        "KPI diagnóstico: magnitud total para contextualizar "
+                        "la escala del análisis."
+                    ),
+                    filters=plan_filters,
+                    metrics=[primary_metric],
+                    metric_unit=(
+                        metric_unit
+                        if isinstance(metric_unit, MetricUnit)
+                        else MetricUnit.NUMBER
+                    ),
+                    aggregation="sum",
+                    visual_protocol=VisualProtocol.KPI,
+                ),
+                title=kpi_title,
+                column_aliases={primary_metric: metric_label},
+                metric_polarity=MetricPolarity.NEUTRAL,
+            )
+        )
+
+    emit_structured_log(
+        "semantic_translator_simple_path_enriched",
+        primary_type=primary_type,
+        primary_metric=primary_metric,
+        primary_dimension=primary_dimension,
+        plan_count=len(enriched),
+    )
+    return enriched[:3]
+
+
 def translate(
     prompt: str,
     columns: list,
@@ -1228,6 +1742,82 @@ def translate(
     related_frames_context: str = "",
     candidate_df: pd.DataFrame | None = None,
 ) -> Optional[List[AnalysisPlan]]:
+    # [SAFE BYPASS MACRO — 0 tokens de traducción para consultas genéricas]
+    # [P0.3 2026-09] Telemetría de la clase: registra la decisión del gate y el
+    # residuo de dominio. Permite detectar en producción cualquier prompt con
+    # conceptos de negocio que estuviera siendo atendido por el fast-path.
+    macro_gate_is_broad = looks_broad_analysis_request(prompt)
+    emit_structured_log(
+        "semantic_broad_gate_decision",
+        prompt=prompt[:160],
+        is_broad=macro_gate_is_broad,
+        domain_residue=extract_domain_residue(prompt)[:10],
+    )
+    if macro_gate_is_broad:
+        # [TIER 0 2026-09 firebreak] Un error de construcción del bundle macro
+        # NUNCA debe matar la tarea: se degrada a la ruta unificada/LLM.
+        try:
+            macro_bundle_plans = build_macro_analysis_bundle(
+                prompt=prompt,
+                columns=list(columns or []),
+                schema_profile=schema_profile,
+                dataset_contract=dataset_contract,
+                candidate_df=candidate_df,
+            )
+            if macro_bundle_plans:
+                result = finalize_plans(macro_bundle_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
+                if result and macro_bundle_plans[0].coverage_metadata:
+                    result[0].coverage_metadata = macro_bundle_plans[0].coverage_metadata
+                emit_structured_log(
+                    "semantic_translator_macro_bypass_activated",
+                    prompt=prompt[:180],
+                    plan_count=len(result),
+                )
+                return result
+        except Exception as macro_exc:
+            emit_structured_log(
+                "semantic_translator_macro_bundle_error",
+                level="error",
+                prompt=prompt[:180],
+                error_type=type(macro_exc).__name__,
+                error=str(macro_exc)[:300],
+            )
+
+    # [CAPA 4: FAST-PATH UNIFICADO - Router + Planner en 1 solo round-trip]
+    if getattr(settings, "UNIFIED_SEMANTIC_TRANSLATOR_ENABLED", True):
+        try:
+            from app.services.semantic_translator.unified_translator import unified_translate
+            unified_res = unified_translate(
+                prompt=prompt,
+                columns=list(columns or []),
+                glossary_context=glossary_context,
+                topology_context=topology_context,
+                memory_context=memory_context,
+                memory_instruction=memory_instruction,
+                format_instruction=format_instruction,
+                schema_profile=schema_profile,
+                dataset_contract=dataset_contract,
+                related_frames_context=related_frames_context,
+                candidate_df=candidate_df,
+            )
+            if unified_res:
+                unified_decision, unified_plans = unified_res
+                if unified_plans:
+                    emit_structured_log(
+                        "semantic_translator_unified_path_accepted",
+                        prompt=prompt[:180],
+                        plan_count=len(unified_plans),
+                        route=unified_decision.get("route"),
+                    )
+                    return unified_plans
+        except Exception as unified_exc:
+            emit_structured_log(
+                "semantic_translator_unified_path_fallback",
+                level="info",
+                prompt=prompt[:180],
+                error=str(unified_exc)[:200],
+            )
+
     router_decision = route_prompt_with_semantic_router(
         prompt, list(columns or []),
         schema_profile=schema_profile, dataset_contract=dataset_contract,
@@ -1236,20 +1826,41 @@ def translate(
     force_deep_planner = False
 
     if use_simple_runtime:
-        fast_path_plans = build_plan_from_router_contract(
-            router_decision, list(columns or []),
-            schema_profile=schema_profile, dataset_contract=dataset_contract,
-            candidate_df=candidate_df,
-        )
-        if fast_path_plans:
-            emit_structured_log(
-                "semantic_translator_simple_contract_accepted",
-                prompt=prompt[:200], confidence=router_decision.get("confidence"),
-                detected_intent=router_decision.get("detected_intent"),
-                semantic_contract=router_decision.get("semantic_contract"),
-                plan_count=len(fast_path_plans),
+        # [TIER 0 2026-09 firebreak] Un fallo al construir/enriquecer el contrato
+        # SIMPLE degrada al planificador profundo en vez de matar la tarea.
+        try:
+            fast_path_plans = build_plan_from_router_contract(
+                router_decision, list(columns or []),
+                schema_profile=schema_profile, dataset_contract=dataset_contract,
+                candidate_df=candidate_df,
             )
-            return finalize_plans(fast_path_plans, schema_profile)
+            if fast_path_plans:
+                # [V2.3] Enrich SIMPLE path with complementary dashboard views.
+                # Deterministic Triple Vista: add distribution + KPI (or trend + KPI)
+                # so the user receives a complete analytical dashboard without the
+                # latency of the LLM deep planner.
+                enriched_plans = _build_complementary_dashboard_plans(
+                    fast_path_plans, router_decision, list(columns or []),
+                    schema_profile=schema_profile or {},
+                    dataset_contract=dataset_contract or {},
+                )
+                emit_structured_log(
+                    "semantic_translator_simple_contract_accepted",
+                    prompt=prompt[:200], confidence=router_decision.get("confidence"),
+                    detected_intent=router_decision.get("detected_intent"),
+                    semantic_contract=router_decision.get("semantic_contract"),
+                    plan_count=len(enriched_plans),
+                    enriched=len(enriched_plans) > len(fast_path_plans),
+                )
+                return finalize_plans(enriched_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
+        except Exception as simple_exc:
+            emit_structured_log(
+                "semantic_translator_simple_contract_error",
+                level="error",
+                prompt=prompt[:180],
+                error_type=type(simple_exc).__name__,
+                error=str(simple_exc)[:300],
+            )
         force_deep_planner = True
         emit_structured_log(
             "semantic_translator_simple_contract_delegated",
@@ -1270,14 +1881,37 @@ def translate(
             schema_profile=schema_profile, dataset_contract=dataset_contract,
         )
         if dimension_bundle_plans:
-            return finalize_plans(dimension_bundle_plans, schema_profile)
+            return finalize_plans(dimension_bundle_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
 
         macro_bundle_plans = build_macro_analysis_bundle(
             prompt, list(columns or []),
             schema_profile=schema_profile, dataset_contract=dataset_contract,
+            candidate_df=candidate_df,
         )
         if macro_bundle_plans:
-            return finalize_plans(macro_bundle_plans, schema_profile)
+            result = finalize_plans(macro_bundle_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
+            if macro_bundle_plans and macro_bundle_plans[0].coverage_metadata:
+                result[0].coverage_metadata = macro_bundle_plans[0].coverage_metadata
+            return result
+    elif router_decision.get("route") == "COMPLEJO":
+        reason_codes = router_decision.get("reason_codes") or []
+        if "broad_analysis" in reason_codes:
+            macro_bundle_plans = build_macro_analysis_bundle(
+                prompt, list(columns or []),
+                schema_profile=schema_profile, dataset_contract=dataset_contract,
+                candidate_df=candidate_df,
+            )
+            if macro_bundle_plans:
+                result = finalize_plans(macro_bundle_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
+                if macro_bundle_plans and macro_bundle_plans[0].coverage_metadata:
+                    result[0].coverage_metadata = macro_bundle_plans[0].coverage_metadata
+                emit_structured_log(
+                    "semantic_translator_broad_deterministic_accepted",
+                    prompt=prompt[:200],
+                    plan_count=len(result),
+                    reason_codes=reason_codes,
+                )
+                return result
 
     translator_cache_key = build_cache_key(
         "semantic_translator", {
@@ -1312,14 +1946,14 @@ def translate(
                 file_id=_tx_file_id or None, plan_metrics=_tx_metrics[:5],
                 cache_key_prefix=translator_cache_key[:16],
             )
-            return finalize_plans(restored_plans, schema_profile)
+            return finalize_plans(restored_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
         except Exception as cache_restore_error:
             emit_structured_log(
                 "semantic_translator_cache_restore_error",
                 level="warning", error=str(cache_restore_error)[:200],
             )
 
-    schema_json = json.dumps(AnalysisPlan.model_json_schema(), indent=2)
+    schema_json = json.dumps(AnalysisPlan.model_json_schema(), separators=(",", ":"), ensure_ascii=False)
     router_context_json = json.dumps(router_decision, ensure_ascii=False, sort_keys=True)
     primary_model_name = str(settings.AI_MODEL_NAME or "").strip()
 
@@ -1564,7 +2198,14 @@ def translate(
                     plan_count=len(router_contract_plans),
                     reason="all_llm_plans_invalid",
                 )
-                return finalize_plans(router_contract_plans, schema_profile)
+                return finalize_plans(router_contract_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
+            emit_structured_log(
+                "semantic_translator_no_plans",
+                level="error",
+                prompt=prompt[:200],
+                reason="empty_llm_and_no_router_contract",
+                primary_model=primary_model_name,
+            )
             return None
 
         set_cached_json(
@@ -1572,7 +2213,7 @@ def translate(
             [plan.model_dump(mode="json") for plan in plans],
             settings.SEMANTIC_TRANSLATOR_CACHE_TTL_SECONDS,
         )
-        return finalize_plans(plans, schema_profile)
+        return finalize_plans(plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
 
     except Exception as e:
         if is_recoverable_translator_model_error(e):
@@ -1598,7 +2239,7 @@ def translate(
                         reason_codes=router_decision.get("reason_codes"),
                         fallback_priority="quota_first",
                     )
-                    return finalize_plans(router_contract_plans, schema_profile)
+                    return finalize_plans(router_contract_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
 
             if fallback_model_name:
                 try:
@@ -1617,7 +2258,7 @@ def translate(
                             fallback_model=fallback_model_name,
                             plan_count=len(fallback_plans),
                         )
-                        return finalize_plans(fallback_plans, schema_profile)
+                        return finalize_plans(fallback_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
                 except Exception as fallback_error:
                     emit_structured_log(
                         "semantic_translator_model_fallback_error",
@@ -1644,6 +2285,15 @@ def translate(
                     plan_count=len(router_contract_plans),
                     reason_codes=router_decision.get("reason_codes"),
                 )
-                return finalize_plans(router_contract_plans, schema_profile)
+                return finalize_plans(router_contract_plans, schema_profile, dataset_contract=dataset_contract, prompt=prompt)
 
+        emit_structured_log(
+            "semantic_translator_no_plans",
+            level="error",
+            prompt=prompt[:200],
+            reason="terminal_no_recoverable_path",
+            error_type=type(e).__name__,
+            error=str(e)[:300],
+            recoverable=is_recoverable_translator_model_error(e),
+        )
         return None

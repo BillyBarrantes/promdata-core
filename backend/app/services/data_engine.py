@@ -1,19 +1,43 @@
 import csv
+from contextlib import contextmanager
 import json
 import pandas as pd
 import numpy as np
 import io
 import re
 import os
+import threading
 import unicodedata
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Cloud Run y macOS disponen de fcntl.
+    fcntl = None
+
+from pydantic import BaseModel
+
+from app.core.analytical_contract import (
+    AnalyticalContract,
+    compute_bootstrap_expiry,
+    is_bootstrap_expired,
+)
+from app.core.config import settings
 from app.core.structured_logging import emit_structured_log
+from app.core.temporal_axis import detect_ordinal_axis, series_monotonic_direction
 
 class DataEngine:
     """
     Motor de Ingeniería de Datos V3 (Unicorn Edition).
     Responsabilidades: Lectura Robusta, Limpieza Inteligente, Unificación y Topología.
     """
+
+    _SEMANTIC_CONTRACT_VERSION = "phase_1_foundation_v3"
+    _sidecar_refresh_locks: dict[str, threading.Lock] = {}
+    _sidecar_refresh_locks_guard = threading.Lock()
+
+    @classmethod
+    def semantic_contract_version(cls) -> str:
+        return cls._SEMANTIC_CONTRACT_VERSION
 
     @staticmethod
     def read_file(file_bytes: bytes, filename: str) -> dict:
@@ -53,7 +77,9 @@ class DataEngine:
                             dfs['principal'] = df
                             print(f"Success CSV: Enc={enc}, Sep='{delimiter}'")
                             break
-                    except: continue
+                    except Exception as _enc_err:
+                        print(f"Warn: CSV enc={enc} falló ({type(_enc_err).__name__})")
+                        continue
                         
             if not dfs: raise ValueError("Formato de archivo desconocido o ilegible.")
             return dfs
@@ -97,7 +123,17 @@ class DataEngine:
             'ingreso', 'ingresos', 'revenue', 'facturacion', 'precio', 'price',
             'costo', 'coste', 'cost', 'stock', 'saldo', 'saldos', 'qty',
             'quantity', 'units', 'unidades', 'volumen', 'pieza', 'piezas',
-            'porcentaje', 'ratio', 'margen', 'growth', 'variacion', 'pen', 'usd', 'eur'
+            'porcentaje', 'ratio', 'margen', 'growth', 'variacion', 'pen', 'usd', 'eur',
+            'multa', 'multas', 'penalidad', 'penalidades',
+            # [DUAL-ROLE 2026-09] Magnitudes que pueden tener baja cardinalidad
+            # (ej: desperfectos_mecanicos = 0/1/2) y NO deben clasificarse como
+            # dimensión. Se incluyen formas singular y plural. NO agregar
+            # adjetivos/sustantivos de persona (ej: 'mecanicos'), que forzarían
+            # columnas tipo tipo_mecanico o id_mecanico a clasificarse como métrica.
+            'desperfecto', 'desperfectos', 'falla', 'fallas',
+            'averia', 'averias', 'incidente', 'incidentes',
+            'retraso', 'retrasos', 'incumplimiento', 'incumplimientos',
+            'observacion', 'observaciones',
         }
         return bool(tokens & measure_tokens)
 
@@ -344,7 +380,14 @@ class DataEngine:
                     # Example: tipo_almacen (6 values in 2000+ rows = 0.3% ratio)
                     # Counter-example: quantity_sold (19 values in 100 rows = 19% ratio) = metric
                     elif cardinality <= 20 and total_rows > 50 and cardinality_ratio < 0.1:
-                        info = {'type': 'categorical', 'role': 'dimension'}
+                        # [DUAL-ROLE 2026-09] Alineado con canonical_schema_profiler:
+                        # si el nombre tiene semántica de medida (ej: desperfectos),
+                        # es métrica aunque tenga baja cardinalidad. Sin este check,
+                        # este segundo path anulaba la lógica del profiler.
+                        if DataEngine._has_measure_semantic_name(col):
+                            info = {'type': 'numeric', 'role': 'metric'}
+                        else:
+                            info = {'type': 'categorical', 'role': 'dimension'}
                     else:
                         info = {'type': 'numeric', 'role': 'metric'}
                 else:
@@ -676,6 +719,11 @@ class DataEngine:
         if dimension_canonicalization:
             semantic_contract['canonical_dimensions'] = dimension_canonicalization
         main_df.attrs['semantic_contract'] = semantic_contract
+
+        analytical_contract = AnalyticalContract.from_legacy_dict(
+            dataset_contract=semantic_contract,
+        )
+        main_df.attrs['analytical_contract'] = analytical_contract
         
         # --- 📸 SNAPSHOT LOGIC INJECTION V8 (Contract-Driven) ---
         # Solo crea `is_latest_snapshot` cuando el contrato del dataset lo autoriza.
@@ -707,6 +755,9 @@ class DataEngine:
         main_df.attrs['literal_filter_catalog'] = DataEngine._build_literal_filter_catalog(main_df, schema_profile)
         main_df.attrs['translator_context_summary'] = DataEngine._build_translator_context_summary(schema_profile, topology_rules)
         main_df.attrs['reference_date'] = DataEngine._detect_reference_date(main_df, schema_profile, semantic_contract)
+        # [MEJORA 6 2026-09] Exponer reference_date también en el contrato (aditivo).
+        if semantic_contract.get('reference_date') is None:
+            semantic_contract['reference_date'] = main_df.attrs['reference_date']
         main_df.attrs['cleaning_notes'] = "\n".join(cleaning_notes)
 
         # Return includes schema_profile for downstream consumers (IbisEngine, SemanticTranslator)
@@ -799,6 +850,8 @@ class DataEngine:
             return value.isoformat()
         if isinstance(value, np.generic):
             return value.item()
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json") if hasattr(value, "model_dump") else value.dict()
         return value
 
     @staticmethod
@@ -950,6 +1003,84 @@ class DataEngine:
         return df, notes
 
     @staticmethod
+    def _select_period_time_axis(df: pd.DataFrame, date_cols: list[str]) -> str | None:
+        """
+        Selecciona el eje temporal que mejor se comporta como eje de PERIODO
+        (snapshot) en lugar de tomar posicionalmente la primera columna fecha.
+
+        Coherencia con 'Snapshot Isolation': un archivo puede tener una fecha
+        de corte (pocos valores, muchas filas por corte) y una fecha accesoria
+        de alta cardinalidad (caducidad, vencimiento, registro). Elegir la
+        primera por posición puede escoger la accesoria y colapsar el análisis
+        a una rebanada irrelevante.
+
+        Criterio data-driven (schema-agnostic, sin hardcode de nombres): la
+        densidad de filas por valor distinto (`avg_rows_per_period`) es máxima
+        en el eje que particiona el dataset en cortes comparables. Se desempata
+        por filas en la fecha máxima y, finalmente, por orden original.
+        """
+        candidates = [col for col in date_cols if col in df.columns]
+        if not candidates:
+            return date_cols[0] if date_cols else None
+        if len(candidates) == 1:
+            return candidates[0]
+
+        best_col = candidates[0]
+        best_density = -1.0
+        best_rows_at_max = -1
+        for col in candidates:
+            try:
+                parsed = pd.to_datetime(df[col], errors='coerce')
+            except Exception:
+                continue
+            valid = parsed.dropna()
+            if valid.empty:
+                continue
+            unique_dates = int(valid.nunique())
+            density = float(len(valid)) / max(unique_dates, 1)
+            rows_at_max = int((parsed == valid.max()).fillna(False).sum())
+            if density > best_density or (
+                density == best_density and rows_at_max > best_rows_at_max
+            ):
+                best_col = col
+                best_density = density
+                best_rows_at_max = rows_at_max
+        return best_col
+
+    @staticmethod
+    def _compute_metric_semantics(
+        df: pd.DataFrame,
+        metric_cols: list[str],
+        axis_col: str,
+        axis_order: list[str] | None = None,
+    ) -> dict:
+        """[Fase 1.2 2026-09] Señales estructurales por métrica (data-driven).
+
+        Calcula la dirección monótona de cada métrica sobre el eje temporal
+        disponible (tipado u ordinal). Es la señal #1 del guard de acumulados,
+        ahora declarada en el contrato L1 en vez de recomputarse por consulta.
+        """
+        if df is None or df.empty or not metric_cols or axis_col not in df.columns:
+            return {}
+        semantics: dict[str, dict] = {}
+        try:
+            if axis_order:
+                rank = {str(value): index for index, value in enumerate(axis_order)}
+                ordering = df[axis_col].astype(str).map(rank)
+                ordered_index = ordering.sort_values(kind="stable").index
+            else:
+                ordered_index = df[axis_col].sort_values(kind="stable").index
+        except Exception:
+            return {}
+        for col in metric_cols:
+            if col not in df.columns:
+                continue
+            direction = series_monotonic_direction(df[col].loc[ordered_index])
+            if direction is not None:
+                semantics[col] = {"cumulative_monotonic_direction": direction}
+        return semantics
+
+    @staticmethod
     def _infer_dataset_semantic_contract(df: pd.DataFrame, schema_profile: dict, topology_rules: dict | None = None) -> dict:
         """
         Capa contractual del dataset.
@@ -959,15 +1090,26 @@ class DataEngine:
         topology_rules = topology_rules or {}
 
         contract = {
-            'version': 'phase_1_foundation',
-            'dataset_mode': 'undetermined',
+            'version': DataEngine._SEMANTIC_CONTRACT_VERSION,
+            'dataset_mode': 'unknown',
             'snapshot_guard_allowed': False,
+            'contract_state': 'unknown',
+            # F3: presentes siempre para que el merge `{**previo, **reinferido}`
+            # de `_refresh_stale_semantic_contract` limpie un expiry vencido aunque
+            # la reinferencia salga por un early-return (evita bucle de refresh).
+            'bootstrap_expires_at': None,
+            'bootstrap_scope': {},
             'time_axis': None,
             'date_columns': [],
             'metric_columns': [],
             'dimension_columns': [],
             'identifier_columns': [],
             'entity_key': None,
+            # [Fase 1.1/1.2 2026-09] Eje ordinal + señales estructurales por métrica.
+            'ordinal_axis': None,
+            'ordinal_axis_order': [],
+            'time_axis_kind': None,
+            'metric_semantics': {},
             'evidence': {},
         }
 
@@ -984,15 +1126,53 @@ class DataEngine:
         contract['dimension_columns'] = dimension_cols
         contract['identifier_columns'] = identifier_cols
 
-        if not date_cols or not metric_cols:
+        # [Fase 1.1 2026-09] Eje temporal ORDINAL (mes-texto, "2021-07", "W30").
+        # Se detecta por VALORES sobre columnas no-fecha/no-métrica. No habilita
+        # corte (snapshot_guard_allowed sigue False): solo expone orden temporal.
+        ordinal_axis, ordinal_order = detect_ordinal_axis(
+            df,
+            schema_profile,
+            exclude=set(date_cols) | set(metric_cols),
+        )
+        if ordinal_axis:
+            contract['ordinal_axis'] = ordinal_axis
+            contract['ordinal_axis_order'] = ordinal_order
+
+        if not metric_cols:
+            contract['time_axis_kind'] = 'ordinal' if ordinal_axis else None
             contract['evidence'] = {
                 'total_rows': int(len(df)),
-                'reason': 'missing_date_or_metric_columns',
+                'reason': 'missing_metric_columns',
+                'ordinal_axis': ordinal_axis,
             }
             return contract
 
-        time_axis = date_cols[0]
+        if not date_cols:
+            # Sin eje tipado: si hay eje ordinal, el contrato lo expone y calcula
+            # las señales estructurales por métrica sobre ese orden. Sin corte.
+            contract['time_axis_kind'] = 'ordinal' if ordinal_axis else None
+            if ordinal_axis:
+                contract['metric_semantics'] = DataEngine._compute_metric_semantics(
+                    df, metric_cols, ordinal_axis, ordinal_order
+                )
+            contract['evidence'] = {
+                'total_rows': int(len(df)),
+                'reason': 'missing_date_columns',
+                'ordinal_axis': ordinal_axis,
+            }
+            return contract
+
+        time_axis = DataEngine._select_period_time_axis(df, date_cols) or date_cols[0]
         contract['time_axis'] = time_axis
+        contract['time_axis_kind'] = 'date'
+        # [Fase 1.2] Señales estructurales por métrica sobre el eje tipado.
+        contract['metric_semantics'] = DataEngine._compute_metric_semantics(
+            df, metric_cols, time_axis
+        )
+        # [MEJORA 6 2026-09] Vocabulario temporal explícito (aditivo):
+        # snapshot_axis = eje de corte; event_axes = fechas accesorias distintas.
+        contract['snapshot_axis'] = time_axis
+        contract['event_axes'] = [c for c in date_cols if c != time_axis]
 
         date_series = df[time_axis]
         if not pd.api.types.is_datetime64_any_dtype(date_series):
@@ -1034,6 +1214,8 @@ class DataEngine:
 
         entity_key = None
         repeated_entity_ratio = None
+        entity_period_coverage = None
+        entity_key_confidence = 0.0
         entity_candidates = identifier_cols[:]
         if not entity_candidates:
             entity_candidates = [
@@ -1044,20 +1226,34 @@ class DataEngine:
         if entity_candidates:
             entity_key = entity_candidates[0]
             contract['entity_key'] = entity_key
-            try:
-                entity_date_span = (
-                    pd.DataFrame({
-                        '__entity__': df[entity_key].astype(str),
-                        '__date__': date_series,
-                    })
-                    .dropna(subset=['__entity__', '__date__'])
-                    .groupby('__entity__')['__date__']
-                    .nunique()
+            entity_observations = pd.DataFrame({
+                '__entity__': df[entity_key],
+                '__date__': date_series,
+            }).dropna(subset=['__entity__', '__date__'])
+            entity_observations['__entity__'] = entity_observations['__entity__'].astype(str).str.strip()
+            entity_observations = entity_observations[entity_observations['__entity__'] != '']
+            if not entity_observations.empty:
+                entity_date_span = entity_observations.groupby('__entity__')['__date__'].nunique()
+                repeated_entity_ratio = float((entity_date_span > 1).mean())
+                unique_entities = int(entity_date_span.size)
+                observed_entity_periods = int(entity_observations.drop_duplicates().shape[0])
+                possible_entity_periods = unique_entities * unique_dates
+                entity_period_coverage = (
+                    observed_entity_periods / possible_entity_periods
+                    if possible_entity_periods > 0 else None
                 )
-                if not entity_date_span.empty:
-                    repeated_entity_ratio = float((entity_date_span > 1).mean())
-            except Exception:
-                repeated_entity_ratio = None
+                entity_cardinality_ratio = unique_entities / max(len(entity_observations), 1)
+                # La confianza requiere una clave que sea a la vez distinguible y recurrente.
+                entity_key_confidence = (
+                    0.55 * repeated_entity_ratio
+                    + 0.30 * max(0.0, 1.0 - entity_cardinality_ratio)
+                    + 0.15 * min(1.0, entity_cardinality_ratio / 0.02)
+                )
+
+        rows_per_period = valid_dates.value_counts(dropna=True)
+        rows_per_period_cv = None
+        if not rows_per_period.empty and float(rows_per_period.mean()) > 0:
+            rows_per_period_cv = float(rows_per_period.std(ddof=0) / rows_per_period.mean())
 
         semantic_snapshot_hints = (
             ' '.join(metric_cols + dimension_cols + identifier_cols).lower()
@@ -1073,10 +1269,7 @@ class DataEngine:
             snapshot_score += 1
             score_reasons.append('multi_period_dataset')
 
-        if avg_rows_per_period >= 10:
-            snapshot_score += 2
-            score_reasons.append(f'avg_rows_per_period={avg_rows_per_period:.2f}')
-        elif avg_rows_per_period <= 2:
+        if avg_rows_per_period <= 2:
             flow_score += 2
             score_reasons.append(f'avg_rows_per_period={avg_rows_per_period:.2f}')
 
@@ -1127,8 +1320,95 @@ class DataEngine:
         else:
             dataset_mode = 'undetermined'
 
+        legacy_dataset_mode = dataset_mode
+        confidence_threshold = settings.SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_THRESHOLD
+        confidence_version = settings.SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_VERSION
+        threshold_is_valid = isinstance(confidence_threshold, (int, float)) and 0.0 <= confidence_threshold <= 1.0
+        configuration_is_valid = threshold_is_valid and bool(confidence_version)
+        gate_enabled = bool(settings.SEMANTIC_CONTRACT_F0_GATE)
+        bridge_votes = sum((
+            entity_period_coverage is not None and entity_period_coverage >= 0.60,
+            repeated_entity_ratio is not None and repeated_entity_ratio >= 0.25,
+            rows_per_period_cv is not None and rows_per_period_cv <= 0.20,
+        ))
+        veto_reasons = []
+        if entity_period_coverage is None or entity_period_coverage <= 0.25:
+            veto_reasons.append('entity_period_coverage')
+        if repeated_entity_ratio is None or repeated_entity_ratio <= 0.10:
+            veto_reasons.append('repeated_entity_ratio')
+        if not threshold_is_valid or entity_key_confidence < float(confidence_threshold):
+            veto_reasons.append('entity_key_confidence')
+
+        allow_cut_legacy = (
+            gate_enabled
+            and configuration_is_valid
+            and legacy_dataset_mode == 'snapshot'
+            and not veto_reasons
+            and entity_key_confidence >= float(confidence_threshold)
+            and bridge_votes >= 2
+        )
+        # [F2] Confirmación: la evidencia F0 fuerte (los TRES votos del puente)
+        # eleva el contrato del puente `legacy_inferred` a `confirmed_file_contract`.
+        # No cambia `dataset_mode` ni `snapshot_guard_allowed`: el corte es idéntico.
+        f2_confirm_enabled = bool(settings.SEMANTIC_CONTRACT_F2_CONFIRM)
+        # [F3] Bootstrap verificado (time-boxed): el puente que pasa el gate pero
+        # no alcanza confirmación fuerte se marca como provisional con expiración,
+        # en vez de un `legacy_inferred` abierto. El corte no cambia.
+        f3_bootstrap_enabled = bool(settings.SEMANTIC_CONTRACT_F3_BOOTSTRAP)
+        bootstrap_expires_at: str | None = None
+        bootstrap_scope: dict = {}
+        contract_confirmed = False
+        confirmation_reasons: list[str] = []
+        if gate_enabled and legacy_dataset_mode in {'snapshot', 'hybrid', 'undetermined'}:
+            if allow_cut_legacy:
+                dataset_mode = 'snapshot'
+                snapshot_guard_allowed = True
+                if f2_confirm_enabled and bridge_votes == 3:
+                    contract_state = 'confirmed_file_contract'
+                    contract_confirmed = True
+                    confirmation_reasons = ['allow_cut_legacy', 'bridge_votes=3']
+                elif f3_bootstrap_enabled:
+                    contract_state = 'bootstrap_verified'
+                    bootstrap_expires_at = compute_bootstrap_expiry(
+                        ttl_hours=settings.SEMANTIC_CONTRACT_BOOTSTRAP_TTL_HOURS
+                    )
+                    bootstrap_scope = {'origin': 'f0_bridge', 'file_scope': True}
+                else:
+                    contract_state = 'legacy_inferred'
+            else:
+                dataset_mode = 'unknown'
+                snapshot_guard_allowed = False
+                contract_state = 'unknown'
+        else:
+            snapshot_guard_allowed = legacy_dataset_mode in {'snapshot', 'hybrid'}
+            contract_state = 'legacy_inferred'
+
+        # [F4] Retiro del puente: con el flag activo, SOLO la evidencia fuerte
+        # (`confirmed_file_contract`) o un template de tenant confiable concede
+        # corte. `legacy_inferred` y `bootstrap_verified` dejan de habilitarlo y
+        # pasan a `unknown` (fail-closed). Default OFF = comportamiento F0/F2/F3
+        # byte-idéntico (inercia total). El retiro nunca concede corte: solo lo
+        # retira cuando el gate F0 está activo.
+        f4_retire_enabled = bool(settings.SEMANTIC_CONTRACT_F4_RETIRE_BRIDGE)
+        bridge_retired = (
+            gate_enabled
+            and f4_retire_enabled
+            and contract_state not in {'confirmed_file_contract', 'trusted_tenant_template'}
+        )
+        if bridge_retired:
+            dataset_mode = 'unknown'
+            snapshot_guard_allowed = False
+            contract_state = 'unknown'
+            bootstrap_expires_at = None
+            bootstrap_scope = {}
+            contract_confirmed = False
+            confirmation_reasons = []
+
         contract['dataset_mode'] = dataset_mode
-        contract['snapshot_guard_allowed'] = dataset_mode in {'snapshot', 'hybrid'}
+        contract['snapshot_guard_allowed'] = snapshot_guard_allowed
+        contract['contract_state'] = contract_state
+        contract['bootstrap_expires_at'] = bootstrap_expires_at
+        contract['bootstrap_scope'] = bootstrap_scope
         contract['evidence'] = {
             'total_rows': total_rows,
             'unique_dates': unique_dates,
@@ -1140,15 +1420,35 @@ class DataEngine:
             'primary_metric': primary_metric,
             'metric_at_max_ratio': round(metric_at_max_ratio, 4),
             'repeated_entity_ratio': round(repeated_entity_ratio, 4) if repeated_entity_ratio is not None else None,
+            'entity_period_coverage': round(entity_period_coverage, 4) if entity_period_coverage is not None else None,
+            'rows_per_period_cv': round(rows_per_period_cv, 4) if rows_per_period_cv is not None else None,
+            'entity_key_confidence': round(entity_key_confidence, 4),
+            'entity_key_confidence_threshold': confidence_threshold if threshold_is_valid else None,
+            'entity_key_confidence_version': confidence_version or None,
+            'legacy_dataset_mode': legacy_dataset_mode,
+            'bridge_votes': bridge_votes,
+            'veto_reasons': veto_reasons,
+            'allow_cut_legacy': allow_cut_legacy,
+            'contract_confirmed': contract_confirmed,
+            'confirmation_reasons': confirmation_reasons,
+            'bootstrap_expires_at': bootstrap_expires_at,
+            'bridge_retired': bridge_retired,
             'snapshot_score': snapshot_score,
             'flow_score': flow_score,
             'score_reasons': score_reasons,
         }
 
-        print(
-            "🧠 [DATA CONTRACT] "
-            f"mode={dataset_mode} | snapshot_guard={contract['snapshot_guard_allowed']} | "
-            f"time_axis={time_axis} | rows_at_max={rows_at_max_date}/{total_rows}"
+        emit_structured_log(
+            'semantic_contract_f0_gate_decision',
+            contract_state=contract_state,
+            dataset_mode=dataset_mode,
+            legacy_dataset_mode=legacy_dataset_mode,
+            allow_cut_legacy=allow_cut_legacy,
+            contract_confirmed=contract_confirmed,
+            bridge_votes=bridge_votes,
+            veto_reasons=veto_reasons,
+            entity_key_confidence=round(entity_key_confidence, 4),
+            confidence_version=confidence_version or None,
         )
 
         return contract
@@ -1258,6 +1558,103 @@ class DataEngine:
         return f"{base_path}.snapshot.arrow.b64"
 
     @staticmethod
+    def _write_sidecar_payload(contract_path: str, payload: dict) -> None:
+        """Publica el sidecar completo de forma atómica para no exponer contratos parciales."""
+        temporary_path = f"{contract_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+        try:
+            with open(temporary_path, 'w', encoding='utf-8') as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2, default=DataEngine._to_json_safe)
+            os.replace(temporary_path, contract_path)
+        finally:
+            if os.path.exists(temporary_path):
+                os.remove(temporary_path)
+
+    @classmethod
+    def _sidecar_refresh_lock(cls, parquet_path: str) -> threading.Lock:
+        with cls._sidecar_refresh_locks_guard:
+            return cls._sidecar_refresh_locks.setdefault(parquet_path, threading.Lock())
+
+    @classmethod
+    @contextmanager
+    def _sidecar_file_lock(cls, parquet_path: str):
+        """Serializa la reinferencia entre threads y procesos del mismo runtime."""
+        with cls._sidecar_refresh_lock(parquet_path):
+            lock_path = f"{parquet_path}.semantic-contract.lock"
+            with open(lock_path, 'a+', encoding='utf-8') as lock_file:
+                if fcntl is not None:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    if fcntl is not None:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    @classmethod
+    def _refresh_stale_semantic_contract(cls, parquet_path: str, payload: dict | None = None) -> tuple[dict, bool]:
+        """Reinfiere sidecars previos una sola vez por archivo y proceso.
+
+        La versión del contrato forma parte de la corrección semántica: un
+        resultado cacheado no puede seguir reutilizando una inferencia previa.
+        """
+        current_payload = payload if isinstance(payload, dict) else cls.load_sidecar_payload(parquet_path)
+        if not current_payload:
+            return current_payload, False
+        if (
+            current_payload.get('version') == cls._SEMANTIC_CONTRACT_VERSION
+            and not is_bootstrap_expired(current_payload.get('bootstrap_expires_at'))
+        ):
+            return current_payload, False
+        if not os.path.exists(parquet_path):
+            return current_payload, False
+
+        with cls._sidecar_file_lock(parquet_path):
+            current_payload = cls.load_sidecar_payload(parquet_path)
+            if not current_payload:
+                return current_payload, False
+            version_stale = current_payload.get('version') != cls._SEMANTIC_CONTRACT_VERSION
+            bootstrap_expired = is_bootstrap_expired(current_payload.get('bootstrap_expires_at'))
+            if not version_stale and not bootstrap_expired:
+                return current_payload, False
+            try:
+                cached_df = pd.read_parquet(parquet_path)
+            except Exception as error:
+                emit_structured_log(
+                    'semantic_contract_sidecar_refresh_failed',
+                    level='warning',
+                    parquet_path=os.path.basename(parquet_path),
+                    reason='parquet_unreadable',
+                    error=str(error)[:240],
+                )
+                return current_payload, False
+
+            refreshed_contract = cls._infer_dataset_semantic_contract(
+                cached_df,
+                current_payload.get('_schema_profile', {}) or {},
+                current_payload.get('_topology_rules', {}) or {},
+            )
+            refreshed_payload = {**current_payload, **refreshed_contract}
+            try:
+                cls._write_sidecar_payload(cls._contract_path_from_parquet_path(parquet_path), refreshed_payload)
+            except Exception as error:
+                emit_structured_log(
+                    'semantic_contract_sidecar_refresh_failed',
+                    level='warning',
+                    parquet_path=os.path.basename(parquet_path),
+                    reason='sidecar_write_failed',
+                    error=str(error)[:240],
+                )
+                return current_payload, False
+
+            emit_structured_log(
+                'semantic_contract_sidecar_refreshed',
+                previous_version=current_payload.get('version'),
+                semantic_contract_version=cls._SEMANTIC_CONTRACT_VERSION,
+                reason='bootstrap_expired' if bootstrap_expired else 'version_stale',
+                parquet_path=os.path.basename(parquet_path),
+            )
+            return refreshed_payload, True
+
+    @staticmethod
     def load_sidecar_payload(parquet_path: str) -> dict:
         if not parquet_path:
             return {}
@@ -1280,6 +1677,7 @@ class DataEngine:
         Recupera el contrato semántico sidecar asociado al parquet.
         """
         payload = DataEngine.load_sidecar_payload(parquet_path)
+        payload, _ = DataEngine._refresh_stale_semantic_contract(parquet_path, payload)
         if not payload:
             return {}
         return {
@@ -1326,6 +1724,7 @@ class DataEngine:
             return None
 
         sidecar_payload = DataEngine.load_sidecar_payload(parquet_path)
+        sidecar_payload, _ = DataEngine._refresh_stale_semantic_contract(parquet_path, sidecar_payload)
         if not sidecar_payload:
             return None
 
@@ -1349,6 +1748,15 @@ class DataEngine:
         cached_df.attrs['reference_date'] = sidecar_payload.get('_reference_date')
         cached_df.attrs['cleaning_notes'] = sidecar_payload.get('_cleaning_notes', '')
         return cached_df, parquet_path, sidecar_payload
+
+    @staticmethod
+    def refresh_cached_semantic_contract(file_id: str) -> bool:
+        """Actualiza un sidecar obsoleto; devuelve si cambió su semántica."""
+        parquet_path, _ = DataEngine._cache_paths_from_file_id(file_id)
+        if not os.path.exists(parquet_path):
+            return False
+        _, refreshed = DataEngine._refresh_stale_semantic_contract(parquet_path)
+        return refreshed
 
     @staticmethod
     def commit_to_parquet(df: pd.DataFrame, file_id: str) -> str:
@@ -1376,6 +1784,9 @@ class DataEngine:
         if len(df.columns) > 500:
             print(f"⚠️ [DATA SHIELD] DataFrame con {len(df.columns)} columnas (sospechoso). Limitando a 200.")
             df = df.iloc[:, :200]
+        
+        if hasattr(df, 'attrs'):
+            df.attrs = {k: v for k, v in (df.attrs or {}).items() if not isinstance(v, BaseModel)}
         
         try:
             df.to_parquet(file_path, index=False, engine='pyarrow')
@@ -1406,8 +1817,7 @@ class DataEngine:
             else:
                 sidecar_payload = contract_payload
 
-            with open(contract_path, 'w', encoding='utf-8') as fh:
-                json.dump(sidecar_payload, fh, ensure_ascii=False, indent=2, default=DataEngine._to_json_safe)
+            DataEngine._write_sidecar_payload(contract_path, sidecar_payload)
             
             print(f"✅ [DATA ENGINE] Snapshot Parquet generado: {file_path} ({file_size_mb:.2f} MB, {len(df)} filas, {len(df.columns)} cols)")
             print(f"🧠 [DATA CONTRACT] Sidecar generado: {contract_path}")

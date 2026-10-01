@@ -271,3 +271,167 @@ def _reset_rate_limit_state_for_tests() -> None:
         _MEMORY_STORE.clear()
     with _TEAM_CACHE_LOCK:
         _TEAM_CACHE.clear()
+
+
+def check_rate_limits_batch(
+    *,
+    request: Request,
+    token: str,
+    scope: str,
+    rate_limit: int,
+    rate_window: int,
+    burst_limit: int,
+    burst_window: int,
+    max_concurrent: int,
+    concurrency_ttl: int,
+) -> tuple[bool, dict]:
+    """Valida rate limit, burst limit y concurrencia en un solo round-trip a Redis.
+
+    Garantías de seguridad:
+    1. Agrupa los INCR en indices [0, 1, 2] y los EXPIRE después.
+    2. Revierte inmediatamente el slot de concurrencia si falla rate o burst limit (evita slots fantasma).
+    3. Fallback seguro a los métodos secuenciales individuales si ocurre RedisError.
+    """
+    if not settings.RATE_LIMIT_ENABLED:
+        return True, {"slot_acquired": False, "user_id": None}
+
+    actor_key, user_id, team_id = _actor_key(request, token)
+    now_epoch = int(time.time())
+
+    rate_bucket = now_epoch - (now_epoch % rate_window) if rate_window > 0 else now_epoch
+    rate_key = f"ratelimit:{scope}:{actor_key}:{rate_bucket}"
+
+    burst_bucket = now_epoch - (now_epoch % burst_window) if burst_window > 0 else now_epoch
+    burst_key = f"ratelimit:burst:{scope}:{actor_key}:{burst_bucket}"
+
+    conc_key = f"concurrency:user:{user_id}" if (user_id and max_concurrent > 0) else None
+
+    redis_client = _get_redis_client()
+    if redis_client is not None:
+        try:
+            pipe = redis_client.pipeline(transaction=False)
+
+            # 1. Comandos INCR (Posiciones 0, 1 y opcional 2)
+            pipe.incr(rate_key)       # [0]
+            pipe.incr(burst_key)      # [1]
+            if conc_key:
+                pipe.incr(conc_key)   # [2]
+
+            # 2. Comandos EXPIRE
+            pipe.expire(rate_key, rate_window + 1)
+            pipe.expire(burst_key, burst_window + 1)
+            if conc_key:
+                pipe.expire(conc_key, concurrency_ttl)
+
+            results = pipe.execute()
+
+            rate_count = int(results[0])
+            burst_count = int(results[1])
+            conc_count = int(results[2]) if conc_key else 0
+
+            # Validación de Rate Limit
+            if rate_limit > 0 and rate_count > rate_limit:
+                redis_client.decr(rate_key)
+                if conc_key:
+                    redis_client.decr(conc_key)
+                emit_structured_log(
+                    "api_rate_limit_exceeded",
+                    level="warning",
+                    scope=scope,
+                    path=request.url.path,
+                    method=request.method,
+                    actor_key=actor_key,
+                    user_id=user_id,
+                    team_id=team_id,
+                    count=rate_count,
+                    limit=rate_limit,
+                    retry_after_seconds=rate_window,
+                )
+                return False, {
+                    "error": "Límite de solicitudes excedido. Inténtalo de nuevo en unos segundos.",
+                    "status_code": 429,
+                    "retry_after": rate_window,
+                    "slot_acquired": False,
+                    "user_id": user_id,
+                }
+
+            # Validación de Burst Limit
+            if burst_limit > 0 and burst_count > burst_limit:
+                redis_client.decr(burst_key)
+                if conc_key:
+                    redis_client.decr(conc_key)
+                emit_structured_log(
+                    "api_burst_limit_exceeded",
+                    level="warning",
+                    scope=f"burst:{scope}",
+                    path=request.url.path,
+                    method=request.method,
+                    actor_key=actor_key,
+                    user_id=user_id,
+                    team_id=team_id,
+                    count=burst_count,
+                    limit=burst_limit,
+                    retry_after_seconds=burst_window,
+                )
+                return False, {
+                    "error": "Demasiadas peticiones consecutivas (ráfaga). Espera un momento.",
+                    "status_code": 429,
+                    "retry_after": burst_window,
+                    "slot_acquired": False,
+                    "user_id": user_id,
+                }
+
+            # Validación de Concurrencia
+            if conc_key and max_concurrent > 0 and conc_count > max_concurrent:
+                redis_client.decr(conc_key)
+                emit_structured_log(
+                    "api_concurrency_limit_exceeded",
+                    level="warning",
+                    user_id=user_id,
+                    count=conc_count,
+                    limit=max_concurrent,
+                )
+                return False, {
+                    "error": "Tienes demasiados análisis en curso. Por favor, espera a que terminen antes de solicitar uno nuevo.",
+                    "status_code": 429,
+                    "retry_after": 5,
+                    "slot_acquired": False,
+                    "user_id": user_id,
+                }
+
+            return True, {
+                "slot_acquired": bool(conc_key),
+                "user_id": user_id,
+            }
+        except RedisError as error:
+            emit_structured_log(
+                "rate_limit_pipeline_redis_error",
+                level="warning",
+                error=str(error)[:180],
+            )
+
+    # Fallback seguro a métodos individuales (incluye fallback en memoria)
+    enforce_rate_limit(
+        request=request,
+        token=token,
+        scope=scope,
+        limit=rate_limit,
+        window_seconds=rate_window,
+    )
+    enforce_burst_limit(
+        request=request,
+        token=token,
+        scope=scope,
+        limit=burst_limit,
+        window_seconds=burst_window,
+    )
+    slot_ok = acquire_concurrency_slot(token, max_concurrent, concurrency_ttl)
+    if not slot_ok:
+        return False, {
+            "error": "Tienes demasiados análisis en curso. Por favor, espera a que terminen antes de solicitar uno nuevo.",
+            "status_code": 429,
+            "retry_after": 5,
+            "slot_acquired": False,
+            "user_id": user_id,
+        }
+    return True, {"slot_acquired": True, "user_id": user_id}

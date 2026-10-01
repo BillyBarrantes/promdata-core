@@ -19,6 +19,30 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_unit_interval(name: str, default: float | None) -> float | None:
+    """Lee una probabilidad sin convertir una configuración corrupta en permiso."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = float(raw_value.strip())
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 <= value <= 1.0 else None
+
+
+def _env_positive_int(name: str, default: int) -> int:
+    """Lee un entero estrictamente positivo; una config corrupta cae al default."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(str(raw_value).strip())
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
 def _is_running_in_container() -> bool:
     return Path("/.dockerenv").exists()
 
@@ -77,7 +101,16 @@ class Settings:
     CELERY_RESULT_BACKEND: str = _normalize_redis_url_for_runtime(
         os.getenv("CELERY_RESULT_BACKEND", _LOCAL_REDIS_URL)
     )
-    AI_MODEL_NAME= os.getenv("AI_MODEL_NAME", "gemini-3.5-flash")
+    AI_MODEL_NAME: str = os.getenv("AI_MODEL_NAME", "DeepSeek-V4.1-flash")
+    # --- LLM Gateway Multi-Proveedor ---
+    LLM_PROVIDER: str = (os.getenv("LLM_PROVIDER", "deepseek") or "deepseek").strip().lower()
+    DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
+    DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "DeepSeek-V4.1-flash")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+    GEMINI_RPM_GOVERNOR: int = int(os.getenv("GEMINI_RPM_GOVERNOR", "800"))
     BACKEND_PUBLIC_URL: str = os.getenv("BACKEND_PUBLIC_URL", "http://localhost:8000")
     FRONTEND_APP_URL: str = os.getenv("FRONTEND_APP_URL", "http://localhost:3000")
     OAUTH_STATE_TTL_SECONDS: int = int(os.getenv("OAUTH_STATE_TTL_SECONDS", "900"))
@@ -121,8 +154,8 @@ class Settings:
     RATE_LIMIT_ANALYZE_LIMIT: int = int(os.getenv("RATE_LIMIT_ANALYZE_LIMIT", "8"))
     RATE_LIMIT_BURST_WINDOW_SECONDS: int = int(os.getenv("RATE_LIMIT_BURST_WINDOW_SECONDS", "5"))
     RATE_LIMIT_BURST_ANALYZE_LIMIT: int = int(os.getenv("RATE_LIMIT_BURST_ANALYZE_LIMIT", "2"))
-    CONCURRENT_TASKS_PER_USER: int = int(os.getenv("CONCURRENT_TASKS_PER_USER", "2"))
-    CONCURRENT_TASKS_TTL_SECONDS: int = int(os.getenv("CONCURRENT_TASKS_TTL_SECONDS", "3600"))
+    CONCURRENT_TASKS_PER_USER: int = int(os.getenv("CONCURRENT_TASKS_PER_USER", "5"))
+    CONCURRENT_TASKS_TTL_SECONDS: int = int(os.getenv("CONCURRENT_TASKS_TTL_SECONDS", "300"))
     RATE_LIMIT_CHAT_LIMIT: int = int(os.getenv("RATE_LIMIT_CHAT_LIMIT", "30"))
     RATE_LIMIT_KNOWLEDGE_ASK_LIMIT: int = int(os.getenv("RATE_LIMIT_KNOWLEDGE_ASK_LIMIT", "20"))
     RATE_LIMIT_TEAM_CACHE_TTL_SECONDS: int = int(os.getenv("RATE_LIMIT_TEAM_CACHE_TTL_SECONDS", "300"))
@@ -159,6 +192,33 @@ class Settings:
         os.getenv("NARRATIVE_CACHE_TTL_SECONDS", str(AI_RESPONSE_CACHE_TTL_SECONDS))
     )
     DETERMINISTIC_VISUAL_FASTPATH_ENABLED: bool = _env_bool("DETERMINISTIC_VISUAL_FASTPATH_ENABLED", True)
+    UNIFIED_SEMANTIC_TRANSLATOR_ENABLED: bool = _env_bool("UNIFIED_SEMANTIC_TRANSLATOR_ENABLED", True)
+    # F0: el puente legacy nunca corta si el umbral o su versión no son legibles.
+    SEMANTIC_CONTRACT_F0_GATE: bool = _env_bool("SEMANTIC_CONTRACT_F0_GATE", True)
+    SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_THRESHOLD: float | None = _env_unit_interval(
+        "SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_THRESHOLD",
+        0.65,
+    )
+    SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_VERSION: str = (
+        os.getenv("SEMANTIC_CONTRACT_ENTITY_KEY_CONFIDENCE_VERSION", "f0-calibrated-v1") or ""
+    ).strip()
+    # F1: traza de linaje de filtros temporales (aditiva, rollback por flag).
+    SEMANTIC_CONTRACT_F1_TRACE: bool = _env_bool("SEMANTIC_CONTRACT_F1_TRACE", True)
+    # F2: elevar a `confirmed_file_contract` cuando la evidencia F0 es fuerte
+    # (allow_cut_legacy + bridge_votes==3). `false` restaura el comportamiento F0.
+    SEMANTIC_CONTRACT_F2_CONFIRM: bool = _env_bool("SEMANTIC_CONTRACT_F2_CONFIRM", True)
+    # F3: bootstrap verificado (time-boxed) para el puente que pasa el gate pero
+    # no alcanza confirmación fuerte. `false` restaura F2.
+    SEMANTIC_CONTRACT_F3_BOOTSTRAP: bool = _env_bool("SEMANTIC_CONTRACT_F3_BOOTSTRAP", True)
+    SEMANTIC_CONTRACT_BOOTSTRAP_TTL_HOURS: int = _env_positive_int(
+        "SEMANTIC_CONTRACT_BOOTSTRAP_TTL_HOURS", 168
+    )
+    # F4: retiro del puente `legacy_inferred`/`bootstrap_verified`. Con el flag
+    # activo, solo `confirmed_file_contract` (o un template de tenant confiable)
+    # concede corte. Default OFF = inercia total (comportamiento F0/F2/F3).
+    SEMANTIC_CONTRACT_F4_RETIRE_BRIDGE: bool = _env_bool(
+        "SEMANTIC_CONTRACT_F4_RETIRE_BRIDGE", False
+    )
     FILE_INTELLIGENCE_ROUTER_ENABLED: bool = _env_bool("FILE_INTELLIGENCE_ROUTER_ENABLED", False)
     FILE_INTELLIGENCE_STRICT_SIGNATURES: bool = _env_bool("FILE_INTELLIGENCE_STRICT_SIGNATURES", True)
     CANONICAL_EXTRACTION_PIPELINE_ENABLED: bool = _env_bool("CANONICAL_EXTRACTION_PIPELINE_ENABLED", False)
@@ -251,6 +311,15 @@ class Settings:
         "CANONICAL_TABULAR_CANARY_FAIL_OPEN_ENABLED",
         True,
     )
+    # [Fase 2 2026-09] Kill-switch de retiro del runtime legacy. Default True =
+    # paridad exacta (el legacy sigue siendo fallback). Con False, todo archivo
+    # tabular elegible se enruta a `universal_tabular` (sin allowlist/trafico),
+    # usando el legacy solo como válvula de emergencia si el gate de salud del
+    # runtime universal no pasa. Reversible sin redeploy de datos.
+    LEGACY_ANALYSIS_RUNTIME_ENABLED: bool = _env_bool(
+        "LEGACY_ANALYSIS_RUNTIME_ENABLED",
+        True,
+    )
     CANONICAL_TABULAR_CANARY_TRAFFIC_PERCENT: int = int(
         os.getenv("CANONICAL_TABULAR_CANARY_TRAFFIC_PERCENT", "0")
     )
@@ -299,8 +368,8 @@ class Settings:
     LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
     LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
-    NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "gemini-3.5-flash")
-    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "gemini-3.1-pro-preview")
+    NARRATIVE_FAST_MODEL_NAME: str = os.getenv("NARRATIVE_FAST_MODEL_NAME", "DeepSeek-V4.1-flash")
+    NARRATIVE_STRICT_MODEL_NAME: str = os.getenv("NARRATIVE_STRICT_MODEL_NAME", "DeepSeek-V4.1-flash")
     UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES: int = int(
         os.getenv("UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES", "1500000")
     )

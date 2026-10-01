@@ -18,7 +18,7 @@ from app.core.circuit_breaker import GeminiCircuitOpenError, GeminiQuotaExceeded
 from app.core.config import settings
 from app.core.supabase_client import get_supabase_client
 from app.core.structured_logging import emit_structured_log
-from app.core.serializers import CustomEncoder, convert_keys_to_str
+from app.core.serializers import CustomEncoder, convert_keys_to_str, dumps_safe
 from app.core.redis_client import publish_task_progress
 
 from app.services.enterprise_telemetry import (
@@ -44,7 +44,8 @@ from app.services.visual_recommendation_engine import (
     extract_prompt_visual_requests,
     normalize_visual_id,
 )
-from app.services.file_cache import get_cached_analysis, set_cached_analysis
+from app.services.data_engine import DataEngine
+from app.services.file_cache import get_cached_analysis, invalidate_file_cache, set_cached_analysis
 from app.services.analysis_memory_context import unwrap_prompt_payload
 
 from app.tasks.analysis_pipeline.data_loader import (
@@ -149,12 +150,33 @@ def _try_restore_cached_analysis(
     allow_unscoped_fallback: bool = False,
 ) -> str | None:
     try:
+        if DataEngine.refresh_cached_semantic_contract(file_id):
+            invalidate_file_cache(file_id)
+            emit_structured_log(
+                "analysis_file_cache_invalidated_semantic_contract_refresh",
+                task_id=task_id,
+                file_id=file_id,
+                runtime=runtime,
+                semantic_contract_version=DataEngine.semantic_contract_version(),
+            )
+            return None
         cached_payload = get_cached_analysis(
             file_id,
             prompt,
             parent_context=parent_context,
             allow_unscoped_fallback=allow_unscoped_fallback,
         )
+        if cached_payload and cached_payload.get("semantic_contract_version") != DataEngine.semantic_contract_version():
+            invalidate_file_cache(file_id)
+            emit_structured_log(
+                "analysis_file_cache_invalidated_semantic_contract_version",
+                task_id=task_id,
+                file_id=file_id,
+                runtime=runtime,
+                cached_semantic_contract_version=cached_payload.get("semantic_contract_version"),
+                semantic_contract_version=DataEngine.semantic_contract_version(),
+            )
+            return None
         parsed = _extract_cached_result_payload(cached_payload or {})
         if not parsed:
             emit_structured_log(
@@ -167,7 +189,7 @@ def _try_restore_cached_analysis(
         status, result_payload = parsed
         sb.table("analysis_tasks").update({
             "status": status,
-            "results_json": json.dumps(result_payload, cls=CustomEncoder),
+            "results_json": dumps_safe(result_payload),
         }).eq("id", task_id).execute()
         emit_structured_log(
             "analysis_file_cache_restored",
@@ -208,6 +230,7 @@ def _try_store_completed_analysis_cache(
             {
                 "status": status,
                 "result": result_payload,
+                "semantic_contract_version": DataEngine.semantic_contract_version(),
             },
             parent_context=parent_context,
             write_unscoped_alias=write_unscoped_alias,
@@ -608,6 +631,7 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
                 file_id=file_id, prompt=prompt, service_client=sb,
                 uploaded_file_row=uploaded_row_data,
                 max_plans=max(int(settings.CANONICAL_SHADOW_TRAFFIC_MIRROR_MAX_PLANS or 3), 1),
+                prompt_type=prompt_type,
             )
             if settings.CANONICAL_SHADOW_TRAFFIC_MIRROR_ENABLED:
                 from app.tasks.analysis_tasks import observe_canonical_tabular_canary_runtime_task
@@ -894,6 +918,34 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             }).eq('id', task_id).execute()
             return "failed"
 
+        # [Fase 3 2026-09] Forma no soportada / sin plan válido: mensaje honesto
+        # y específico (no el genérico), con las columnas disponibles cuando el
+        # executor las incluyó. Fail-closed: se informa, no se inventa.
+        if _real_error_str.startswith("canonical_production_not_ready"):
+            _headline, _message, _status, _has_hint = _format_unsupported_shape_message(
+                _real_error_str
+            )
+            emit_structured_log(
+                "canonical_tabular_unsupported_shape",
+                level="warning", task_id=task_id, file_id=file_id,
+                production_status=_status,
+                has_column_hint=_has_hint,
+            )
+            sb.table('analysis_tasks').update({
+                'status': 'failed',
+                'results_json': json.dumps({
+                    "analysis": _message,
+                    "metrics": {},
+                    "chart_options": [],
+                    "data": [],
+                    "recommendations": [],
+                    "explainability": [],
+                    "error_code": "UNSUPPORTED_SHAPE",
+                    "error_trace": _real_error_str[:300],
+                }, cls=CustomEncoder),
+            }).eq('id', task_id).execute()
+            return "failed"
+
         emit_structured_log(
             "canonical_tabular_execution_failed_no_fallback",
             level="error", task_id=task_id, file_id=file_id,
@@ -922,3 +974,32 @@ def execute_universal_tabular_task(task_id: str, file_id: str, prompt: str, user
             }, cls=CustomEncoder),
         }).eq('id', task_id).execute()
         return "failed"
+
+
+def _format_unsupported_shape_message(error_str: str) -> tuple[str, str, str, bool]:
+    """[Fase 3 2026-09] Mensaje honesto para una forma de dato no soportada.
+
+    Interpreta el error `canonical_production_not_ready:<status>:...` y devuelve
+    `(headline, analysis_markdown, production_status, has_column_hint)`. Función
+    pura: no toca Supabase ni el estado, y es testeable de forma aislada.
+    """
+    text = str(error_str or "")
+    parts = text.split(":", 3)
+    status = parts[1] if len(parts) > 1 else ""
+    hint = ""
+    if "Columnas disponibles" in text:
+        hint = "Columnas disponibles" + text.split("Columnas disponibles", 1)[1]
+    headline = (
+        "No pudimos generar el análisis solicitado"
+        if status in {"no_plans", "query_failed"}
+        else "El análisis no está disponible para este archivo"
+    )
+    message = (
+        f"## ⚠️ {headline}\n\n"
+        "La solicitud no coincide con la estructura de este archivo "
+        "(por ejemplo, un período o categoría que no existe, o una "
+        "métrica no disponible).\n\n"
+        + (f"{hint}\n\n" if hint else "")
+        + "Reformula la pregunta usando una de las columnas disponibles."
+    )
+    return headline, message, status, bool(hint)

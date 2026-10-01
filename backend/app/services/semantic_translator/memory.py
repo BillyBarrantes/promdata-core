@@ -102,7 +102,11 @@ def should_bypass_memory_context(
     return bool((dimension_candidates and metric_candidates) or (date_candidates and metric_candidates))
 
 
-def classify_memory_intent(prompt: str, memory_context: str) -> str:
+def classify_memory_intent(
+    prompt: str,
+    memory_context: str,
+    previous_dimensions: list[str] | None = None,
+) -> str:
     if not memory_context:
         return ""
 
@@ -132,9 +136,14 @@ def classify_memory_intent(prompt: str, memory_context: str) -> str:
     if any(kw in prompt_lower for kw in kw_drill_down):
         print(f"🧠 [INTENT CLASSIFIER] Tipo: DRILL_DOWN")
         prev_dim = "Unknown"
-        match = re.search(r"Agrupado por: \[?([a-zA-Z0-9_ ]+)\]?", memory_context)
-        if match:
-            prev_dim = match.group(1).strip()
+        # [F2-D4] Usar las dimensiones reales del análisis previo (desde el contexto
+        # estructurado). El parse por "Agrupado por:" queda como fallback legacy.
+        if previous_dimensions:
+            prev_dim = str(previous_dimensions[0])
+        else:
+            match = re.search(r"Agrupado por: \[?([a-zA-Z0-9_ ]+)\]?", memory_context)
+            if match:
+                prev_dim = match.group(1).strip()
 
         return f"""--- 🎯 MODO DRILL-DOWN (Detectado por Ibis) ---
     El usuario quiere PROFUNDIZAR en el análisis anterior, NO un análisis nuevo.

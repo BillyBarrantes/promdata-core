@@ -77,6 +77,7 @@ def test_production_analysis_marks_final_struct_as_production(monkeypatch):
         execution_summaries=[{"status": "success"}],
         metadata={"production_query_status": "query_executed"},
         prompt_strategy="production_semantic_translator",
+        plans=[],
     )
 
     monkeypatch.setattr(

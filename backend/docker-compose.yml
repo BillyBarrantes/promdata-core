@@ -12,7 +12,9 @@ services:
       - ./google-credentials.json:/code/google-credentials.json:ro
     environment:
       - PYTHONPATH=/code
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/google-credentials.json
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       redis:
         condition: service_healthy
@@ -37,7 +39,9 @@ services:
       - ./google-credentials.json:/code/google-credentials.json:ro
     environment:
       - PYTHONPATH=/code
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/google-credentials.json
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       redis:
         condition: service_healthy

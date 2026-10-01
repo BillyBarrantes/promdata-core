@@ -254,6 +254,7 @@ def preprocess_dataframe(df: pd.DataFrame, dynamic_glossary: dict = None) -> pd.
                 clean_col = df[col].astype(str).str.replace(r'\s+[-]\s+', ' ', regex=True)
                 clean_col = clean_col.str.replace(r'[^\d.,-]', '', regex=True)
 
+                # @deprecated("Reemplazado por vectorización nativa con regex=False")
                 def clean_regional(val: Any) -> Any:
                     if not val: return val
                     if ',' in val and '.' in val:
@@ -262,7 +263,22 @@ def preprocess_dataframe(df: pd.DataFrame, dynamic_glossary: dict = None) -> pd.
                     elif ',' in val: return val.replace(',', '.')
                     return val
 
-                df[col] = pd.to_numeric(clean_col.apply(clean_regional), errors='coerce')
+                # Vectorización regional robusta (con regex=False para buscar el punto literal)
+                has_comma = clean_col.str.contains(',', regex=False, na=False)
+                has_dot = clean_col.str.contains('.', regex=False, na=False)
+                both = has_comma & has_dot
+
+                # Formato europeo: última coma posterior al último punto (ej: "1.234,56")
+                eu_format = both & (clean_col.str.rfind(',') > clean_col.str.rfind('.'))
+                us_format = both & ~eu_format
+                only_comma = has_comma & ~has_dot
+
+                result = clean_col.copy()
+                result[eu_format] = result[eu_format].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                result[us_format] = result[us_format].str.replace(',', '', regex=False)
+                result[only_comma] = result[only_comma].str.replace(',', '.', regex=False)
+
+                df[col] = pd.to_numeric(result, errors='coerce')
             else:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
@@ -274,33 +290,35 @@ def preprocess_dataframe(df: pd.DataFrame, dynamic_glossary: dict = None) -> pd.
 
 def get_dataframe_from_storage(supabase: Any, file_id: str, glossary_map: dict = None) -> tuple[dict, list]:
     """
-    Lee el archivo crudo del Storage.
+    Lee el archivo crudo del Storage con validación de ingesta, formatos y reintentos.
     NOTA: Ya NO limpiamos aquí. La limpieza la hará el DataEngine en el siguiente paso.
     """
+    import os
+    from app.services.ingestion_validator import (
+        download_storage_file_with_retry,
+        parse_tabular_bytes_to_dfs,
+    )
+
     if glossary_map is None:
         glossary_map = {}
 
     resp = supabase.table('uploaded_files').select('storage_path').eq('id', file_id).single().execute()
-    file_bytes = supabase.storage.from_('dash-uploads').download(resp.data['storage_path'])
-    f_io = io.BytesIO(file_bytes)
+    storage_path = resp.data.get('storage_path', '') if isinstance(resp.data, dict) else ''
+    file_name = os.path.basename(storage_path) or 'dataset.csv'
 
     audit_log = []
-    dfs = {}
 
     try:
-        try:
-            xls = pd.ExcelFile(f_io)
-            for sheet in xls.sheet_names:
-                df_sheet = pd.read_excel(xls, sheet_name=sheet)
-                dfs[sheet] = df_sheet
-        except Exception:
-            f_io.seek(0)
-            df = pd.read_csv(f_io, encoding='latin-1', on_bad_lines='skip')
-            dfs['principal'] = df
-
+        file_bytes = download_storage_file_with_retry(
+            supabase.storage,
+            bucket_name='dash-uploads',
+            storage_path=storage_path,
+        )
+        dfs = parse_tabular_bytes_to_dfs(file_bytes, file_name)
         return dfs, audit_log
     except Exception as e:
         raise Exception(f"Error crítico leyendo archivo raw: {str(e)}")
+
 
 
 def load_dataset_for_task(supabase: Any, file_id: str, user_id: str | None, prompt: str, user_token: str, glossary_map: dict = None) -> tuple:

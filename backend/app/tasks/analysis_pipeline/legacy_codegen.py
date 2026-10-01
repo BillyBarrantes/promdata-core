@@ -698,7 +698,14 @@ def generar_analisis(
     if results.get('status') == 'error':
         return [{"type": "error_analitico", "content": results.get('message')}]
     if user_id and results.get('status') == 'success':
-        guardar_insight_aprendido(supabase_client, user_id, f"Analysis: {prompt}", code, adn)
+        guardar_insight_aprendido(
+            supabase_client,
+            user_id,
+            f"Analysis: {prompt}",
+            code,
+            adn,
+            user_access_token=user_token,
+        )
 
     # Synthesis visual
     hydrated = []

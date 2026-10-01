@@ -3,7 +3,7 @@
 Usage:
     from app.core.secret_manager import get_secret
 
-    api_key = get_secret("GEMINI_API_KEY")
+    api_key = get_secret("DEEPSEEK_API_KEY")
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _check_secret_manager_available() -> bool:
 def get_secret(secret_id: str, default: Any = None) -> Any:
     """Fetch a secret from GCP Secret Manager, falling back to env var.
 
-    The secret must be named after the env var (e.g. 'GEMINI_API_KEY').
+    The secret must be named after the env var (e.g. 'DEEPSEEK_API_KEY').
     Falls back to os.getenv(secret_id) if Secret Manager is unavailable.
     """
     env_val = os.getenv(secret_id)

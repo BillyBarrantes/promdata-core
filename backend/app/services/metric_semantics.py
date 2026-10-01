@@ -136,7 +136,7 @@ def align_plan_metrics_with_prompt(
     schema_profile = schema_profile or {}
     metric_columns = [
         col_name for col_name, info in schema_profile.items()
-        if info.get("role") == "metric"
+        if isinstance(info, dict) and info.get("role") == "metric"
     ]
     if not metric_columns or not plans:
         return plans

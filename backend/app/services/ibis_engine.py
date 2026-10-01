@@ -2,7 +2,11 @@ import ibis
 import pandas as pd
 import datetime
 import re
+from app.core.ibis_sqlglot_patch import apply_ibis_sqlglot_patch
+apply_ibis_sqlglot_patch()
 from app.services.data_engine import DataEngine
+from app.core.config import settings
+from app.core.structured_logging import emit_structured_log
 from app.services.snapshot_guard import should_apply_latest_snapshot_filter
 from app.services.semantic_translator.temporal_resolver import (
     normalize_intent_temporal_filters,
@@ -34,6 +38,68 @@ class IbisEngine:
             if key == suffix or key.endswith(suffix):
                 return key
         return None
+
+    # ═══════════════════════════════════════════════════════════════════
+    # [F1.2] Agregación no aditiva — no sumar promedios/ratios/porcentajes
+    # ═══════════════════════════════════════════════════════════════════
+    _NON_ADDITIVE_METRIC_TOKENS = (
+        "promedio", "media", "ratio", "tasa", "margen", "porcentaje",
+        "pct", "rate", "avg", "average", "mean", "indice", "index",
+    )
+
+    @staticmethod
+    def _metric_aggregation_method(
+        intent, column_name: str, ignore_intent_aggregation: bool = False
+    ) -> str:
+        """Decide la agregación de una métrica: 'mean' para no aditivas, 'sum' por defecto.
+
+        Evita el error matemático de sumar promedios, ratios o porcentajes
+        (ej: "evolución del margen" no debe sumar el % mes a mes).
+
+        [#4 2026-09] Honor a max/min: la agregación explícita del intent debe
+        llegar a DuckDB (antes caían silenciosamente a sum, sumando series
+        acumuladas o 'pico/mínimo por período').
+
+        [secondary 2026-09] `ignore_intent_aggregation=True` decide la agregación
+        SOLO por la naturaleza de la columna (nombre/unidad), para que la segunda
+        métrica de un combo no herede la agregación de la métrica primaria.
+        """
+        aggregation = str(getattr(intent, "aggregation", "") or "").strip().lower()
+        if not ignore_intent_aggregation:
+            if aggregation in {"avg", "mean"}:
+                return "mean"
+            if aggregation == "count":
+                return "count"
+            if aggregation in {"max", "min"}:
+                return aggregation
+            unit = getattr(intent, "metric_unit", None)
+            unit_value = str(getattr(unit, "value", unit) or "").strip().lower()
+            if unit_value == "percentage":
+                return "mean"
+        name = str(column_name or "").lower()
+        if any(token in name for token in IbisEngine._NON_ADDITIVE_METRIC_TOKENS):
+            return "mean"
+        return "sum"
+
+    @staticmethod
+    def _aggregate_metric_expr(
+        column_expr, intent, column_name: str, ignore_intent_aggregation: bool = False
+    ):
+        """Aplica count()/mean()/sum()/max()/min() según la naturaleza de la métrica."""
+        if "string" in str(column_expr.type()).lower():
+            return column_expr.count()
+        method = IbisEngine._metric_aggregation_method(
+            intent, column_name, ignore_intent_aggregation=ignore_intent_aggregation
+        )
+        if method == "count":
+            return column_expr.count()
+        if method == "mean":
+            return column_expr.mean()
+        if method == "max":
+            return column_expr.max()
+        if method == "min":
+            return column_expr.min()
+        return column_expr.sum()
 
     # ═══════════════════════════════════════════════════════════════════
     # IBIS_FUNC_MAP — Catálogo de funciones de agregación soportadas
@@ -193,10 +259,52 @@ class IbisEngine:
         return df
 
     @staticmethod
+    def _resolve_runtime_time_grain(t, date_column: str, requested_grain: TimeGrain) -> TimeGrain:
+        """Red de seguridad (doble cerrojo) para la granularidad temporal.
+
+        Calcula el rango real y los periodos distintos directamente en DuckDB
+        (una sola agregación, sin escanear filas al driver) y aplica la misma
+        regla pura del planificador. Si el grano pedido colapsaría la serie a
+        < 2 puntos, la refina. Nunca lanza: ante cualquier error devuelve el
+        grano solicitado.
+        """
+        from app.core.time_grain import resolve_time_grain
+
+        try:
+            col = t[date_column]
+            stats = t.aggregate(mn=col.min(), mx=col.max(), nd=col.nunique()).execute()
+            row = stats.iloc[0] if hasattr(stats, "iloc") else stats[0]
+            distinct_dates = int(row["nd"]) if row["nd"] is not None else None
+            span_days = None
+            mn, mx = row["mn"], row["mx"]
+            if mn is not None and mx is not None:
+                delta = mx - mn
+                if hasattr(delta, "total_seconds"):
+                    span_days = max(delta.total_seconds() / 86400.0, 0.0)
+            return resolve_time_grain(requested_grain, span_days, distinct_dates)
+        except Exception as exc:
+            emit_structured_log(
+                "ibis_adaptive_grain_failed",
+                level="warning",
+                date_column=date_column,
+                error=str(exc)[:180],
+            )
+            return requested_grain
+
+    @staticmethod
     def _format_period_label(period_obj, grain: TimeGrain):
         """
         Formats a period object (datetime) into a human-readable string based on grain.
         """
+        # [P1.6] Un valor nulo (NaT/None/NaN) no es un periodo. Nunca debe
+        # mostrarse como categoría "NaT" en el eje temporal.
+        if period_obj is None:
+            return "Sin fecha"
+        try:
+            if pd.isna(period_obj):
+                return "Sin fecha"
+        except (TypeError, ValueError):
+            pass
         if isinstance(period_obj, pd.Timestamp):
             if grain == TimeGrain.MONTH:
                 month_es = IbisEngine._MONTH_NAMES_ES.get(period_obj.month, '???')
@@ -204,7 +312,10 @@ class IbisEngine:
             elif grain == TimeGrain.YEAR:
                 return period_obj.strftime('%Y') # e.g., 2021
             elif grain == TimeGrain.WEEK:
-                return period_obj.strftime('%Y-W%W') # e.g., 2021-W10
+                # [P2 2026-09] ISO-8601 (%V) para alinear el label del backend
+                # con el key temporal ISO que calcula el frontend
+                # (lib/dashboard-crossfilter.ts: toTemporalWeekKey).
+                return period_obj.strftime('%G-W%V') # e.g., 2021-W30
             else: # Day or other
                 return period_obj.strftime('%Y-%m-%d') # e.g., 2021-03-15
         return str(period_obj).split(' ')[0] # Fallback for non-datetime or other types
@@ -439,6 +550,24 @@ class IbisEngine:
 
         print(f"🕵️ [IBIS SPY] Columna '{f.column}' | Tipo Crudo: '{raw_type}' | Normalizado: '{col_type}'")
 
+        # [MEJORA 1 2026-09] Soporte nativo 'between' → (col>=lo)&(col<=hi).
+        # Permite negar un rango correctamente en negative_filters (~(A & B)).
+        # Los 'between' positivos siguen expandiéndose antes en
+        # _sanitize_intent_projection (sin cambios de comportamiento).
+        if operator == "between":
+            _raw_between = f.value
+            if isinstance(_raw_between, list) and len(_raw_between) == 2:
+                _lo_raw, _hi_raw = _raw_between[0], _raw_between[1]
+            elif isinstance(_raw_between, str) and " and " in _raw_between.lower():
+                _parts = re.split(r"\s+and\s+", _raw_between, flags=re.IGNORECASE)
+                _lo_raw, _hi_raw = _parts[0].strip(), _parts[1].strip()
+            else:
+                return None
+            _lo_c = IbisEngine._coerce_filter_scalar(col_type, _lo_raw)
+            _hi_c = IbisEngine._coerce_filter_scalar(col_type, _hi_raw)
+            print(f"🧠 [IBIS] Filtro between nativo: '{f.column}' ∈ [{_lo_c}, {_hi_c}]")
+            return (col >= _lo_c) & (col <= _hi_c)
+
         is_date_col = 'timestamp' in col_type or 'date' in col_type
         if is_date_col and isinstance(val, str) and val.lower() in ['latest', 'last', 'ultimo', 'actual', 'recent', 'hoy']:
             print(f"🧠 [IBIS] Traducción Simbólica activada para '{val}'...")
@@ -544,16 +673,68 @@ class IbisEngine:
             expr = IbisEngine._build_filter_expression(t, f)
             if expr is not None:
                 t = t.filter(expr)
+            else:
+                # [TIER 1 2026-09] Un filtro de usuario no debe descartarse en
+                # silencio: se emite telemetría para poder reconciliar el resultado.
+                emit_structured_log(
+                    "ibis_filter_dropped",
+                    level="warning",
+                    column=str(getattr(f, "column", "")),
+                    operator=str(getattr(getattr(f, "operator", ""), "value", getattr(f, "operator", ""))),
+                    reason="unresolvable_expression",
+                    negative=False,
+                )
 
         for f in list(getattr(intent, "negative_filters", []) or []):
             expr = IbisEngine._build_filter_expression(t, f)
             if expr is None:
+                emit_structured_log(
+                    "ibis_filter_dropped",
+                    level="warning",
+                    column=str(getattr(f, "column", "")),
+                    operator=str(getattr(getattr(f, "operator", ""), "value", getattr(f, "operator", ""))),
+                    reason="unresolvable_expression",
+                    negative=True,
+                )
                 continue
             operator = IbisEngine._normalize_filter_operator(f.operator)
             if operator not in {"!=", "not_in"}:
                 expr = ~expr
             t = t.filter(expr)
         return t
+
+    @staticmethod
+    def _plan_required_primary_columns(plan: AnalysisPlan) -> set[str]:
+        """Columnas de la tabla primaria que el plan necesita para ejecutarse.
+
+        Se usa como guardia anti-destructiva: una pre-agregación multi-hoja que
+        elimine columnas referenciadas por dimensiones, eje temporal, métricas o
+        filtros del plan rompería la query (incidente 2026-09-23:
+        'texto_breve_de_material' no existe). Schema-agnostic: solo lee
+        referencias del plan, nunca nombres de columnas.
+        """
+        intent = getattr(plan, "main_intent", None) or getattr(plan, "intent", None)
+        required: set[str] = set()
+
+        def _add(value: object) -> None:
+            if isinstance(value, str):
+                if value.strip():
+                    required.add(value.strip())
+            elif isinstance(value, (list, tuple, set)):
+                for item in value:
+                    if isinstance(item, str) and item.strip():
+                        required.add(item.strip())
+
+        for attr in (
+            "date_column", "value_column", "dimension", "metric",
+            "metrics", "group_by", "split_dimension", "plot_metric",
+            "time_dimension", "primary_metric", "ranking_metric",
+        ):
+            _add(getattr(intent, attr, None))
+        for filter_attr in ("filters", "negative_filters", "positive_filters"):
+            for filt in (getattr(intent, filter_attr, None) or []):
+                _add(getattr(filt, "column", None))
+        return required
 
     @staticmethod
     def execute_plan(
@@ -588,9 +769,24 @@ class IbisEngine:
         # consolidar la tabla primaria ANTES del JOIN. Esto reduce 43,800 filas
         # diarias a ~120 filas totales por entidad, evitando explosiones cartesianas.
         _agg_spec = getattr(plan, "pre_aggregation", None)
-        if _agg_spec and _agg_spec.group_by and _agg_spec.metrics:
-            _agg_func_name = getattr(_agg_spec, "aggregation", "sum") or "sum"
-            _agg_func_name = IbisEngine.IBIS_FUNC_MAP.get(_agg_func_name, _agg_func_name)
+        _agg_func_name = (getattr(_agg_spec, "aggregation", "sum") or "sum") if _agg_spec else "sum"
+        _agg_func_name = IbisEngine.IBIS_FUNC_MAP.get(_agg_func_name, _agg_func_name)
+        _preagg_allowed = bool(_agg_spec and _agg_spec.group_by and _agg_spec.metrics)
+        if _preagg_allowed:
+            # [GUARD 2026-09-23] No colapsar el schema si el plan depende de
+            # columnas que la pre-agregación eliminaría (dimensión/fecha/filtros).
+            _preserved = set(_agg_spec.group_by) | set(_agg_spec.metrics)
+            _endangered = sorted(
+                c for c in IbisEngine._plan_required_primary_columns(plan)
+                if c in t.columns and c not in _preserved
+            )
+            if _endangered:
+                _preagg_allowed = False
+                print(
+                    "⚠️ [MULTI-HOJA] Pre-agregación OMITIDA para preservar columnas "
+                    f"requeridas por el plan: {_endangered}"
+                )
+        if _preagg_allowed:
             _agg_exprs = {}
             for _metric in _agg_spec.metrics:
                 if _metric in t.columns:
@@ -621,7 +817,7 @@ class IbisEngine:
                 print(f"📋 [MULTI-HOJA] Resuelto: '{frame_id}' → '{resolved_key}'")
 
                 # [FASE 3C MULTI-HOJA] Pre-agregación de tabla relacionada
-                if _agg_spec and _agg_spec.group_by and _agg_spec.metrics:
+                if _preagg_allowed and _agg_spec and _agg_spec.group_by and _agg_spec.metrics:
                     _rel_agg_exprs = {}
                     for _metric in _agg_spec.metrics:
                         if _metric in related_table.columns:
@@ -659,15 +855,35 @@ class IbisEngine:
                             if k in _join_schema and _join_schema[k].is_string()
                         ]
                         if _categorical:
-                            join_key = _categorical[0]
-                            used_keys = list(_categorical)
-                            _rejected = set(valid_keys) - set(_categorical)
-                            if _rejected:
-                                print(f"⚠️ [MULTI-HOJA] Contrato filtrado: {_rejected} "
-                                      f"rechazadas (métricas numéricas). "
-                                      f"Usando: {_categorical}")
-                            print(f"📋 [MULTI-HOJA] JOIN gobernado por contrato: '{join_key}'"
-                                  f" (plan.join_keys={_categorical})")
+                            # --- Cardinality guard for LLM keys (Layer 1-2) ---
+                            # Mismo threshold que Layer 3: max(10, 1% rows)
+                            # Evita que una key categorica de baja cardinalidad
+                            # pase el type guard pero cause many-to-many.
+                            _cardinality_threshold_llm = max(10, int(_primary_rows * 0.01))
+                            _valid_llm_keys = []
+                            for k in _categorical:
+                                _nunique = int(t[k].nunique().execute())
+                                if _nunique >= _cardinality_threshold_llm:
+                                    _valid_llm_keys.append(k)
+                                else:
+                                    print(f"⚠️ [MULTI-HOJA] LLM join key '{k}' rechazada por baja "
+                                          f"cardinalidad: {_nunique} únicos en {_primary_rows} filas "
+                                          f"(umbral: {_cardinality_threshold_llm})")
+                            if _valid_llm_keys:
+                                join_key = _valid_llm_keys[0]
+                                used_keys = list(_valid_llm_keys)
+                                _rejected = set(valid_keys) - set(_valid_llm_keys)
+                                if _rejected:
+                                    print(f"⚠️ [MULTI-HOJA] Contrato filtrado: {_rejected} "
+                                          f"rechazadas (numéricas o baja cardinalidad). "
+                                          f"Usando: {_valid_llm_keys}")
+                                print(f"📋 [MULTI-HOJA] JOIN gobernado por contrato: '{join_key}'"
+                                      f" (plan.join_keys={_valid_llm_keys})")
+                            else:
+                                print(f"🛑 [MULTI-HOJA] Contrato RECHAZADO: todas las "
+                                      f"join_keys tienen baja cardinalidad. "
+                                      f"Delegando a heurístico categórico.")
+                                # join_key queda None → cae a CAPA 3 heurístico
                         else:
                             _type_hints = {
                                 k: str(_join_schema[k]) for k in valid_keys
@@ -683,10 +899,20 @@ class IbisEngine:
 
                 # --- CAPA 3: Heurístico de nombres (fallback) ---
                 if join_key is None:
+                    def _looks_like_key(column_name: str) -> bool:
+                        # [TIER 2 2026-09] Token-based, no substring: evita que
+                        # 'medida'/'unidad'/'vida' se tomen como llave por contener "id".
+                        lowered = str(column_name).lower()
+                        tokens = re.split(r"[^a-z0-9]+", lowered)
+                        return (
+                            "id" in tokens or "cod" in tokens or "key" in tokens
+                            or lowered.startswith("id_") or lowered.endswith("_id")
+                            or lowered.startswith("cod_") or lowered.endswith("_cod")
+                        )
+
                     common_keys = [
                         col for col in (primary_cols & related_cols)
-                        if col.lower().startswith("id_") or col.lower() == "id"
-                        or "id" in col.lower() or "cod" in col.lower() or "key" in col.lower()
+                        if _looks_like_key(col)
                     ]
                     if not common_keys:
                         common_keys = [col for col in (primary_cols & related_cols) if col in primary_cols]
@@ -709,19 +935,38 @@ class IbisEngine:
                                 for col in common_keys
                                 if col in _join_schema
                             }
-                            print(f"🛑 [MULTI-HOJA] JOIN abortado: "
+                            print(f"⚠️ [MULTI-HOJA] Join degradado: "
                                   f"ninguna columna común es categórica. "
-                                  f"Tipos detectados: {_type_hints}")
-                            return {
-                                "error": (
-                                    f"Data Contract Violation: Join key must be categorical "
-                                    f"(string-based). Las columnas comunes "
-                                    f"({', '.join(str(k) for k in common_keys[:5])}) "
-                                    f"son numéricas/métricas. "
-                                    f"Usa una columna categórica como 'placa_unidad', "
-                                    f"'tipo_unidad' u 'origen' como llave de cruce."
-                                )
-                            }
+                                  f"Tipos detectados: {_type_hints}. "
+                                  f"Ejecutando sobre tabla primaria sin JOIN a '{frame_id}'.")
+                            continue
+
+                    # --- CAPA 3d: Guardián de cardinalidad (anti many-to-many) ---
+                    # Se aplica a TODOS los datasets sin condicion de tamaño.
+                    # max(10, 1% rows) escala segun volumen: para 100 filas umbral=10,
+                    # para 10K filas umbral=100. Esto evita que una columna con 2-9
+                    # valores unicos (ej. tipo_movimiento {ingreso, egreso}) cause
+                    # many-to-many en datasets pequenos.
+                    if common_keys:
+                        _cardinality_threshold = max(10, int(_primary_rows * 0.01))
+                        _valid_candidates: list[str] = []
+                        for col in common_keys:
+                            _nunique = int(t[col].nunique().execute())
+                            if _nunique >= _cardinality_threshold:
+                                _valid_candidates.append(col)
+                            else:
+                                print(f"⚠️ [MULTI-HOJA] Columna '{col}' rechazada por baja cardinalidad: "
+                                      f"{_nunique} valores únicos en {_primary_rows} filas "
+                                      f"(umbral: {_cardinality_threshold})")
+                        if _valid_candidates:
+                            common_keys = _valid_candidates
+                        else:
+                            print(f"⚠️ [MULTI-HOJA] Degradación controlada: JOIN abortado con "
+                                  f"'{frame_id}'. Tabla primaria: {_primary_rows} filas, "
+                                  f"umbral de cardinalidad: {_cardinality_threshold}. "
+                                  f"Las {len(common_keys)} columna(s) común(es) no alcanzan "
+                                  f"la cardinalidad mínima. Ejecutando solo tabla primaria.")
+                            continue
 
                     if common_keys:
                         join_key = common_keys[0]
@@ -741,24 +986,18 @@ class IbisEngine:
                     }
                     joined = t.left_join(related_table, join_key)
                     all_cols = {**left_cols, **right_cols}
-                    t = joined.select(**all_cols)
+                    t_after = joined.select(**all_cols)
 
                     # --- CAPA 4c: Guardián anti many-to-many ---
-                    _joined_rows = int(t.count().execute())
+                    _joined_rows = int(t_after.count().execute())
                     _max_allowed = max(_primary_rows, _related_rows) * 10
                     if _joined_rows > _max_allowed:
-                        print(f"🛑 [MULTI-HOJA] JOIN con '{join_key}' produjo explosión: "
+                        print(f"⚠️ [MULTI-HOJA] JOIN con '{join_key}' produjo explosión: "
                               f"{_primary_rows}+{_related_rows} → {_joined_rows} filas "
-                              f"(límite: {_max_allowed}). Abortando.")
-                        return {
-                            "error": (
-                                f"El cruce de tablas con la columna '{join_key}' produjo "
-                                f"{_joined_rows} filas ({_primary_rows} × {_related_rows}), "
-                                f"lo que sugiere un producto cartesiano (many-to-many). "
-                                f"Usa una columna con mayor unicidad como llave de JOIN "
-                                f"(ej: un identificador único por registro)."
-                            )
-                        }
+                              f"(límite: {_max_allowed}). "
+                              f"Ejecutando sobre tabla primaria sin JOIN a '{frame_id}'.")
+                        continue
+                    t = t_after
                     _primary_rows = _joined_rows
 
         # 🧬 [V7] UNIVERSAL SCHEMA INSPECTOR (Replaces hardcoded money_cols)
@@ -846,10 +1085,34 @@ class IbisEngine:
         # E. Validate dimension column (distribution/diagnostic)
         if hasattr(intent, 'dimension') and intent.dimension:
             if not _validate_col(intent.dimension, "dimension"):
-                return {
-                    "error": f"Columna de dimensión '{intent.dimension}' no existe en el dataset. "
-                             f"Columnas disponibles: {sorted(available_columns)}"
-                }
+                # [SYN-REPAIR 2026-09] Auto-reparación de dimensiones alucinadas.
+                # Antes de retornar el error duro, intenta resolver el término
+                # del usuario (ej: "rutas") a columnas reales del dataset
+                # (ej: origen + destino) vía el diccionario de stems. Si no hay
+                # match confiable, se preserva el error original (fail closed).
+                _original_dimension = intent.dimension
+                from app.services.semantic_translator.dimension_synonyms import (
+                    resolve_synonym,
+                )
+                _synonym_cols = resolve_synonym(_original_dimension, available_columns)
+                if _synonym_cols:
+                    intent.dimension = _synonym_cols[0]
+                    _existing_group = list(getattr(intent, 'group_by', None) or [])
+                    _extra = [
+                        c for c in _synonym_cols[1:]
+                        if c not in _existing_group
+                    ]
+                    if _extra:
+                        intent.group_by = _existing_group + _extra
+                    print(
+                        f"🔄 [DATA SHIELD] Dimensión '{_original_dimension}' "
+                        f"→ auto-reparada a '{intent.dimension}' + group_by={_extra}"
+                    )
+                else:
+                    return {
+                        "error": f"Columna de dimensión '{_original_dimension}' no existe en el dataset. "
+                                 f"Columnas disponibles: {sorted(available_columns)}"
+                    }
 
         # F. Validate metric column (singular — distribution/diagnostic)
         if hasattr(intent, 'metric') and intent.metric:
@@ -920,7 +1183,41 @@ class IbisEngine:
 
         # 2. Aplicar Filtros Globales (Si existen en la intención)
         snapshot_guard_applied = False
-        if IbisEngine._should_apply_latest_snapshot_filter(intent, t.columns, dataset_contract):
+        # [F1] Linaje temporal: un único conteo base + reutilización del conteo
+        # final de la ejecución. No se escanea el dataset una vez por filtro.
+        _f1_trace_enabled = bool(getattr(settings, "SEMANTIC_CONTRACT_F1_TRACE", True))
+        _f1_guard_will_apply = IbisEngine._should_apply_latest_snapshot_filter(
+            intent, t.columns, dataset_contract
+        )
+        # [F1] Columnas temporales autorizadas por el contrato (domain-agnostic).
+        _f1_temporal_columns: set[str] = set()
+        if dataset_contract:
+            for _f1_date_col in (dataset_contract.get('date_columns') or []):
+                if str(_f1_date_col).strip():
+                    _f1_temporal_columns.add(str(_f1_date_col).strip())
+            _f1_time_axis = str(dataset_contract.get('time_axis') or '').strip()
+            if _f1_time_axis:
+                _f1_temporal_columns.add(_f1_time_axis)
+        _f1_temporal_cols_lower = {c.lower() for c in _f1_temporal_columns}
+        # Solo se activa el conteo base si hay linaje temporal que trazar:
+        # guard aplicado o algún filtro sobre una columna temporal confirmada.
+        _f1_has_temporal_intent_filters = any(
+            str(getattr(_f1_f, "column", "") or "").strip().lower() in _f1_temporal_cols_lower
+            for _f1_list in (
+                getattr(intent, "filters", []) or [],
+                getattr(intent, "positive_filters", []) or [],
+                getattr(intent, "negative_filters", []) or [],
+            )
+            for _f1_f in _f1_list
+        )
+        _f1_trace_base_rows: int | None = None
+        if _f1_trace_enabled and (_f1_guard_will_apply or _f1_has_temporal_intent_filters):
+            try:
+                _f1_trace_base_rows = int(t.count().execute())
+            except Exception as _f1_count_err:
+                print(f"⚠️ [F1 TRACE] No se pudo contar filas base: {_f1_count_err}")
+                _f1_trace_base_rows = None
+        if _f1_guard_will_apply:
             print("📸 [IBIS SNAPSHOT GUARD] Aplicando filtro automático is_latest_snapshot == True")
             t = t.filter(t['is_latest_snapshot'] == True)
             snapshot_guard_applied = True
@@ -946,9 +1243,11 @@ class IbisEngine:
             rounded_result = IbisEngine._round_result(result)
 
             # FASE 5: Añadir el dataframe granular filtrado para Cross-Filtering local
+            _f1_final_rows: int | None = None
             try:
                 MAX_GRANULAR_ROWS = 100000
                 row_count = int(t.count().execute())
+                _f1_final_rows = row_count
                 if row_count > MAX_GRANULAR_ROWS:
                     df_filtered = t.limit(MAX_GRANULAR_ROWS).to_pandas()
                     print(f"⚠️ [IBIS] Dataset truncado a {MAX_GRANULAR_ROWS} filas para cross-filter (total: {row_count})")
@@ -957,6 +1256,32 @@ class IbisEngine:
                 rounded_result['filtered_granular_df'] = df_filtered
             except Exception as e:
                 print(f"⚠️ [IBIS] Error extrayendo filtered_granular_df: {e}")
+
+            # [F1] Traza de linaje temporal (estrictamente aditiva). No altera
+            # ninguna clave existente del resultado ni el payload de Arrow.
+            if _f1_trace_enabled and _f1_trace_base_rows is not None:
+                try:
+                    from app.services.temporal_filter_trace import (
+                        build_temporal_filter_trace,
+                    )
+                    _f1_filter_lists = {
+                        "filters": list(getattr(intent, "filters", []) or []),
+                        "positive_filters": list(getattr(intent, "positive_filters", []) or []),
+                        "negative_filters": list(getattr(intent, "negative_filters", []) or []),
+                    }
+                    _f1_contract_state = (
+                        str((dataset_contract or {}).get("contract_state") or "").strip() or None
+                    )
+                    rounded_result['temporal_filter_trace'] = build_temporal_filter_trace(
+                        filter_lists=_f1_filter_lists,
+                        snapshot_guard_applied=snapshot_guard_applied,
+                        temporal_columns=_f1_temporal_columns,
+                        rows_before=_f1_trace_base_rows,
+                        rows_after=_f1_final_rows,
+                        contract_state=_f1_contract_state,
+                    ).model_dump(mode="json")
+                except Exception as _f1_err:
+                    print(f"⚠️ [F1 TRACE] No se pudo construir la traza temporal: {_f1_err}")
 
             # [FIX 2026-06-??] Cross-filter snapshot inheritance (v2)
             # 1) Propagar bandera de que el snapshot guard se aplicó (legacy)
@@ -1003,6 +1328,14 @@ class IbisEngine:
         plot_metric = getattr(intent, "plot_metric", None) or intent.value_column
         ranking_metric = getattr(intent, "ranking_metric", None) or plot_metric
         ranking_direction = str(getattr(intent, "ranking_direction", "desc") or "desc").lower()
+
+        # [P1.6] Un periodo sin fecha no es un periodo: se excluye del eje
+        # temporal (antes generaba una categoría "NaT" en el gráfico).
+        try:
+            t = t.filter(t[intent.date_column].notnull())
+        except Exception as _null_filter_err:
+            print(f"⚠️ [TREND] No se pudo filtrar periodos nulos en '{intent.date_column}': {_null_filter_err}")
+
         col_date = t[intent.date_column]
         col_val = t[plot_metric]
         col_rank = t[ranking_metric]
@@ -1011,6 +1344,22 @@ class IbisEngine:
         # Si la columna es string (ej: "Enero", "Febrero"), no se puede truncar;
         # se usan los valores crudos como periodos.
         if IbisEngine._is_temporal_column(t, intent.date_column):
+            # [P1.5 doble cerrojo] Adaptar el grano al rango REAL de los datos
+            # antes de truncar: si MONTH colapsaría la serie a < 2 puntos, se
+            # refina a WEEK/DAY. El planificador ya lo hizo; esto protege ante
+            # cualquier plan que llegue sin pasar por finalize_plans.
+            adapted_grain = IbisEngine._resolve_runtime_time_grain(
+                t, intent.date_column, intent.grain,
+            )
+            if adapted_grain != intent.grain:
+                print(
+                    f"🕰️ [TREND] Grano adaptado en ejecución: {intent.grain} → {adapted_grain} "
+                    f"(rango real insuficiente para el grano solicitado)."
+                )
+                try:
+                    intent.grain = adapted_grain
+                except (ValueError, TypeError):
+                    pass
             trunc_op = col_date.truncate('M') if intent.grain == TimeGrain.MONTH else \
                        col_date.truncate('W') if intent.grain == TimeGrain.WEEK else \
                        col_date.truncate('Y') if intent.grain == TimeGrain.YEAR else col_date.truncate('D')
@@ -1037,9 +1386,9 @@ class IbisEngine:
                 f"mode={top_n_aggregation_mode}"
             )
 
-            # Agregación segura según tipo de métrica
+            # Agregación segura según tipo de métrica (F1.2: no sumar no aditivas)
             met_type = str(col_val.type()).lower()
-            agg_expr = col_val.count() if 'string' in met_type else col_val.sum()
+            agg_expr = IbisEngine._aggregate_metric_expr(col_val, intent, intent.value_column)
             rank_type = str(col_rank.type()).lower()
             rank_agg_expr = col_rank.count() if 'string' in rank_type else col_rank.sum()
 
@@ -1213,11 +1562,50 @@ class IbisEngine:
 
         # 1. Extracción Pesada (Ibis)
         t = t.mutate(periodo=trunc_op)
-        # [FIX V2.2] Soporte volumétrico: count() para strings, sum() para numéricos
+        # [FIX V2.2] Soporte volumétrico: count() para strings + F1.2 (no sumar no aditivas)
         met_type_single = str(col_val.type()).lower()
-        agg_expr_single = col_val.count() if 'string' in met_type_single else col_val.sum()
+        agg_expr_single = IbisEngine._aggregate_metric_expr(col_val, intent, intent.value_column)
+
+        # [#5 2026-09] Segunda métrica opcional para combo (barras + línea).
+        # Guard fail-closed: si la columna no existe o no es numérica, se ignora
+        # y el trend queda de una sola serie (comportamiento previo exacto). La
+        # agregación de la 2ª métrica se decide por su propia naturaleza
+        # (ignore_intent_aggregation=True), no por la agregación de la primaria.
+        secondary_col = getattr(intent, "secondary_value_column", None)
+        if isinstance(secondary_col, str) and secondary_col:
+            if secondary_col not in t.columns:
+                emit_structured_log(
+                    "trend_secondary_metric_ignored",
+                    level="warning",
+                    column=secondary_col,
+                    reason="missing_column",
+                )
+                secondary_col = None
+            elif not t[secondary_col].type().is_numeric():
+                emit_structured_log(
+                    "trend_secondary_metric_ignored",
+                    level="warning",
+                    column=secondary_col,
+                    reason="non_numeric_column",
+                )
+                secondary_col = None
+        else:
+            secondary_col = None
+
+        # [Fase 1.3 2026-09] Serie DERIVADA (no columna): variación % período a
+        # período. Fail-closed: cualquier valor desconocido se ignora.
+        derived_secondary = getattr(intent, "derived_secondary", None)
+        if not isinstance(derived_secondary, str) or derived_secondary not in {"mom_pct", "variation_pct"}:
+            derived_secondary = None
+
+        _agg_kwargs = {"valor": agg_expr_single}
+        if secondary_col:
+            _agg_kwargs["valor_sec"] = IbisEngine._aggregate_metric_expr(
+                t[secondary_col], intent, secondary_col, ignore_intent_aggregation=True
+            )
+
         agged = (t.group_by('periodo')
-                 .aggregate(valor=agg_expr_single)
+                 .aggregate(**_agg_kwargs)
                  .order_by('periodo'))
         df_res = agged.to_pandas()
 
@@ -1248,7 +1636,13 @@ class IbisEngine:
 
         # 2. Inyección de HARD FACTS (Python/Pandas)
         # MoM: variación porcentual respecto al periodo anterior
-        df_res['_growth'] = df_res['valor'].pct_change().fillna(0) * 100
+        # [TIER 1 2026-09] pct_change puede producir ±inf por base 0; fillna no
+        # los neutraliza. Se sanean para no propagar no-finitos al payload.
+        df_res['_growth'] = (
+            df_res['valor'].pct_change()
+            .replace([float('inf'), float('-inf')], 0)
+            .fillna(0) * 100
+        )
         
         # 🔮 [PHASE 2] YoY: variación porcentual respecto al mismo periodo del año anterior
         has_yoy = len(df_res) >= 12
@@ -1257,9 +1651,18 @@ class IbisEngine:
             yoy_shift = 12 if intent.grain == TimeGrain.MONTH else \
                         52 if intent.grain == TimeGrain.WEEK else \
                         1 if intent.grain == TimeGrain.YEAR else 365
-            df_res['_yoy'] = df_res['valor'].pct_change(periods=yoy_shift).fillna(0) * 100
+            df_res['_yoy'] = (
+                df_res['valor'].pct_change(periods=yoy_shift)
+                .replace([float('inf'), float('-inf')], 0)
+                .fillna(0) * 100
+            )
         
-        overall_growth = ((df_res['valor'].iloc[-1] - df_res['valor'].iloc[0]) / df_res['valor'].iloc[0] * 100) if len(df_res) > 1 else 0
+        _base_val = float(df_res['valor'].iloc[0]) if len(df_res) > 1 else 0.0
+        overall_growth = (
+            (float(df_res['valor'].iloc[-1]) - _base_val) / _base_val * 100
+            if (len(df_res) > 1 and _base_val != 0)
+            else 0
+        )
         trend_direction = "Creciente" if overall_growth > 0 else "Decreciente"
         
         # 📊 [PHASE 2] Peak & Trough detection
@@ -1275,6 +1678,14 @@ class IbisEngine:
             extra = {"growth": f"{row['_growth']:.1f}%"}
             if has_yoy:
                 extra["yoy"] = f"{row['_yoy']:.1f}%"
+            # [#5 2026-09] 2ª métrica del combo, por período.
+            if secondary_col and 'valor_sec' in df_res.columns:
+                _sec_val = row['valor_sec']
+                if pd.notna(_sec_val):
+                    extra["secondary_value"] = float(_sec_val)
+            # [Fase 1.3 2026-09] 2ª serie derivada: variación % (MoM) ya calculada.
+            elif derived_secondary:
+                extra["secondary_value"] = float(row['_growth'])
             chart_data.append({
                 "name": IbisEngine._format_period_label(row['periodo'], intent.grain), 
                 "value": float(row['valor']),
@@ -1339,10 +1750,11 @@ class IbisEngine:
         exprs = []
         for m in intent.metrics:
             col = t[m]
-            try: 
-                if 'String' in str(col.type()): col = col.cast('float64') 
-            except: pass
-            
+            try:
+                if 'String' in str(col.type()): col = col.cast('float64')
+            except Exception as _cast_err:
+                print(f"⚠️ [DESCRIPTIVE] No se pudo castear '{m}' a float64 ({type(_cast_err).__name__})")
+
             if intent.aggregation == "sum": exprs.append(col.sum().name(m))
             elif intent.aggregation == "avg": exprs.append(col.mean().name(m))
             elif intent.aggregation == "count": exprs.append(col.count().name(m))
@@ -1399,7 +1811,11 @@ class IbisEngine:
             
             # 2. Inyección de HARD FACTS (Python/Pandas)
             total_val = df_res[primary_metric].sum()
-            df_res['_share'] = (df_res[primary_metric] / total_val * 100).round(1) # % del total
+            # [TIER 1 2026-09] Guarda de base cero: share no debe producir inf/NaN.
+            if float(total_val) != 0:
+                df_res['_share'] = (df_res[primary_metric] / total_val * 100).round(1) # % del total
+            else:
+                df_res['_share'] = 0.0
             df_res['_rank'] = range(1, len(df_res) + 1) # Ranking 1, 2, 3...
             
             # 3. Selección del Gráfico (Protocolo Visual del PDF)
@@ -1650,11 +2066,8 @@ class IbisEngine:
             except Exception as card_e:
                 print(f"⚠️ [DISTRIBUTION] Error detectando cardinalidad: {card_e}")
 
-        # 🛡️ Agregación segura según tipo de métrica
-        if 'string' in str(col_met.type()).lower():
-            agg_expr = col_met.count()
-        else:
-            agg_expr = col_met.sum()
+        # 🛡️ Agregación segura según tipo de métrica (F1.2: no sumar no aditivas)
+        agg_expr = IbisEngine._aggregate_metric_expr(col_met, intent, intent.metric)
         if 'string' in str(col_rank.type()).lower():
             rank_agg_expr = col_rank.count()
         else:
@@ -2108,6 +2521,18 @@ class IbisEngine:
                 x_label = IbisEngine._normalize_metric_label(x_col)
                 y_label = IbisEngine._normalize_metric_label(y_col)
 
+                # [Fase 3 2026-09] 3ª magnitud numérica → burbuja (productor de
+                # `bubble_size`). Fail-closed: si no existe, el scatter queda igual.
+                size_metric = next(
+                    (
+                        candidate for candidate in t.columns
+                        if candidate not in {x_col, y_col, dimension_col}
+                        and not str(candidate).startswith('_')
+                        and IbisEngine._is_numeric_column(t, candidate)
+                    ),
+                    None,
+                )
+
                 def _derive_temporal_axis(metric_name: str):
                     reference_col = IbisEngine._pick_reference_date_column(intent, t.columns, exclude=metric_name)
                     if not reference_col or not IbisEngine._is_temporal_column(t, reference_col):
@@ -2191,13 +2616,30 @@ class IbisEngine:
                         f"usando referencia '{reference_col}'."
                     )
 
+                series_col = None
                 if dimension_col:
+                    # [P5-B 2026-09] Segunda categórica nombrada (group_by) → color.
+                    # Si el usuario menciona una segunda categoría ("...considerando
+                    # el método de pago"), se emite como `series` para que el scatter
+                    # la coloree. Fail-closed: sin segunda categórica, no cambia nada.
+                    series_col = next(
+                        (
+                            candidate for candidate in (
+                                c for c in (getattr(intent, 'group_by', None) or [])
+                                if c and c in t.columns
+                            )
+                            if candidate != dimension_col
+                            and not IbisEngine._is_numeric_column(t, candidate)
+                        ),
+                        None,
+                    )
+                    _agg_kwargs = {"x_value": x_expr.mean(), "y_value": y_expr.mean()}
+                    if size_metric:
+                        _agg_kwargs["size_value"] = t[size_metric].mean()
+                    _group_cols = [dimension_col] + ([series_col] if series_col else [])
                     scatter_df = (
-                        t.group_by(dimension_col)
-                        .aggregate(
-                            x_value=x_expr.mean(),
-                            y_value=y_expr.mean(),
-                        )
+                        t.group_by(_group_cols)
+                        .aggregate(**_agg_kwargs)
                         .order_by(ibis.desc('y_value'))
                         .limit(500)
                         .to_pandas()
@@ -2205,36 +2647,53 @@ class IbisEngine:
                     scatter_df = scatter_df.dropna(subset=['x_value', 'y_value'])
                     # [V2.6] Orden cronológico para meses string en scatter (diagnostic)
                     scatter_df = IbisEngine._apply_month_sort_if_needed(scatter_df, dimension_col)
-                    scatter_data = [
-                        {
-                            "name": IbisEngine._format_chart_name(dimension_col, row[dimension_col]),
-                            "raw_name": IbisEngine._format_chart_name(dimension_col, row[dimension_col]),
-                            "series": IbisEngine._format_chart_name(dimension_col, row[dimension_col]),
+                    scatter_data = []
+                    for _, row in scatter_df.iterrows():
+                        _scatter_label = IbisEngine._format_chart_name(dimension_col, row[dimension_col])
+                        _scatter_series = (
+                            IbisEngine._format_chart_name(series_col, row[series_col])
+                            if series_col else _scatter_label
+                        )
+                        _scatter_item = {
+                            "name": _scatter_label,
+                            "raw_name": _scatter_label,
+                            "series": _scatter_series,
                             "x_value": float(row['x_value']),
                             "y_value": float(row['y_value']),
                         }
-                        for _, row in scatter_df.iterrows()
-                    ]
+                        if size_metric and 'size_value' in scatter_df.columns and pd.notna(row['size_value']):
+                            _scatter_item["size_value"] = float(row['size_value'])
+                            _scatter_item["extra_info"] = {"bubble_size": float(row['size_value'])}
+                        scatter_data.append(_scatter_item)
                     corr_source = scatter_df[['x_value', 'y_value']]
                 else:
+                    _select_kwargs = {
+                        'x_value': x_expr,
+                        'y_value': y_expr,
+                    }
+                    if size_metric:
+                        _select_kwargs['size_value'] = t[size_metric]
                     df_scatter = (
                         t.select(
-                            x_expr.name('x_value'),
-                            y_expr.name('y_value'),
+                            **{name: expr.name(name) for name, expr in _select_kwargs.items()}
                         )
                         .limit(500)
                         .to_pandas()
                     )
                     df_scatter = df_scatter.dropna(subset=['x_value', 'y_value'])
-                    scatter_data = [
-                        {
-                            "name": (lambda v: str(round(float(v), 2)) if v is not None and not pd.isna(v) else "N/A")(row.get('x_value')),
-                            "raw_name": (lambda v: str(round(float(v), 2)) if v is not None and not pd.isna(v) else "N/A")(row.get('x_value')),
+                    scatter_data = []
+                    for idx, (_, row) in enumerate(df_scatter.iterrows()):
+                        _raw_label = (lambda v: str(round(float(v), 2)) if v is not None and not pd.isna(v) else "N/A")(row.get('x_value'))
+                        _raw_item = {
+                            "name": _raw_label,
+                            "raw_name": _raw_label,
                             "x_value": float(row['x_value']) if not pd.isna(row['x_value']) else 0.0,
                             "y_value": float(row['y_value']) if not pd.isna(row['y_value']) else 0.0,
                         }
-                        for idx, (_, row) in enumerate(df_scatter.iterrows())
-                    ]
+                        if size_metric and 'size_value' in df_scatter.columns and pd.notna(row['size_value']):
+                            _raw_item["size_value"] = float(row['size_value'])
+                            _raw_item["extra_info"] = {"bubble_size": float(row['size_value'])}
+                        scatter_data.append(_raw_item)
                     corr_source = df_scatter[['x_value', 'y_value']]
                 
                 # Calculate correlation
@@ -2249,12 +2708,13 @@ class IbisEngine:
                     "data": scatter_data,
                     "x_axis": x_label,
                     "y_axis": y_label,
-                    "series_label": IbisEngine._normalize_metric_label(dimension_col) if dimension_col else None,
+                    "series_label": IbisEngine._normalize_metric_label(series_col or dimension_col) if (series_col or dimension_col) else None,
                     "title": f"Correlación: {x_label} vs {y_label}",
                     "hard_facts": {
                         "correlation": round(corr, 3),
                         "strength": "Fuerte" if abs(corr) > 0.7 else "Moderada" if abs(corr) > 0.4 else "Débil",
-                        "sample_size": len(scatter_data)
+                        "sample_size": len(scatter_data),
+                        "color_dimension": series_col,
                     }
                 }
         
@@ -2551,10 +3011,28 @@ class IbisEngine:
         # --- ANOMALY DETECTION ---
         elif analysis_type == 'anomalies':
             anomaly_result = PredictiveEngine.detect_anomalies(df, value_col)
-            
+
             if anomaly_result is not None and not anomaly_result.empty:
-                # Return top anomalies as scatter overlay
-                top_anomalies = anomaly_result.head(50)
+                # [QW-1 REGRESSION FIX] Solo filas con is_anomaly=True llegan al chart.
+                # Antes: anomaly_result.head(50) tomaba las primeras 50 filas del
+                # dataset completo (mayoría normales) y las etiquetaba como
+                # anomalías, y hard_facts.total_anomalies reportaba el total de
+                # filas del dataset. Ahora se filtra por el flag y se ordena por
+                # score (IsolationForest: menor score = más anómalo).
+                # Alinea con data_loader.detect_anomalies(), que ya filtraba bien.
+                if 'is_anomaly' in anomaly_result.columns:
+                    true_anomalies = anomaly_result[anomaly_result['is_anomaly']]
+                else:
+                    # Sin flags del detector no podemos afirmar anomalías:
+                    # soft-fail honesto en vez de etiquetar filas arbitrarias.
+                    true_anomalies = anomaly_result.head(0)
+
+                if true_anomalies.empty:
+                    return {"error": "No se detectaron anomalías significativas."}
+
+                if 'anomaly_score' in true_anomalies.columns:
+                    true_anomalies = true_anomalies.sort_values('anomaly_score', ascending=True)
+                top_anomalies = true_anomalies.head(50)
                 chart_data = [
                     {"name": str(row.get(date_col, idx)), "value": float(row[value_col]),
                      "extra_info": {"is_anomaly": True, "score": float(row.get('anomaly_score', 0))}}
@@ -2566,7 +3044,7 @@ class IbisEngine:
                     "data": chart_data,
                     "title": f"Anomalías Detectadas: {value_col}",
                     "hard_facts": {
-                        "total_anomalies": len(anomaly_result),
+                        "total_anomalies": int(len(true_anomalies)),
                         "shown": len(chart_data)
                     }
                 }

@@ -35,7 +35,7 @@ def test_phase8_orchestrator_infers_join_candidate_from_shared_identifier() -> N
                 column_count=2,
                 column_names=["employee_id", "department"],
                 extraction_confidence=0.95,
-                metadata={"sample_rows": [["E-1", "Sales"], ["E-2", "Finance"]]},
+                metadata={"sample_rows": [["E-1", "Sales"], ["E-2", "Finance"], ["E-3", "Engineering"]]},
             ),
             CanonicalTabularFrame(
                 frame_id="payroll",
@@ -44,7 +44,7 @@ def test_phase8_orchestrator_infers_join_candidate_from_shared_identifier() -> N
                 column_count=2,
                 column_names=["employee_id", "salary"],
                 extraction_confidence=0.95,
-                metadata={"sample_rows": [["E-1", "1500"], ["E-2", "1200"]]},
+                metadata={"sample_rows": [["E-1", "1500"], ["E-2", "1200"], ["E-3", "1800"]]},
             ),
         ],
     )

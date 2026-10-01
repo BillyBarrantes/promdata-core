@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.redis_client import reset_redis_pools, publish_task_progress
 from app.core.sentry import init_sentry
 from app.core.structured_logging import emit_structured_log
+from app.core.ibis_sqlglot_patch import apply_ibis_sqlglot_patch
 
 # ---------------------------------------------------------------------------
 # Sentry: inicializar ANTES de crear celery_app y registrar tasks.
@@ -17,6 +18,7 @@ from app.core.structured_logging import emit_structured_log
 # Si SENTRY_DSN no está configurado, es un no-op silencioso.
 # ---------------------------------------------------------------------------
 init_sentry()
+apply_ibis_sqlglot_patch()
 
 celery_app = Celery(
     "tasks",
@@ -48,6 +50,8 @@ _celery_redis_kwargs: dict = {
 
 celery_app.conf.update(
     task_track_started=True,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
     # [REDIS CLOUD TLS] Configuración SSL requerida para conexiones externas
     # desde Google Cloud Run hacia Redis Cloud (db.redis.io).
     # ssl_cert_reqs=None evita errores de verificación de certificado.

@@ -1,7 +1,97 @@
 # En: backend/app/core/semantic_grammar.py
+import unicodedata
+
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Union, Literal
 from enum import Enum
+
+# --- 0. CANONICALIZACIÓN DE AGREGACIÓN (frontera única, fail-safe) ---
+# [TIER 0 2026-09] Fuente única de verdad para la agregación. Cualquier productor
+# (LLM, planificador determinista, cache) pasa por aquí. Esto vuelve ESTRUCTURALMENTE
+# imposible el crash por un valor fuera del Literal (p.ej. el histórico "mean").
+AGGREGATION_LITERAL_VALUES: frozenset[str] = frozenset({"sum", "avg", "min", "max", "count"})
+
+# Alias de lenguaje natural (ES/EN/PT) + tolerancia a typos comunes. No es
+# vocabulario de dominio: es aritmética universal.
+_AGGREGATION_ALIASES: dict[str, str] = {
+    # Suma
+    "sum": "sum", "suma": "sum", "sumar": "sum", "total": "sum", "totales": "sum",
+    "acumulado": "sum", "acumulada": "sum", "acumular": "sum", "agregado": "sum",
+    "add": "sum", "soma": "sum", "somar": "sum", "totalizar": "sum",
+    # Promedio
+    "avg": "avg", "mean": "avg", "average": "avg", "promedio": "avg", "media": "avg",
+    "prom": "avg", "media_aritmetica": "avg", "valor_medio": "avg", "medio": "avg",
+    # Mínimo
+    "min": "min", "minimo": "min", "menor": "min", "lowest": "min", "minimum": "min",
+    "minima": "min", "menor_valor": "min",
+    # Máximo
+    "max": "max", "maximo": "max", "mayor": "max", "highest": "max", "maximum": "max",
+    "maxima": "max", "mayor_valor": "max",
+    # Conteo
+    "count": "count", "conteo": "count", "cuenta": "count", "contar": "count",
+    "frecuencia": "count", "frequency": "count", "n": "count", "numero": "count",
+    # Reconocidas pero NO soportadas por el Literal → se aproximan a la más cercana
+    # y se emite telemetría (semantic_aggregation_coerced). Nunca crashea.
+    "count_distinct": "count", "nunique": "count", "distinct": "count",
+    "unico": "count", "distintos": "count", "distinct_count": "count",
+    "median": "avg", "mediana": "avg",
+    "std": "avg", "stddev": "avg", "std_dev": "avg", "desviacion": "avg",
+    "variance": "avg", "var": "avg", "varianza": "avg",
+}
+
+# Valores que requieren coerción (no están en el Literal) para telemetría.
+_AGGREGATION_COERCED_FROM: frozenset[str] = frozenset({
+    "count_distinct", "nunique", "distinct", "unico", "distintos", "distinct_count",
+    "median", "mediana", "std", "stddev", "std_dev", "desviacion",
+    "variance", "var", "varianza",
+})
+
+
+def _fold_agg_text(value: object) -> str:
+    """Normaliza a minúsculas, sin acentos, sin espacios/símbolos."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().lower()
+    for char in (" ", "-", ".", "/"):
+        text = text.replace(char, "_")
+    return text.strip("_")
+
+
+def canonicalize_aggregation(value: object, *, default: str = "sum") -> str:
+    """Devuelve SIEMPRE un valor válido del Literal de agregación.
+
+    Cualquier alias de lenguaje natural se mapea al canónico. Un valor
+    desconocido cae al `default` (sum) con telemetría. `None`/vacío → default.
+    """
+    normalized = _fold_agg_text(value)
+    if not normalized:
+        return default
+    mapped = _AGGREGATION_ALIASES.get(normalized)
+    if mapped is not None:
+        if normalized in _AGGREGATION_COERCED_FROM:
+            _emit_aggregation_coerced(normalized, mapped)
+        return mapped
+    if normalized in AGGREGATION_LITERAL_VALUES:
+        return normalized
+    _emit_aggregation_coerced(normalized, default, unknown=True)
+    return default
+
+
+def _emit_aggregation_coerced(original: str, mapped: str, *, unknown: bool = False) -> None:
+    try:
+        from app.core.structured_logging import emit_structured_log
+
+        emit_structured_log(
+            "semantic_aggregation_coerced",
+            level="warning",
+            original=original,
+            mapped=mapped,
+            unknown=unknown,
+        )
+    except Exception:
+        # La telemetría jamás puede romper la canonicalización.
+        pass
+
 
 # --- 1. VOCABULARIO BÁSICO (Atomic Types) ---
 
@@ -41,6 +131,10 @@ class FilterOperator(str, Enum):
     LESS_THAN = "<"
     GREATER_EQUAL = ">="   # [FASE 3F] Necesario para filtros de rango (ej: fecha >= X)
     LESS_EQUAL = "<="       # [FASE 3F] Necesario para filtros de rango (ej: fecha <= X)
+    # [MEJORA 1 2026-09] between nativo (col>=lo & col<=hi). Necesario para
+    # emitir un rango como UN solo filtro y poder negarlo correctamente
+    # (~(A & B)) en negative_filters, donde la negación se aplica por AND.
+    BETWEEN = "between"
 
     # --- Operadores de texto (case-insensitive en IbisEngine) ---
     CONTAINS = "contains"           # Substring match: col.upper().contains(val.upper())
@@ -124,6 +218,11 @@ class DataFilter(BaseModel):
             "less_equal": "<=",
             "menor_igual": "<=",
             "menor_o_igual": "<=",
+            # --- Rango cerrado (between) ---
+            "between": "between",
+            "entre": "between",
+            "rango": "between",
+            "range": "between",
             # --- Texto / Pattern matching ---
             "ilike": "ilike",
             "like": "like",
@@ -205,6 +304,11 @@ class DescriptiveIntent(BaseIntent):
     aggregation: Literal["sum", "avg", "min", "max", "count"] = "sum"
     group_by: Optional[List[str]] = Field(None, description="Columnas para agrupar (ej: ['categoria'])")
 
+    @field_validator("aggregation", mode="before")
+    @classmethod
+    def _canon_aggregation(cls, value):
+        return canonicalize_aggregation(value)
+
 class TimeTrendIntent(BaseIntent):
     """Para análisis de evolución temporal (ej: 'Evolución de precios mensual')
 
@@ -214,6 +318,22 @@ class TimeTrendIntent(BaseIntent):
     type: Literal["trend"] = "trend"
     date_column: str = Field(..., description="Columna de fecha principal")
     value_column: str = Field(..., description="Métrica a analizar en el tiempo")
+    # [V3 2026-09] Segunda métrica opcional para gráfico combinado (barras +
+    # línea) cuando el usuario pide comparar dos magnitudes de escalas distintas
+    # a lo largo del tiempo. Es opcional y fail-closed: si la columna no existe
+    # o no es numérica, se ignora y el trend queda como una sola serie.
+    secondary_value_column: Optional[str] = Field(
+        default=None,
+        description="Columna numérica de la segunda métrica para un gráfico combinado (combo/dual-axis) sobre la misma serie temporal.",
+    )
+    # [Fase 1.3 2026-09] Serie DERIVADA (no es columna): variación % período a
+    # período. Permite un combo barras+línea cuando el usuario pide "% de
+    # variación"/"combinado" y NO existe una 2ª métrica real. Fail-closed: un
+    # valor desconocido se ignora y el trend queda de una sola serie.
+    derived_secondary: Optional[str] = Field(
+        default=None,
+        description="Serie derivada calculada sobre la marcha: 'mom_pct' (variación % período a período).",
+    )
     grain: TimeGrain = Field(default=TimeGrain.MONTH, description="Granularidad temporal")
     fill_missing: bool = Field(default=True, description="Si rellenar huecos temporales con 0")
     # V6.5: Optional dimensional split for multi-series line charts
@@ -226,6 +346,15 @@ class TimeTrendIntent(BaseIntent):
         default="split",
         description="Modo de agregación para tendencias Top-N: 'split' separa series; 'sum' agrupa Top-N en una sola línea."
     )
+    aggregation: Literal["sum", "avg", "min", "max", "count"] = Field(
+        default="sum",
+        description="Función de agregación de la métrica en el tiempo. Usa 'avg' para promedios/ratios/porcentajes (no sumar).",
+    )
+
+    @field_validator("aggregation", mode="before")
+    @classmethod
+    def _canon_aggregation(cls, value):
+        return canonicalize_aggregation(value)
 
 class DistributionIntent(BaseIntent):
     """Para entender cómo se reparten los datos (ej: 'Top 10 productos', 'Pareto', 'Histograma', 'Desglose')"""
@@ -235,6 +364,15 @@ class DistributionIntent(BaseIntent):
     limit: Optional[int] = Field(10, description="Límite de resultados (Top N) sobre la dimensión principal")
     group_by: Optional[List[str]] = Field(None, description="Columnas secundarias para desglosar/apilar el análisis principal (ej: ['tipo_almacen'])")
     barmode: Literal["stacked", "group"] = Field(default="stacked", description="Si se especifica group_by, usa 'stacked' para barras apiladas (ej: 'apilado', 'apilar') y 'group' para barras agrupadas/lado a lado (ej: 'lado a lado', 'compara').")
+    aggregation: Literal["sum", "avg", "min", "max", "count"] = Field(
+        default="sum",
+        description="Función de agregación de la métrica. Usa 'avg' para promedios/ratios/porcentajes (no sumar).",
+    )
+
+    @field_validator("aggregation", mode="before")
+    @classmethod
+    def _canon_aggregation(cls, value):
+        return canonicalize_aggregation(value)
 
 # --- 2.1 NEW INTENT TYPES (Schema-Agnostic V7) ---
 
@@ -246,6 +384,11 @@ class DiagnosticIntent(BaseIntent):
     dimension: Optional[str] = Field(None, description="Columna categórica para agrupar")
     group_by: Optional[List[str]] = Field(None, description="Columnas para agrupar")
     aggregation: Literal["sum", "avg", "min", "max", "count"] = "sum"
+
+    @field_validator("aggregation", mode="before")
+    @classmethod
+    def _canon_aggregation(cls, value):
+        return canonicalize_aggregation(value)
 
 class PredictiveIntent(BaseIntent):
     """Para responder '¿Qué pasará?' — Forecast, Anomalías, Proyecciones"""
@@ -285,6 +428,11 @@ class PreAggregationSpec(BaseModel):
         default="sum",
         description="Función de agregación. 'sum' para totales anuales, 'avg' para promedios."
     )
+
+    @field_validator("aggregation", mode="before")
+    @classmethod
+    def _canon_aggregation(cls, value):
+        return canonicalize_aggregation(value)
 
 # --- 3. CONTENEDOR MAESTRO (El JSON final que devolverá la IA) ---
 
@@ -348,4 +496,20 @@ class AnalysisPlan(BaseModel):
     glossary_hint: Optional[str] = Field(
         default=None,
         description="Si no puedes mapear un concepto del usuario a una columna, escribe aquí qué término falta en el glosario. Ej: 'No encontré una columna de vencimiento. Sugiero agregar al Glosario qué columna contiene fechas de caducidad.'"
+    )
+
+    # [F1.2] Metric coverage metadata for broad analysis.
+    # Populated by the deterministic macro bundle when the prompt is broad.
+    # Contains families_found, families_covered, metrics_selected, uncovered_columns.
+    coverage_metadata: Optional[dict] = Field(
+        default=None,
+        description="Metric coverage metadata for broad analysis. Aditivo, no rompe parsing existente."
+    )
+
+    # [P6 2026-09] Divulgación honesta de cobertura: cuando el usuario nombra un
+    # concepto/medida que no existe en el dataset, el sistema NO lo oculta ni
+    # sustituye en silencio; se adjunta aquí una nota para el usuario. Aditivo.
+    coverage_disclosure: Optional[str] = Field(
+        default=None,
+        description="Nota al usuario cuando el prompt nombra un concepto sin columna disponible."
     )

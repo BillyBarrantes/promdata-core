@@ -15,6 +15,7 @@ aplicando UNA de estas dos reglas (o ambas):
      Ejemplos válidos:
        - "semantic_router"        → decisiones de ruteo (intent, route, confidence)
        - "semantic_translator"    → planes analíticos (AnalysisPlan JSON)
+       - "semantic_unified"       → plan unificado (clasificación + AnalysisPlan en 1 llamada)
        - "chart_narrative"        → narrativas de un chart específico
        - "dashboard_executive_summary" → resumen ejecutivo de un dashboard
        - "semantic_router_schema" → fingerprint de schema (sin prompt)

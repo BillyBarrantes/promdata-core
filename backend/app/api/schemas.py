@@ -1,6 +1,8 @@
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+from app.core.analytical_contract import InteractionContractV1
+
 
 PROMPT_MAX_LENGTH = 5000
 
@@ -38,6 +40,8 @@ class AnalysisHistoryItemResponse(BaseModel):
     recommendation_count: int = 0
     format_override: str | None = None
     traceability_available: bool = False
+    temporal_cut_applied: bool = False
+    temporal_authority: str | None = None
 
 
 class AnalysisHistoryResponse(BaseModel):
@@ -426,3 +430,19 @@ class KnowledgeAskResponse(BaseModel):
     retrieved_count: int
     grounded: bool
     insufficient_evidence: bool
+
+
+class InteractionEvaluateRequest(BaseModel):
+    file_id: str
+    base_filters: dict[str, Any] = Field(default_factory=dict)
+    active_filters: dict[str, Any] = Field(default_factory=dict)
+    requested_changes: dict[str, Any] = Field(default_factory=dict)
+    evidence_id: str | None = None
+
+
+class InteractionEvaluateResponse(BaseModel):
+    contract: InteractionContractV1
+    merged_filters: dict[str, Any] = Field(default_factory=dict)
+    is_valid: bool = True
+    message: str | None = None
+

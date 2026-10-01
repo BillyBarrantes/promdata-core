@@ -250,3 +250,10 @@ class GeminiCircuitBreaker:
             return self.recovery_timeout_seconds
         elapsed = self._clock() - self._opened_at
         return max(int(math.ceil(self.recovery_timeout_seconds - elapsed)), 0)
+
+
+# --- Aliases Multi-Proveedor (Retrocompatibilidad asegurada) ---
+LLMCircuitBreaker = GeminiCircuitBreaker
+LLMQuotaExceededError = GeminiQuotaExceededError
+LLMCircuitOpenError = GeminiCircuitOpenError
+is_recoverable_llm_error = is_recoverable_gemini_error

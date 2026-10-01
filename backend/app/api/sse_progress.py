@@ -15,6 +15,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 router = APIRouter()
 
+# This stream is intentionally bounded so disconnected clients cannot retain a
+# Redis Pub/Sub subscription indefinitely. The frontend owns the same 180-second
+# completion deadline and switches to HTTP status polling when this stream closes.
+SSE_STREAM_MAX_SECONDS = 180
+SSE_POLL_INTERVAL_SECONDS = 0.1
+SSE_STREAM_MAX_TICKS = int(SSE_STREAM_MAX_SECONDS / SSE_POLL_INTERVAL_SECONDS)
+SSE_HEARTBEAT_INTERVAL_TICKS = int(3 / SSE_POLL_INTERVAL_SECONDS)
+SSE_STATUS_FALLBACK_INTERVAL_TICKS = int(5 / SSE_POLL_INTERVAL_SECONDS)
+
 async def sse_generator(request: Request, task_id: str):
     """
     Generador SSE que se suscribe al canal de Redis de una task
@@ -33,8 +42,7 @@ async def sse_generator(request: Request, task_id: str):
     pubsub.subscribe(channel)
 
     try:
-        # 600 iteraciones × 0.1s = 60 segundos
-        for tick in range(600):
+        for tick in range(SSE_STREAM_MAX_TICKS):
             if await request.is_disconnected():
                 break
                 
@@ -56,19 +64,19 @@ async def sse_generator(request: Request, task_id: str):
                 ):
                     break
             
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
 
             # Heartbeat cada 3 segundos para mantener la conexión viva.
             # El comentario SSE (línea que empieza con ':') es ignorado
             # por EventSource pero impide que Cloud Run / proxies cierren
             # la conexión por inactividad.
-            if tick % 30 == 0 and tick > 0:
+            if tick % SSE_HEARTBEAT_INTERVAL_TICKS == 0 and tick > 0:
                 yield ": heartbeat\n\n"
 
             # Fallback: consultar Supabase cada 5s (50 ticks × 0.1s)
             # como respaldo si el mensaje Pub/Sub del worker no llega
             # (ej. cache-hit donde publish_task_progress se perdió).
-            if tick % 50 == 0 and tick > 0:
+            if tick % SSE_STATUS_FALLBACK_INTERVAL_TICKS == 0 and tick > 0:
                 try:
                     sb = get_supabase_service_client()
                     if sb:

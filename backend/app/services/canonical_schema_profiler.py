@@ -105,8 +105,12 @@ def build_canonical_schema_profile(df: pd.DataFrame) -> tuple[pd.DataFrame, dict
                     info["type"] = "id"
                     info["role"] = "identifier"
                 elif cardinality <= 20 and total_rows > 50 and cardinality_ratio < 0.1:
-                    info["type"] = "categorical"
-                    info["role"] = "dimension"
+                    if DataEngine._has_measure_semantic_name(column_name):
+                        info["type"] = "numeric"
+                        info["role"] = "metric"
+                    else:
+                        info["type"] = "categorical"
+                        info["role"] = "dimension"
                 else:
                     info["type"] = "numeric"
                     info["role"] = "metric"
@@ -156,8 +160,12 @@ def build_canonical_schema_profile(df: pd.DataFrame) -> tuple[pd.DataFrame, dict
                 info["type"] = "id"
                 info["role"] = "identifier"
             elif cardinality <= 20 and total_rows > 50 and cardinality_ratio < 0.1:
-                info["type"] = "categorical"
-                info["role"] = "dimension"
+                if DataEngine._has_measure_semantic_name(column_name):
+                    info["type"] = "numeric"
+                    info["role"] = "metric"
+                else:
+                    info["type"] = "categorical"
+                    info["role"] = "dimension"
             else:
                 info["type"] = "numeric"
                 info["role"] = "metric"
@@ -166,5 +174,22 @@ def build_canonical_schema_profile(df: pd.DataFrame) -> tuple[pd.DataFrame, dict
             info["role"] = "dimension"
 
         schema_profile[column_name] = info
+
+    # [F1.6] Exponer valores únicos para columnas categóricas de baja cardinalidad.
+    # Habilita la detección robusta de columnas de dirección (antónimos Ingreso/Egreso,
+    # Entrada/Salida, ...) por VALORES en vez de solo por nombre. Sin esto, el
+    # DirectionGuard en producción solo reconocía columnas de cardinalidad 2 con un
+    # token direccional en el nombre, y no detectaba columnas de 3+ valores.
+    for column_name, info in schema_profile.items():
+        if info.get("role") not in {"dimension", "categorical"}:
+            continue
+        cardinality = int(info.get("cardinality") or 0)
+        if not (2 <= cardinality <= 5) or column_name not in working_df.columns:
+            continue
+        series = working_df[column_name].dropna().astype(str).str.strip()
+        series = series[series != ""]
+        unique_values = sorted(set(series.tolist()))
+        if 2 <= len(unique_values) <= 5:
+            info["unique_values"] = unique_values
 
     return working_df, schema_profile, temporal_report

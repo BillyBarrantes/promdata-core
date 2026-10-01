@@ -13,6 +13,7 @@ from app.services.smart_table_builder import (
     should_offer_hybrid_smart_table,
     echarts_to_smart_table,
 )
+from app.services.visual_contract_validator import build_visual_contract
 from app.services.visual_recommendation_engine import build_visual_governance
 from app.tasks.analysis_pipeline.plan_generator import (
     coerce_chart_rows_to_table_rows,
@@ -246,6 +247,14 @@ def build_chart_config(
         widget_query_contract = build_widget_query_contract(plan, schema_profile)
         if widget_query_contract:
             chart_opt['query_contract'] = widget_query_contract
+
+        try:
+            chart_opt['visual_contract'] = build_visual_contract(
+                c_type, chart_opt, plan=plan, ibis_output=ibis_output
+            ).model_dump(mode="json")
+        except Exception as vc_err:
+            emit_structured_log("visual_contract_build_warning", error=str(vc_err)[:200])
+
 
         if filtered_granular_df is not None and not filtered_granular_df.empty:
             try:

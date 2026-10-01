@@ -92,17 +92,13 @@ def should_apply_latest_snapshot_filter(intent, table_columns: list[str], datase
             or str(getattr(intent, 'dimension', '') or '')
         ).strip().lower()
 
-        # [FIX 2026-07-04] Verificar contra date_columns del contrato.
-        # Si el trend usa CUALQUIER columna temporal del dataset (no solo time_axis),
-        # es una evolución histórica legítima. Omitir el guard.
-        date_columns = [col.lower() for col in dataset_contract.get('date_columns', []) or []]
-        if trend_dim and trend_dim in date_columns:
-            print(
-                "🧠 [IBIS SNAPSHOT GUARD] Omitido para trend sobre columna temporal "
-                f"del contrato: {trend_dim}"
-            )
-            return False
-
+        # [FIX A 2026-09-23] Restaurado ADR-TEMPORAL-001: un trend solo omite el
+        # guard cuando su eje temporal coincide con el time_axis (evolución real
+        # de snapshots). Un trend sobre una fecha ACCESORIA (ej. caducidad) es una
+        # distribución temporal del inventario vigente y DEBE aislarse al snapshot
+        # más reciente; de lo contrario suma stock de múltiples períodos.
+        # Se eliminó el bypass [FIX 2026-07-04] que omitía el guard para cualquier
+        # columna presente en date_columns (regresión silenciosa).
         if trend_dim and trend_dim == time_axis_lower:
             print(
                 "🧠 [IBIS SNAPSHOT GUARD] Omitido para trend sobre time_axis="
@@ -115,10 +111,11 @@ def should_apply_latest_snapshot_filter(intent, table_columns: list[str], datase
         )
         return True
 
-    # Contract-based decision: if the dataset IS a snapshot, apply guard
-    # Schema-agnostic — no keyword matching needed for known snapshot datasets.
+    # [FIX A+ 2026-09] Solo snapshot puro aplica guard por contrato.
+    # hybrid cae al fallback por keywords (líneas 140-145) que protege
+    # métricas de stock genuinas sin colapsar métricas de flujo.
     dataset_mode = str(dataset_contract.get('dataset_mode', '')).strip()
-    if dataset_mode in ('snapshot', 'hybrid'):
+    if dataset_mode == 'snapshot':
         print(
             "📸 [IBIS SNAPSHOT GUARD] Aplicado por contrato: "
             f"dataset_mode={dataset_mode}"

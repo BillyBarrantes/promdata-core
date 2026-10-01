@@ -67,11 +67,68 @@ class _CaptureSupabase:
         return _CaptureUpdateQuery(self.capture)
 
 
-def test_canary_task_falls_back_to_legacy_on_executor_error(monkeypatch):
-    captured = {}
+class _GracefulFailSupabase:
+    """Supabase fake para el contrato de fallo graceful: soporta los reads
+    previos (metadata de task + uploaded_files) y captura el update final."""
+
+    def __init__(self):
+        self.update_capture = {}
+
+    def table(self, name):
+        if name == "uploaded_files":
+            return _FakeQuery(
+                {
+                    "id": "file-1",
+                    "user_id": "user-1",
+                    "team_id": "team-1",
+                    "file_name": "ventas.csv",
+                    "storage_path": "dash-uploads/u/file.xlsx",
+                    "created_at": "2026-05-09T00:00:00+00:00",
+                }
+            )
+        if name == "analysis_tasks":
+            return _GracefulFailTaskQuery(self.update_capture)
+        return _FakeQuery({})
+
+
+class _GracefulFailTaskQuery:
+    def __init__(self, capture):
+        self._capture = capture
+
+    def select(self, *_args, **_kwargs):
+        return self
+
+    def update(self, payload):
+        self._capture["payload"] = payload
+        return self
+
+    def eq(self, *_args, **_kwargs):
+        return self
+
+    def single(self):
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data={"created_at": "2026-05-09T00:00:00+00:00", "user_id": "user-1"})
+
+
+def test_canary_task_fails_gracefully_on_executor_error_without_legacy_fallback(monkeypatch):
+    """Contrato vigente (commit 1e37b85e, phase-0 hardening): si el ejecutor
+    canónico falla con un error real, la tarea se marca 'failed' con un
+    mensaje amigable al usuario y NO hay fallback silencioso a legacy.
+
+    Reemplaza al test obsoleto `test_canary_task_falls_back_to_legacy_on_executor_error`,
+    que documentaba el contrato anterior (fallback automático a legacy).
+    Fase 2 del Plan Maestro reintroducirá fallback GOBERNADO y medido;
+    este test deberá actualizarse entonces.
+    """
+    legacy_calls = {}
+    supabase_fake = _GracefulFailSupabase()
 
     monkeypatch.setattr(orchestrator.settings, "UNIVERSAL_TABULAR_PRODUCTION_EXECUTOR_ENABLED", False)
-    monkeypatch.setattr(orchestrator, "get_supabase_client", lambda: _FakeSupabase())
+    monkeypatch.setattr(orchestrator, "get_supabase_client", lambda: supabase_fake)
+    monkeypatch.setattr(orchestrator, "get_cached_analysis", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(orchestrator, "set_cached_analysis", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         orchestrator,
         "execute_canonical_tabular_canary_analysis",
@@ -80,17 +137,7 @@ def test_canary_task_falls_back_to_legacy_on_executor_error(monkeypatch):
     monkeypatch.setattr(
         analysis_tasks.perform_analysis_task,
         "run",
-        lambda task_id, file_id, prompt, user_token, runtime_route=None: captured.setdefault(
-            "call",
-            {
-                "task_id": task_id,
-                "file_id": file_id,
-                "prompt": prompt,
-                "user_token": user_token,
-                "runtime_route": runtime_route,
-            },
-        )
-        or "completed",
+        lambda *args, **kwargs: legacy_calls.setdefault("call", {"args": args, "kwargs": kwargs}),
     )
 
     result = analysis_tasks.perform_analysis_task_universal_tabular.run(
@@ -101,9 +148,20 @@ def test_canary_task_falls_back_to_legacy_on_executor_error(monkeypatch):
         runtime_route={"requested_runtime": "universal_tabular", "effective_runtime": "universal_tabular"},
     )
 
-    assert captured["call"]["runtime_route"]["effective_runtime"] == "legacy"
-    assert captured["call"]["runtime_route"]["decision_reason"] == "canary_runtime_execution_error"
-    assert result["runtime_route"]["effective_runtime"] == "legacy"
+    # 1. Legacy NUNCA es invocado (no hay fallback silencioso).
+    assert "call" not in legacy_calls, "Legacy fue invocado: fallback silencioso re-introducido"
+
+    # 2. La tarea retorna 'failed'.
+    assert result == "failed"
+
+    # 3. La tarea queda marcada 'failed' con mensaje amigable al usuario.
+    payload = supabase_fake.update_capture.get("payload")
+    assert payload is not None, "La tarea no fue actualizada tras el error"
+    assert payload["status"] == "failed"
+    results_json = json.loads(payload["results_json"])
+    assert "Error en el Análisis" in results_json["analysis"]
+    assert results_json["chart_options"] == []
+    assert "boom" in results_json["error_trace"]
 
 
 def test_universal_tabular_task_uses_production_executor_and_async_canary(monkeypatch):

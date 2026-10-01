@@ -185,14 +185,25 @@ def _build_unified_materialized_view(
     if not unified_records:
         return None
 
-    sorted_columns = sorted(common_cols_norm)
+    # Preservar el orden de columnas del frame primario (no alfabético):
+    # el orden original refleja la jerarquía semántica del archivo y evita
+    # que columnas accesorias (p.ej. fechas de caducidad) desplacen
+    # posicionalmente al eje real de periodo del dataset.
+    ordered_columns: list[str] = []
+    for col_norm in normalized_schemas[0].keys():
+        if col_norm in common_cols_norm and col_norm not in ordered_columns:
+            ordered_columns.append(col_norm)
+    for col_norm in sorted(common_cols_norm):
+        if col_norm not in ordered_columns:
+            ordered_columns.append(col_norm)
+
     return CanonicalMaterializedView(
         view_id="unified_all__sheets",
         view_type="likely_union",
         status=primary_frame.status,
         source_frame_ids=[f.frame_id for f in all_frames],
         row_count=len(unified_records),
-        column_names=sorted_columns,
+        column_names=ordered_columns,
         records=unified_records,
         metadata={
             "materialization_mode": "unified_all",
