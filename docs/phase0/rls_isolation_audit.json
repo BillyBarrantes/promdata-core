@@ -1,0 +1,321 @@
+{
+  "stamp": "b3bd5d79",
+  "checks": 39,
+  "passed": 39,
+  "failed": 0,
+  "results": [
+    {
+      "table": "analysis_tasks",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "chat_messages",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "saved_reports",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "audit_logs",
+      "action": "SELECT",
+      "actor": "A (dueño)",
+      "expected": "visible",
+      "pass": true,
+      "detail": "1 fila(s) visible(s)"
+    },
+    {
+      "table": "analysis_tasks",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "analysis_tasks",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "error esperado: APIError"
+    },
+    {
+      "table": "analysis_tasks",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "error esperado: APIError"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "chat_messages",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "chat_messages",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "error esperado: APIError"
+    },
+    {
+      "table": "chat_messages",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "saved_reports",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "saved_reports",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "error esperado: APIError"
+    },
+    {
+      "table": "saved_reports",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "UPDATE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "DELETE",
+      "actor": "B",
+      "expected": "0 filas",
+      "pass": true,
+      "detail": "0 fila(s) afectada(s)"
+    },
+    {
+      "table": "audit_logs",
+      "action": "SELECT",
+      "actor": "B (otro tenant)",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "analysis_tasks",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "chat_messages",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "saved_reports",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "audit_logs",
+      "action": "SELECT",
+      "actor": "anónimo",
+      "expected": "denegado/vacío",
+      "pass": true,
+      "detail": "0 fila(s) visible(s)"
+    },
+    {
+      "table": "uploaded_files",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    },
+    {
+      "table": "analysis_tasks",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    },
+    {
+      "table": "saved_reports",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    },
+    {
+      "table": "chat_messages",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    },
+    {
+      "table": "cloud_oauth_connections",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    },
+    {
+      "table": "knowledge_documents",
+      "action": "INTEGRIDAD",
+      "actor": "service (verificación)",
+      "expected": "fila intacta",
+      "pass": true,
+      "detail": "la fila de A sigue intacta tras intentos de B"
+    }
+  ],
+  "verdict": "AISLAMIENTO RLS VERIFICADO — todo intento cross-tenant denegado"
+}

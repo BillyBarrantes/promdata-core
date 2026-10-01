@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-07-26T09:54:40.202477+00:00",
+  "window_days": 30,
+  "task_level": {
+    "total_tasks": 7,
+    "by_runtime": {
+      "canonical_tabular_production": 7
+    },
+    "canonical_pct": 100.0,
+    "non_canonical_tasks": []
+  },
+  "stage_level_telemetry": {
+    "events_sampled": 516,
+    "by_runtime": {
+      "universal_tabular_production": 516
+    },
+    "by_intent_family": {
+      "generic_analysis": 183,
+      "dimension_analysis": 96,
+      "expiry_window_analysis": 9,
+      "other": 54,
+      "kpi_request": 93,
+      "trend_request": 81
+    }
+  },
+  "verdict": "canonical_tabular_production domina el tráfico real; sin evidencia de legacy ni fallback en la ventana muestreada."
+}

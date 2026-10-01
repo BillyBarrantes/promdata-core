@@ -35,10 +35,9 @@ steps:
   # ---------------------------------------------------------------------------
   # Paso 3: Desplegar en Cloud Run
   #
-  # Nota sobre ALLOWED_ORIGINS:
-  # El valor contiene comas (separador de múltiples dominios), por eso usamos
-  # el prefijo ^|^ para indicarle a gcloud que el separador de variables es "|"
-  # y no la coma por defecto. Esto evita que parsee mal el valor.
+  # Las URLs públicas y CORS se configuran en el servicio Cloud Run cuando se
+  # usa como fallback. No fijar un dominio aquí: la producción VPS deriva su
+  # host desde APP_DOMAIN y Cloud Run mantiene su propia configuración.
   #
   # Documentación: https://cloud.google.com/sdk/gcloud/reference/run/deploy
   # ---------------------------------------------------------------------------
@@ -54,8 +53,6 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--max-instances=20'
-      - >-
-        --update-env-vars=^|^ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat|FRONTEND_APP_URL=https://livion.lat
     waitFor: ['push-backend']
 
   # ---------------------------------------------------------------------------

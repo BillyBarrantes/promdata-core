@@ -32,8 +32,17 @@ steps:
       - '--cpu=4'
       - '--memory=16Gi'
       - '--command=celery'
-      - '--args=^|^-A|app.celery_app|worker|--loglevel=info|--pool=prefork|--concurrency=20|--max-tasks-per-child=50|-Ofair|--prefetch-multiplier=1|-Q|default,analysis,background'
-      - '--update-env-vars=^|^REDIS_MAX_CONNECTIONS_RATE_LIMIT=20|REDIS_MAX_CONNECTIONS_AI_CACHE=20|REDIS_MAX_CONNECTIONS_HEALTHCHECK=5|REDIS_MAX_CONNECTIONS_DEFAULT=20|CELERY_BROKER_POOL_LIMIT=20|CELERY_RESULT_BACKEND_MAX_CONNECTIONS=20|GEMINI_RETRY_MAX_RETRIES=3|GEMINI_RETRY_BASE_DELAY_SECONDS=1.0|GEMINI_RETRY_MAX_DELAY_SECONDS=15.0|GEMINI_RETRY_JITTER_SECONDS=0.5'
+      # [QW-3 FIX 2026-07-25] Concurrency y pools alineados a Redis Cloud
+      # Essentials (256 conn). Los defaults Essentials-tuned viven en el
+      # codigo (backend/app/core/config.py: 6/6/2/3, broker=5, result=5) y
+      # son la unica fuente de verdad — por eso los overrides inflados de
+      # REDIS_MAX_CONNECTIONS_* / CELERY_*_POOL_* se eliminan de este YAML
+      # (la limpieza del worker en vivo ya se ejecuto el 2026-06-10; dejar
+      # estos valores aqui los re-introduciria en el proximo deploy).
+      # Migracion a Pro 1: ver AGENTS.md §4.4b/§12.3 — primero el plan,
+      # luego las variables.
+      - '--args=^|^-A|app.celery_app|worker|--loglevel=info|--pool=prefork|--concurrency=4|--max-tasks-per-child=50|-Ofair|--prefetch-multiplier=1|-Q|default,analysis,background'
+      - '--update-env-vars=^|^GEMINI_RETRY_MAX_RETRIES=3|GEMINI_RETRY_BASE_DELAY_SECONDS=1.0|GEMINI_RETRY_MAX_DELAY_SECONDS=15.0|GEMINI_RETRY_JITTER_SECONDS=0.5'
     waitFor: ['push-worker-image']
 
 images:

@@ -38,9 +38,9 @@ reading §10.1 and §10.2 first** — the names overlap with auto-triggers.
   (`us-east4-docker.pkg.dev/.../promdata-core/promdata-core`), and
   runs `gcloud run services update promdata-core`.
 - **Public URL:** `https://promdata-core-698138140658.us-east4.run.app`
-  (serves custom domain `livion.lat`)
 - **⚠️ Do NOT delete this service manually.** The trigger will recreate
-  it on the next push, but in the meantime `livion.lat` will be down.
+  it on the next push. Any custom-domain mapping is configured out of band
+  and must be verified before relying on it.
   See §10.2.
 - **Why the HTML says "v0 App":** the frontend was originally
   generated with v0 (Vercel's AI UI builder). This is the legitimate
@@ -63,8 +63,8 @@ reading §10.1 and §10.2 first** — the names overlap with auto-triggers.
 - **Port:** 8080 (Cloud Run default; uvicorn reads `$PORT`).
 - **Min instances:** 1 (no cold starts in prod).
 - **Env vars of interest (full list has 42 entries as of 2026-06-09):**
-  - `ALLOWED_ORIGINS=https://livion.lat,https://www.livion.lat`
-  - `FRONTEND_APP_URL=https://livion.lat`
+  - `ALLOWED_ORIGINS=https://<APP_DOMAIN>`
+  - `FRONTEND_APP_URL=https://<APP_DOMAIN>`
   - `BACKEND_PUBLIC_URL=https://promdata-backend-698138140658.us-east4.run.app`
   - `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_ANON_KEY`
   - `GEMINI_API_KEY`, `GEMINI_VERTEX_PROJECT`, `GEMINI_VERTEX_LOCATION`
@@ -886,7 +886,7 @@ backend p95 >500ms.
    - `CELERY_RESULT_BACKEND`: misma URL Pro
 4. Deploy → esperar 1-2 min
 5. Verificar logs: buscar `redis_pool_initialized` con valores Pro
-6. Smoke test: lanzar 1 tarea desde `livion.lat`
+6. Smoke test: lanzar 1 tarea desde el origen configurado en `APP_DOMAIN`
 
 **Criterio GO/NO-GO:**
 - ✅ Worker procesó 5+ tareas sin errores
@@ -907,7 +907,7 @@ backend p95 >500ms.
      --update-env-vars=^|^REDIS_MAX_CONNECTIONS_RATE_LIMIT=30|REDIS_MAX_CONNECTIONS_AI_CACHE=30|REDIS_MAX_CONNECTIONS_HEALTHCHECK=10|REDIS_MAX_CONNECTIONS_DEFAULT=20|CELERY_BROKER_POOL_LIMIT=30|CELERY_RESULT_BACKEND_MAX_CONNECTIONS=30
    ```
 4. Healthcheck: `curl /health/ready` → 200 OK
-5. Smoke test E2E: login en `livion.lat`, prompt simple, validar chart
+5. Smoke test E2E: login en el origen configurado en `APP_DOMAIN`, prompt simple, validar chart
 6. Verificar `redis-cli CLIENT LIST | wc -l` → entre 20-50 (no debe estar saturado)
 
 #### B.4 Escalar backend Cloud Run (5 min)
@@ -1050,7 +1050,7 @@ mejorar otras.
 3. **Compatibilidad hacia atrás**: `__init__.py` re-exporta todo, los
    call sites siguen funcionando sin cambios.
 4. **Smoke test en producción**: después de cada deploy, 1 análisis
-   real en `livion.lat` para validar.
+   real en el host configurado en `APP_DOMAIN` para validar.
 5. **Monitoreo activo**: Sentry + Langfuse detectan regresiones
    automáticamente.
 
@@ -1374,6 +1374,711 @@ porque no sabía que el chart original solo graficaba Ingresos.
    - El filterMsg muestra los 2 filtros (base + clic)
    - El badge `+ 1 base` aparece en el menú antes del click
 
+### 14.6 Fix D (2026-07-28) — Eliminar `_snapshot_resolved_date` de `chart_base_filters`
+
+**Síntoma:** Aún con el fix estructural de role guard y `_cross_filter_meta`, el
+cross-filter seguía retornando 0 filas en datos snapshot. Logs mostraban ruteo
+a `pd_snapshot_*_latest` pero `rows=0`.
+
+**Root cause:** `_snapshot_resolved_date` inyectaba `fecha_operacion = '2023-12-31'`
+(exacta) en `chart_base_filters`. El snapshot_arrow YA está pre-filtrado a
+`is_latest_snapshot=true` por el Ibis engine. La fecha exacta es más restrictiva
+que el filtro virtual original: el período completo (ej. diciembre 2023) tiene
+múltiples días, pero la igualdad exacta solo matchea el día 31. Combinada con
+filtros de dimensión del usuario → 0 filas.
+
+**Fix (1 archivo):**
+- `canonical_tabular_canary_executor.py:752-760`: removida la inyección de
+  `_snapshot_resolved_date` en `chart_base_filters`. El valor se conserva para
+  la construcción del snapshot_arrow (líneas 994-1016, 1070-1084), donde sí es
+  útil para filtrar candidate_df antes de serializar Arrow al frontend.
+
+**Cero impacto:** `_snapshot_resolved_date` sigue extrayéndose y computándose
+para snapshot_arrow. Solo se eliminó su uso en `chart_base_filters`.
+
+### 14.7 Diagnóstico separado: rows=1 / temporal (pendiente)
+
+**No cerrado.** Si después de Fix D el cross-filter aún retorna 0 filas, la
+causa probable es:
+- **(E)** El snapshot_arrow está limitado por Big Data Shield (10K rows / 4MB).
+  Si las filas que matchean ambos filtros están más allá del head(), no llegan
+  al frontend. Solución futura: incrementar `_MAX_SNAPSHOT_ROWS` o usar
+  `UNIVERSAL_TABULAR_RESULT_SOFT_LIMIT_BYTES` en producción.
+- Fallback a per-chart table ya implementado en `handleCrossFilter` (chat-interface.tsx:1824-1838).
+
+### 14.8 Eje temporal equivocado en frame unificado multi-hoja (2026-09-22)
+
+**Síntoma:** "realiza un analisis gerencial" sobre un libro de 5 hojas
+mensuales de stock (Mar–Jul 2021) devolvió un único periodo "Jun-2024"
+con 20.152 unidades y distribución 71.8/28.2 — todo calculado sobre
+**10 de 18.193 filas**.
+
+**Root cause (compuesta):**
+1. `canonical_bundle_materializer._build_unified_materialized_view`
+   ordenaba las columnas con `sorted(...)` → `fecaduc_feprefercons`
+   (caducidad) quedaba antes que `fecha_de_stock`.
+2. `data_engine._infer_dataset_semantic_contract` elegía
+   `time_axis = date_cols[0]` **posicionalmente**, adoptando la fecha de
+   caducidad como eje de periodo. El corte "latest" se resolvió en
+   `fecaduc = 2024-06-01` (10 filas).
+3. `planner.build_macro_analysis_bundle` inyectaba el filtro `latest`
+   también en la intención **trend**, colapsando la "evolución" a un punto.
+
+**Fix (3 archivos, sin borrar lógica existente):**
+- `data_engine._select_period_time_axis` (nuevo): elige el eje por
+  **densidad** (`avg_rows_per_period`), data-driven y schema-agnostic.
+- `canonical_bundle_materializer`: la vista unificada preserva el orden
+  de columnas del frame primario (no alfabético).
+- `semantic_translator/planner`: `trend_filters = []` en el macro bundle;
+  KPI y distribución conservan el corte. Alineado con ADR-TEMPORAL-001/T4.
+
+**Blindaje:** `test_snapshot_period_axis.py` (5 tests: eje denso,
+contrato snapshot, orden unificado, trend evolutivo sin latest).
+Suite backend: 554 passed.
+
+### 14.9 Repotenciación semántica P0–P2 (2026-09-23)
+
+**Síntomas (3 prompts sobre el CEDI multi-hoja):**
+1. "productos a vencer en los próximos 60 días" → el LLM emitió solo la cota
+   inferior (`fecaduc >= 2021-07-31`) y arrastró caducidades 2022-2024.
+2. "materiales pronto a vencer semana 30 del 2021" → **query_failed**: la
+   pre-agregación multi-hoja colapsó el schema a `[material, stock_disponible]`.
+3. "stock correspondiente a 2021-W30" → el fast-path macro (≤8 tokens)
+   interceptó el prompt y devolvió un análisis genérico, sin semana.
+
+**Root cause:**
+- P0.2 `canonical_tabular_production_executor`: FASE 3D (pre-agregación)
+  corría ANTES del short-circuit `unified_all__`; y este solo limpiaba
+  `related_frame_ids`, no `pre_aggregation`.
+- P0.3 `looks_broad_analysis_request` (core.py) no excluía periodos concretos.
+- P1 `unified_translator` (prompt realmente usado en producción) no tenía
+  reglas de ventana relativa ni de vencimiento; solo "fechas ISO".
+- P2 no existía resolución ISO-week → rango de fechas.
+
+**Fix (quirúrgico, sin borrar lógica existente):**
+- `canonical_tabular_production_executor`: short-circuit `unified_all__`
+  movido ANTES de FASE 3B/3C/3D, limpiando `related_frame_ids`, `join_keys`
+  y `pre_aggregation`.
+- `ibis_engine`: guard anti-destructivo — la pre-agregación se OMITE si
+  eliminaría columnas requeridas por el plan (`_plan_required_primary_columns`).
+- `core.py`: `contains_concrete_temporal_specifier()` excluye semanas
+  (`W30`, "semana 30"), fechas ISO y ventanas (`60 dias`) del fast-path macro.
+- `temporal_resolver`: `detect_relative_window` + `apply_relative_time_windows`
+  (cotas `>= ref` y `<= ref±N` ancladas al `reference_date`) e ISO-week
+  (`_parse_week_token`) → rango lunes-domingo.
+- `unified_translator`: reglas 5-7 (periodo concreto, ventana relativa,
+  vencimiento) + bump `unified_contract_version` v1→v2.
+- `ibis_engine`: label semanal `%W` → `%G-W%V` (alineado al ISO del frontend).
+
+**Nota:** no se hizo la consolidación total de prompts (P3) por ser un cambio
+estructural de alto riesgo; en su lugar se portaron las reglas de dominio al
+prompt unificado (P1.6).
+
+**Blindaje:** `test_semantic_repower_p0_p2.py` (13 tests). Suite: 567 passed.
+
+### 14.10 Snapshot guard + positive_filters + periodos (2026-09-23)
+
+**Síntomas (2 sobre el CEDI multi-hoja):**
+1. "productos a vencer en los próximos 60 días" y "materiales que vencen hasta
+   el 30 de agosto" → el gráfico de **evolución temporal sumaba stock de los 5
+   meses** (stock fantasma), pese a que KPI/distribución mostraban solo el corte.
+2. "stock de los productos que vencen en la semana 30 del 2021" → **0 gráficos**:
+   el resolver de ISO-week funcionó en `filters` pero el string crudo
+   `2021-W30` sobrevivió en `positive_filters` y DuckDB comparó timestamp
+   contra texto → 0 filas.
+
+**Root cause:**
+- Fix A — `snapshot_guard.py:95-104` tenía un bypass `[FIX 2026-07-04]` que
+  omitía el guard para **cualquier** columna de `date_columns`, contradiciendo
+  el ADR-TEMPORAL-001 (solo `trend_dim == time_axis` debe omitirlo). El test
+  T3 no lo detectaba porque su contrato **no incluía** `date_columns`.
+- Fix B — `normalize_intent_temporal_filters` solo normalizaba `intent.filters`,
+  nunca `positive_filters` (que `ibis_engine` antepone en el merge).
+
+**Fix (quirúrgico):**
+- `snapshot_guard.py`: eliminado el bypass; restaurada la doctrina ADR.
+- `temporal_resolver.normalize_intent_temporal_filters`: normaliza las TRES
+  listas (`filters`/`positive_filters`/`negative_filters`) + dedup +
+  **anti-0-silencioso** (descarta valores temporales irresolubles).
+- `ibis_engine._build_filter_expression`: soporte nativo `between`
+  (`(col>=lo)&(col<=hi)`) para poder **negar rangos** correctamente
+  (`~(A&B)`) en `negative_filters`.
+- `semantic_grammar.FilterOperator`: nuevo `BETWEEN` + alias ES.
+- Mejora 2: resolver de **trimestre / quincena / año** → rango ISO.
+- Mejora 3: `dashboard_narrative._fallback_summary` reporta "sin datos" en vez
+  de un resumen genérico cuando no hay widgets.
+- Hardening: `sanitize_translator_payload_item` sanea `positive_filters`.
+
+**Blindaje:** `test_semantic_repower_guard_filters.py` (14 tests). Suite: 581 passed.
+
+**Nota:** quitar el bypass cambia el comportamiento de trends sobre fechas
+accesorias en datasets `hybrid` (ahora también aíslan al corte). Documentado
+con test dedicado.
+
+### 14.11 Intención determinista de vencimientos + contrato temporal (2026-09)
+
+**Mejora 6 — Contrato temporal enriquecido (aditivo).**
+- `data_engine._infer_dataset_semantic_contract`: emite `snapshot_axis`
+  (= `time_axis`) y `event_axes` (fechas accesorias); `reference_date` se
+  agrega al contrato en el ensamblado.
+- `analytical_contract.DatasetContractV1`: nuevos campos `snapshot_axis`,
+  `event_axes`, `reference_date` (con defaults; `from_legacy_dict` y
+  `to_legacy_dataset_contract` los mapean). `time_axis`/`date_columns`
+  se preservan intactos (retro-compatible).
+
+**Mejora 4 — Builder determinista de "productos a vencer".**
+- Nuevo `app/services/expiry_intent.py`: detecta intención de vencimiento,
+  resuelve la columna de vencimiento **data-driven** (fecha accesoria con
+  mayor proporción de valores futuros + vocabulario de dominio) y construye
+  la Triple Vista (KPI + distribución + calendario de vencimientos) con la
+  ventana anclada al `reference_date`.
+- Ventana: "próximos/últimos N" → `[ref, ref±N]`; sin horizonte → todas las
+  caducidades futuras (`[ref, None]`); con cota explícita (hasta/desde/
+  fecha ISO) → **delega al LLM** (no sobre-incluye).
+- `prompt_type` ahora se propaga de `orchestrator` →
+  `execute_canonical_tabular_production_analysis` →
+  `build_canonical_tabular_production_execution` (parámetro opcional).
+- El snapshot guard (Fix A / ADR-TEMPORAL-001) aísla automáticamente el
+  calendario de vencimientos al corte actual.
+
+**Blindaje:** `test_expiry_intent.py` (10 tests). Suite: 591 passed.
+
+**Pendiente (backlog):** Mejora 5 — period-over-period (YoY/MoM) en sesión única.
+
+### 14.12 Linaje verificable de filtros temporales — F1 / F1.5 / F1.6 (2026-09)
+
+**Qué hace.** Expone, de forma **estrictamente aditiva**, la procedencia del
+corte temporal de cada análisis: qué filtro se aplicó, con qué autoridad, sobre
+qué columna y con qué efecto sobre el conteo de filas.
+
+**Componentes:**
+- `backend/app/services/temporal_filter_trace.py` (nuevo): enums
+  `FilterOrigin` / `FilterAuthority` / `FilterEffect`, modelos
+  `TemporalFilterTraceItem` / `TemporalFilterTrace` (con `TRACE_VERSION =
+  "f1-v1"`) y builder puro `build_temporal_filter_trace(...)`. **No escanea
+  datos**: recibe filtros ya resueltos, el flag del snapshot guard, el set de
+  columnas temporales del contrato y dos conteos.
+- `backend/app/core/config.py`: flag `SEMANTIC_CONTRACT_F1_TRACE` (default
+  `True`). **Rollback inmediato = ponerlo en `false`**: el pipeline queda
+  exactamente como antes (sin la clave `temporal_filter_trace`).
+- `ibis_engine.execute_plan`: firma **intacta**. Un único conteo base antes del
+  guard + `_apply_intent_filters`, y reutiliza el `row_count` final ya existente
+  como `rows_after` (sin escaneo por filtro). La traza se adjunta en
+  `rounded_result["temporal_filter_trace"]`.
+- Propagación: `tasks/analysis_pipeline/plan_executor.py` (a
+  `trace_plan_entry["execution"]`), `canonical_tabular_canary_executor._build_final_struct`
+  (a `traceability.temporal_filters` + `traceability.temporal_cut_applied`) y
+  `canonical_tabular_production_executor` (hereda vía canary).
+- Frontend: `components/temporal-provenance-badge.tsx` (badge compacto),
+  leído desde `data.result.traceability` en `hooks/useChatTaskPipeline.ts`
+  (clave `temporal_provenance` sobre el chart option) y renderizado en
+  `components/chat/chat-message-list.tsx` + `components/drill-down-menu.tsx`.
+
+**Clasificación (contrato):**
+- snapshot guard F0 (`is_latest_snapshot`) → `legacy_inference` + `inferred`,
+  `cut_applied=True`.
+- filtro temporal de usuario (sobre `date_columns`/`time_axis` del contrato) →
+  `user_requested` + `explicit`.
+- sin evidencia → `unknown`, sin cut. **Un `contract_state` desconocido NO
+  degrada filtros explícitos.**
+
+**Invariantes (no romper):**
+- La temporalidad se decide **solo** por pertenencia a `date_columns` /
+  `time_axis` del contrato. Domain-agnostic; sin nombres de columna de usuario.
+- La traza es la **única** clave añadida al resultado; no altera
+  `chart_base_filters`, Arrow, Grid ni ninguna clave existente.
+- `snapshot_guard.py`, ID Shield, Text Guard, Mixed Content Guard, Date Guard y
+  Entropy Sanitization **no se tocan**.
+
+**F1.5 — Hardening de `except` desnudos.** 12 sitios de `backend/app` pasaron
+de `except:` a `except Exception:` (+ observabilidad en `serializers`,
+`data_engine`, `ibis_engine`). Guard estático permanente en
+`backend/test_f15_no_bare_except.py` (escaneo AST: cero `ExceptHandler` sin
+tipo en `app/`).
+
+**F1.6 — Remediación de claridad/gaps.** `contract_state` se persiste en la
+traza (deja de ser parámetro muerto); `temporal_authority` del historial toma la
+autoridad **más fuerte** del conjunto de planes; el conteo base solo se activa
+si hay linaje temporal real (menos ruido); test de regresión de
+`chart_base_filters` en `_build_chart_option`.
+
+**Blindaje:** `backend/test_temporal_filter_trace.py` (14 tests) +
+`backend/test_f15_no_bare_except.py` (3 tests). Suite: **614 passed**.
+
+### 14.13 Confirmación de contrato por archivo — F2 (2026-09)
+
+**Qué hace.** Produce el estado `confirmed_file_contract` (declarado en
+`DatasetContractState` pero nunca emitido antes) cuando la evidencia F0 es
+**fuerte**, sacando a los archivos inequívocos del puente `legacy_inferred`
+(hacia R2/F4). **No cambia el corte**: `dataset_mode` y
+`snapshot_guard_allowed` son idénticos a F0.
+
+**Decisión E1:** persistencia **sidecar/local** existente; **sin** Supabase ni
+RLS en F2 (se difiere a **F4+**, no a F3 — F3 mantiene E1). Cero migraciones y
+cero superficie multi-tenant.
+
+**Regla (domain-agnostic, en `data_engine._infer_dataset_semantic_contract`):**
+- `allow_cut_legacy` y `bridge_votes == 3` y flag on →
+  `confirmed_file_contract` (+ `evidence.contract_confirmed=True`,
+  `evidence.confirmation_reasons`).
+- `allow_cut_legacy` pero `bridge_votes < 3` → `legacy_inferred` (puente).
+- sin `allow_cut_legacy` → `unknown` (fail-closed).
+- gate F0 desactivado → clasificador legacy intacto (`legacy_inferred`).
+
+**Rollback:** `SEMANTIC_CONTRACT_F2_CONFIRM=false` restaura el comportamiento F0
+**solo si además `SEMANTIC_CONTRACT_F3_BOOTSTRAP=false`** (con F3 on, el puente
+pasa a `bootstrap_verified` por el layering F0 ⊂ F2 ⊂ F3). En ambos casos
+`contract_confirmed`/`confirmation_reasons` quedan en `False`/`[]`.
+
+**Invariante crítico:** `contract_state` **no gobierna** el corte; el único
+consumidor que ramifica es `semantic_translator/core.py` (`== "unknown"`). Por
+eso la elevación es funcionalmente inerte respecto al corte.
+
+**Blindaje:** `backend/test_contract_confirmation_f2.py` (6 tests) + los dos
+tests F0 de snapshot completo fijan `F2_CONFIRM=False` **y `F3_BOOTSTRAP=False`**
+para seguir verificando el puente puro. Suite: **624 passed**.
+
+### 14.14 Bootstrap verificado con expiración — F3 (2026-09)
+
+**Qué hace.** Convierte el puente que **pasa el gate F0 pero no confirma**
+(`allow_cut_legacy` con `bridge_votes < 3`) en un `bootstrap_verified`
+**time-boxed**: tiene `bootstrap_expires_at` y `bootstrap_scope`, en vez de un
+`legacy_inferred` abierto. Satisface R1 (el puente no es autoridad permanente).
+**No cambia el corte**: `dataset_mode` y `snapshot_guard_allowed` idénticos a F0.
+
+**Layering:** F0 ⊂ F2 ⊂ F3. Con todo activo:
+- fuerte (`bridge_votes==3`) → `confirmed_file_contract` (F2);
+- puente (`bridge_votes==2`) → `bootstrap_verified` + expiry (F3);
+- sin `allow_cut_legacy` → `unknown`; gate F0 off → `legacy_inferred`.
+
+**Flags:** `SEMANTIC_CONTRACT_F3_BOOTSTRAP` (default `True`) y
+`SEMANTIC_CONTRACT_BOOTSTRAP_TTL_HOURS` (default `168` = 7 días). `F3=false`
+restaura F2.
+
+**Expiración efectiva (`data_engine._refresh_stale_semantic_contract`):** un
+sidecar cuyo `bootstrap_expires_at` ya pasó (o es ilegible) se **reinfiere**
+(fail-closed → tightening). `is_bootstrap_expired(None)` = `False` (no hay
+bootstrap); un valor ilegible = `True` (reinfiere, no concede autoridad).
+
+**Helpers puros (`core/analytical_contract.py`):** `compute_bootstrap_expiry`,
+`is_bootstrap_expired`. **Decisión E1:** persistencia sidecar/local; **sin**
+Supabase/RLS todavía.
+
+**Semántica de la expiración: renovación condicionada, no gracia permanente.**
+Reinferir **re-lee el parquet y re-evalúa con el código y los umbrales
+vigentes**. Si la evidencia sigue siendo de puente → se emite un nuevo TTL
+(`now + TTL`); si degrada (`bridge_votes < 2`) → `allow_cut_legacy=False` →
+`unknown`. Es decir, la autoridad **no se hereda**: se re-verifica en cada
+ciclo y **se auto-revoca cuando la evidencia deja de sostenerla**. Por eso no
+se implementó un contador de renovaciones (complejidad sin efecto sobre el
+corte).
+
+**Contrato para F4 (explícito).** F4 **no puede asumir** que todo archivo
+habilitado llegará como `confirmed_file_contract`: mientras F3 esté activo
+existen `bootstrap_verified` renovables. Opciones de cierre en F4:
+1. dejar de emitir `allow_cut_legacy` (todo pasa a `confirmed_file_contract` o
+   `unknown`), o
+2. exigir `confirmed_file_contract` para conceder corte y tratar
+   `bootstrap_verified` como `legacy_inferred`.
+Sin una de estas dos, `bootstrap_verified` sería un bypass del retiro del puente.
+**→ Resuelto en §14.15 (F4, opción 2).**
+
+**Hardening anti-bucle:** el dict base de `contract` en
+`_infer_dataset_semantic_contract` inicializa `bootstrap_expires_at=None` y
+`bootstrap_scope={}`. Así, si la reinferencia sale por un early-return, el
+merge `{**previo, **reinferido}` limpia un expiry vencido y no reinfiere en
+cada lectura.
+
+**Blindaje:** `backend/test_bootstrap_verified_f3.py` (11 tests). Suite: **635
+passed**. Los tests que verifican el puente puro (F0/F2) fijan `F3=false`.
+
+### 14.15 Retiro del puente `legacy_inferred` — F4 (2026-09)
+
+**Qué hace.** Con `SEMANTIC_CONTRACT_F4_RETIRE_BRIDGE=true`, **solo**
+`confirmed_file_contract` (o `trusted_tenant_template`) concede corte;
+`legacy_inferred` y `bootstrap_verified` pasan a `unknown` (fail-closed). Cierra
+R1–R4: ningún archivo recibe autoridad de corte por el heurístico legacy.
+
+**Default OFF = inercia total.** El deploy es byte-idéntico a F3 (única clave
+nueva, aditiva: `evidence.bridge_retired=False`). Rollback inmediato = env var.
+La activación real se valida contra datos de tenants antes de encenderla.
+
+**Regla (post-clasificación en `data_engine._infer_dataset_semantic_contract`):**
+- flag ON y `contract_state` ∉ {`confirmed_file_contract`,
+  `trusted_tenant_template`} y gate F0 activo → `dataset_mode='unknown'`,
+  `snapshot_guard_allowed=False`, `contract_state='unknown'`, sin bootstrap.
+- **Nunca concede corte; solo lo retira.**
+- gate F0 off → sin retiro (clasificador legacy intacto).
+
+**Consumidores afectados a propósito (auditados):**
+`semantic_translator/core.py:118` (corte), `snapshot_guard.py:24/117`,
+`canonical_tabular_canary_executor.py:884` (`_dataset_is_snapshot`),
+`interaction_engine.py:38`.
+
+**`trusted_tenant_template` NO se emite en F4** (requiere store por tenant
+Supabase/RLS). Diferido a **F4.1**; E1 se mantiene. Cero persistencia nueva.
+
+**R4 (gracia del stock preexistente):** con F4 ON la reinferencia **no vuelve a
+emitir bootstrap**, así que un sidecar de puente pasa a `unknown` en su próxima
+reinferencia (por bump de `_SEMANTIC_CONTRACT_VERSION` o expiración F3). El
+rollout no es instantáneo ni un cliff.
+
+**Rollout (ops):** (1) deploy con flag OFF; (2) medir la tasa de `contract_state`
+en `enterprise_telemetry`; (3) activar flag ON + bump de versión para reinferir
+sidecars; (4) monitorear `unknown` y ghost-stock. Rollback = flag OFF.
+
+**Blindaje:** `backend/test_bridge_retirement_f4.py` (7 tests). Suite: **642
+passed** (635 + 7), 0 fallos.
+
+### 14.16 Frontera de serialización: NaN/Infinity en `results_json` — F5 (2026-09-24)
+
+**Síntoma.** Tras un prompt real, el frontend mostró "El análisis superó el
+tiempo de espera" a los ~180s, aunque el worker había terminado en **11.01s**
+(`status=completed`, 2 charts, payload 204 KB). En consola: `[SSE] ... TypeError:
+Failed to fetch` y 500 repetidos en `GET /api/v1/tasks/{id}`.
+
+**Diagnóstico forense (read-only).** Task `11e09df1-d333-49bb-a04d-77711b9a5a6e`
+contenía **9 rutas no finitas** (`chart_options[*].series[*].data[*].value`,
+`visual_source_payload.rows[*].value`, `data[*].value`,
+`explainability[*].hard_facts.end_val` / `overall_growth_pct`,
+`data_by_chart.*[1].value`). El NaN nace de la **aritmética sobre los datos**
+(división por cero, grupo vacío, crecimiento sin base). La capa semántica
+(F0–F4) **no** escribe floats en `results_json`: solo `dataset_mode`/`time_axis`
+y la traza temporal (ints/strings).
+
+**Cadena causal (4 eslabones).**
+1. Persistencia: `json.dumps(..., cls=CustomEncoder)` con `allow_nan=True`
+   (default) → emite `NaN` literal. Nunca existió `allow_nan=False` en `app/`.
+2. `GET /api/v1/tasks/{id}`: Starlette `JSONResponse.render` usa
+   `allow_nan=False` → `ValueError: Out of range float values are not JSON
+   compliant` → 500.
+3. `Exception` no manejado → `ServerErrorMiddleware` (que envuelve al
+   `CORSMiddleware`, no al revés) → **500 sin `Access-Control-Allow-Origin`** →
+   el navegador lo reporta como `TypeError: Failed to fetch`.
+4. Frontend reintenta hasta `ANALYSIS_COMPLETION_DEADLINE_MS` (180s) → falso
+   timeout.
+
+**Fix (aditivo, sin tocar la capa semántica).**
+- `core/serializers.py`: `json_safe` (no finitos → `None`; normaliza
+  numpy/pandas), `dumps_safe` (`allow_nan=False`), `has_non_finite`
+  (observabilidad). `CustomEncoder`/`convert_keys_to_str` intactos.
+- Persistencia → `dumps_safe`: `payload_shedder.py`, `response_builder.py`,
+  `orchestrator.py`. `file_cache._json_safe` normaliza no finitos.
+- Lectura: `routes.get_task_status` sanea payloads **legacy ya guardados** con
+  NaN (irrecuperables en origen) + evento `api_task_status_non_finite_sanitized`.
+- `main.py`: `@app.exception_handler(Exception)` con headers CORS manuales +
+  `api_unhandled_exception` + `dispatch_500`. Un 500 deja de ser invisible.
+- Frontend: `useChatTaskPipeline.ts` distingue 5xx persistente (5 intentos) del
+  deadline → mensaje honesto en segundos.
+
+**Invariantes preservados.** No se toca `semantic_translator`, `data_engine`,
+`snapshot_guard`, contratos ni flags F0–F4. Sin hardcode de dominio.
+
+**Verificación.** Pre-fix con el payload real: `ValueError`. Post-fix:
+`JSONResponse` → 200, 204356 bytes, `NaN_in_body=False`. TDD:
+`backend/test_json_safety.py` (11 tests). Suite: **653 passed** (642 + 11).
+
+### 14.17 Capa semántica a nivel producción — P0/P1 (2026-09-24)
+
+**Síntoma.** Dos prompts distintos ("realiza un análisis gerencial" y "realiza
+un análisis sobre la forma de pago") devolvieron el **mismo** análisis: el
+segundo no respondía la pregunta (nunca apareció `formapago`). El análisis
+terminaba bien, pero el contenido era genérico y con cifras infladas.
+
+**Diagnóstico (cadena).**
+1. `looks_broad_analysis_request` (`core.py`) calificaba como "broad" todo
+   prompt de ≤ 8 tokens con lenguaje de análisis → `translate()` cortocircuita
+   al **bundle macro (0 tokens)** (`planner.py:1662`) **antes** del traductor
+   unificado. El LLM nunca veía el prompt.
+2. Dentro del macro, métrica y dimensión se elegían con heurísticas **ciegas al
+   prompt** y, en empate, por **orden alfabético**: ganaban `numeropago` y
+   `cuenta` para ambos prompts (el match `"forma de pago" ↔ formapago` fallaba
+   porque el comparador no toleraba stopwords).
+3. Planes idénticos → widgets idénticos → narrativa idéntica. La cache key
+   (`dashboard_narrative.py`) **ya** incluye la intención (métrica, dimensión,
+   agregación, hechos); no era la causa.
+4. `numeropago` es un monto **a nivel documento repetido por línea** (filas
+   contiguas con `num_fe` distinto y el mismo valor) → sumarlo inflaba el total
+   ~19× (`718M` vs `37.4M` del `total` de línea).
+5. El trend mensual sobre un archivo de un solo mes colapsaba a 1 punto +
+   categoría `"NaT"` (`_format_period_label` no manejaba NaT) → "tendencia
+   decreciente" sobre 1 punto.
+
+**Fix (universal, no por archivo).**
+- **P0.1 — Gate del macro por residuo de dominio** (`core.py`):
+  `extract_domain_residue(prompt)` = tokens fuera de un léxico genérico
+  (`_GENERIC_PROMPT_TOKENS`, domain-agnostic). Residuo no vacío ⇒ NO es broad ⇒
+  lo resuelve el traductor unificado (LLM), que entiende sinónimos, typos y
+  jerga por país. Adjetivos de audiencia/alcance (general, global, gerencial,
+  ejecutivo, resumen, overview…) siguen en el fast-path 0 tokens.
+- **P1.4 — No aditividad estructural** (`metric_archetype.py`):
+  `repeated_sum_ratio` (fracción del total aportada por valores repetidos) +
+  `key_repeat_ratio` (constancia dentro de una entidad) + `is_non_additive`.
+  El macro prefiere una métrica aditiva para el KPI; si no existe, degrada a
+  `avg` y titula "(promedio por registro)". Las señales viajan en
+  `coverage_metadata.non_additive_metrics`. **Sin listas de nombres.**
+- **P1.5 — Granularidad adaptativa** (nuevo `app/core/time_grain.py`):
+  `resolve_time_grain(requested, span_days, distinct_dates, prompt_explicit)`
+  elige el grano más grueso que aún produzca ≥ 2 puntos; respeta granularidad
+  explícita del usuario. **Doble cerrojo**: `finalize_plans` (plan-time, con el
+  rango del contrato) + `ibis_engine.execute_plan`
+  (`_resolve_runtime_time_grain`, agregación real en DuckDB antes de truncar).
+- **P1.6 — Eje temporal sin NaT**: el trend filtra periodos nulos antes de
+  agregar y `_format_period_label` nunca devuelve "NaT" (→ "Sin fecha").
+- **P0.2/P0.3 — Invariantes en el choke point**: `finalize_plans` (llamado por
+  las 13 rutas: macro, simple, fallback, cache, unificado) descarta trends con
+  < 2 periodos distintos y adapta el grano; `_log_named_concept_coverage` emite
+  `semantic_named_concept_not_covered` (telemetría de la clase, no destructiva).
+- **P2.7 — `direction_guard_decision`** pasa de `critical` a `info`.
+
+**Decisiones.** Cache key **sin** el prompt (ya incluye la intención; dos formas
+de preguntar lo mismo deben compartir narrativa). El prompt ya viaja en
+`traceability.raw_prompt`. F4 sigue **OFF**.
+
+**Invariantes preservados.** No se tocan guards (ID Shield, Text Guard,
+Snapshot Guard, Date Guard, Entropy), contratos F0–F4, ni flags. Sin hardcode
+de columnas ni vocabulario de cliente.
+
+**Blindaje.** `backend/test_semantic_capability_invariants.py` (13 tests,
+propiedades multi-dominio: SAP cabecera/detalle sintético, reporte de un mes,
+NaT, gate de residuo, grano, invariantes). Suite: **666 passed** (653 + 13),
+0 fallos.
+
+### 14.18 Robustez de frontera semántica — Tier 0/Tier 1/Tier 2 (2026-09-24)
+
+**Síntoma raíz (incidente "muestrame un analisis gerencial").** Un prompt broad
+sobre un dataset con SOLO métricas no aditivas crasheaba: `planner.py` emitía
+`aggregation="mean"`, valor fuera del `Literal` de `DescriptiveIntent`
+(`semantic_grammar.py`). El `ValidationError` escapaba de `translate()` (macro
+bundle y `finalize_plans` sin `try`) y el orquestador mostraba el mensaje
+genérico de error. Confirmado que el mismo prompt con residuo de dominio
+("vehiculos con multa") NO crasheaba porque evitaba el macro bundle.
+
+**Frontera de agregación (estructural).** `canonicalize_aggregation()` en
+`core/semantic_grammar.py` es ahora la única puerta: alias ES/EN/PT
+(`promedio→avg`, `mean→avg`, `suma→sum`, `median→avg`, `nunique→count`…),
+coerción logueada (`semantic_aggregation_coerced`) y fallback `sum`. Se aplica
+como `field_validator(mode="before")` en los 5 intents y en
+`PreAggregationSpec`, y en `normalize_semantic_router_contract`. **Ningún
+productor puede volver a emitir un valor fuera del `Literal`.**
+
+**Firebreak de planes.** `translate()` envuelve macro bundle, contrato SIMPLE y
+`finalize_plans` en `try/except` con degradación a la ruta unificada/LLM; el
+`return None` terminal ahora emite `semantic_translator_no_plans` (level=error).
+
+**Coherencia del macro dashboard.** El `"mean"` pasó a `"avg"`. El trend usa la
+métrica secundaria SOLO si es aditiva; si es no aditiva (documento repetido,
+caso gastos) usa la primaria → la serie reconcilia con el KPI y la
+distribución. Los títulos divulgan "(promedio por registro)".
+
+**Cero silencios (Tier 1).** La narrativa fallida ya no dice "Análisis
+Calculado Exitosamente" (emite `chart_narrative_failed`); `response_builder`
+no reemplaza el payload por un repr (intenta `json_safe` y conserva charts);
+los filtros no resolubles emiten `ibis_filter_dropped` (nunca se omiten en
+silencio); eventos de error a `warning/error`.
+
+**Guardas de no-finitos.** `overall_growth`, `pct_change` (`_growth`,`_yoy`) y
+`_share` en `ibis_engine.py` ya no producen `inf/NaN` por base cero (origen del
+incidente F5).
+
+**Idioma ES/EN/PT (Tier 2).** `_fold_accents` con NFKD (todo Latin-1: `ã õ ç à
+â ê ô`), meses PT + `setiembre` en `temporal_resolver`, y
+`detect_explicit_grain` sin acentos + `mensal`. Bug de join-key corregido:
+detección por tokens, no substring `"id"` (evita `medida/unidad/vida`).
+
+**Decisiones.** Código muerto: solo se eliminó el `elif` duplicado inalcanzable
+del macro; `build_dimension_analysis_bundle` se conserva. IDs numéricos /
+`fillna(0)`: heurística intacta + telemetría (no se cambia clasificación).
+
+**Invariantes preservados.** No se tocan guards, contratos F0–F4 (F4 OFF), ni
+vocabulario de dominio.
+
+**Blindaje.** `backend/test_semantic_robustness.py` (41 tests). Reproducción del
+incidente: "realiza un analisis general" y "muestrame un analisis gerencial"
+sobre solo-métrica-no-aditiva → 3 planes coherentes. Suite: **707 passed**
+(666 + 41), 0 fallos.
+
+### 14.19 Combo (2ª métrica) + métricas acumuladas — #5 / #4 (2026-09-25)
+
+**Qué hace.** Dos mejoras estructurales domain-agnostic de la capa semántica.
+
+**#5 — Gráfico combinado (dual-axis).** `TimeTrendIntent` gana
+`secondary_value_column: Optional[str]` (default `None`). `_analyze_trend` agrega
+la 2ª métrica por período y la emite en `extra_info.secondary_value`; la
+gobernanza visual (`_recommend_visual`) ya recomienda `dual_axis_chart` cuando
+hay eje temporal + 2ª métrica, y el canary promueve el valor a top-level con el
+**nombre real** (`secondary_value_column`, no `metrics[1]`) → `build_combo_chart`
+renderiza barras + línea. La agregación de la 2ª métrica se decide por su propia
+naturaleza (`ignore_intent_aggregation=True`), no hereda la de la primaria.
+
+**#4 — Métricas acumuladas (running totals).** Frontera de agregación: `max`/`min`
+explícitos ya llegan a DuckDB (`_metric_aggregation_method` /
+`_aggregate_metric_expr`); antes caían silenciosamente a `sum` en trend y
+distribution. Guard de ejecución `_apply_cumulative_metric_guard`
+(`canonical_tabular_production_executor`, corre en TODAS las rutas): con **dos
+señales fail-closed** (monotonía temporal AND léxico genérico de acumulación en
+nombre o prompt) y agregación efectiva `sum` → `max` (no decreciente) / `min`
+(no creciente) = último valor del período + divulgación en el título.
+
+**Frontera / fail-closed.** Si `secondary_value_column` no existe o no es
+numérica → se ignora (trend de una sola serie). La ruta unified NO pasa por
+`sanitize_translator_payload_item`; por eso la neutralización vive en
+`finalize_plans` (`_neutralize_hallucinated_secondary_columns`, choque point de
+las 13 rutas) **y** en el engine. Una sola señal de acumulado no cambia nada
+(`semantic_cumulative_signal_insufficient` = telemetría).
+
+**Decisiones.** Léxico de acumulación genérico (`acumul*`, `cumul*`, `running`,
+`ytd`, `corrido`) — vocabulario de agregación, no de dominio (precedente
+`_NON_ADDITIVE_METRIC_TOKENS`). El guard solo actúa sobre `sum`; `avg`/`min`/`max`
+explícitos se respetan. `unified_contract_version` v2→v3 (invalida caché de
+prompt). Sin cambios en `build_query_analytical_contract` (un campo opcional no
+debe bloquear el plan).
+
+**Invariantes preservados.** Cero vocabulario de dominio; firmas intactas (campos
+nuevos `Optional`); guards F0–F4 (F4 OFF), `snapshot_guard`, ID Shield, Text
+Guard, DuckDB-Wasm/Arrow/React Grid sin tocar.
+
+**Blindaje.** `backend/test_semantic_cumulative_combo.py` (46 tests: schema,
+sanitizer, neutralización, ejecución trend, promoción/combo, prompt v3,
+monotonía, léxico, dos señales, frontera max/min, guard acumulado). Suite:
+**753 passed** (707 + 46), 0 fallos.
+
+### 14.20 Contract-First: eje temporal ordinal + serie derivada — Fase 0/1 (2026-09-25)
+
+**Motivo.** Auditoría de producción: la ruta productiva no consumía capacidades
+ya calculadas (el combo de una métrica, el acumulado sobre eje texto), y el
+guard de acumulados leía `attrs["dataset_contract"]` mientras producción escribe
+`attrs["semantic_contract"]` (fallback muerto). Se elevaron los CONTRATOS en vez
+de añadir guards.
+
+**L1 — Contrato de archivo (`DatasetContractV1`, aditivo).**
+- `ordinal_axis` / `ordinal_axis_order` / `time_axis_kind` (`"date"|"ordinal"|None`).
+- `metric_semantics` (p. ej. `{"ventas": {"cumulative_monotonic_direction":"inc"}}`).
+- Detección domain-agnostic por VALORES en `app/core/temporal_axis.py`
+  (mes-texto ES/EN/PT, `"2021-07"`, `"2021-W30"`, `"Q3 2021"`, año), sin nombres
+  de columna. **No concede corte**: `dataset_mode`/`snapshot_guard_allowed`
+  intactos.
+- `time_axis`/`date_columns` **no cambian** (retro-compatible). Bump de
+  `_SEMANTIC_CONTRACT_VERSION` → `phase_1_foundation_v3` para reinferir sidecars.
+
+**L2 — Contrato de consulta.**
+- `TimeTrendIntent.derived_secondary` (`"mom_pct"`): serie derivada (no columna)
+  para combo barras+línea cuando el usuario pide `% de variación`/`combinado`
+  sobre UNA sola métrica. `finalize_plans` la activa en el choke point (y eleva
+  `visual_protocol` a DUAL_AXIS si vino como línea). El engine la emite como
+  `extra_info.secondary_value`; gobernanza la reconoce → combo.
+- Visual explícito = **advisory**: `build_expiry_analysis_bundle` ya NO aborta
+  por una palabra de visual; el bundle determinista de vencimientos corre siempre
+  y pasa por `finalize_plans`.
+
+**Consumo del guard de acumulados.** `_resolve_guard_time_column` lee el contrato
+desde `dataset_contract` **o** `semantic_contract` y usa `ordinal_axis`; el orden
+cronológico sale de `ordinal_axis_order` (no alfabético). `metric_semantics`
+declarado evita recomputar monotonía.
+
+**Telemetría (Fase 0.2).** `visual_downgraded`, `cumulative_detected_not_corrected`
+(antes silenciosos).
+
+**Runner (Fase 0.3).** `backend/run_backend_tests.sh` elige un intérprete que
+importe `pytest+ibis+duckdb`; si no, cae a Docker. AGENTS §6 ya no cita "32/32".
+
+**Invariantes.** No se tocan guards, contratos F0–F4, `snapshot_guard`, ID Shield,
+Text/Mixed/Date Guard, Entropy, DuckDB-Wasm, Arrow, React Grid. F4 sigue OFF.
+
+**Blindaje.** `backend/test_semantic_shape_conformance.py` (harness por clase de
+dato: eje ordinal, acumulado sobre eje texto, KPI sin fecha, combo derivado,
+visual advisory en expiry, round-trip del contrato). Suite: **771 passed**, 0
+fallos.
+
+### 14.21 Fase 2 (retiro gated) + Fase 3 (escala) — 2026-09-25
+
+**Retiro reversible del runtime legacy.** Flag
+`settings.LEGACY_ANALYSIS_RUNTIME_ENABLED` (env `LEGACY_ANALYSIS_RUNTIME_ENABLED`,
+**default `True` = paridad exacta, cero regresión**). Con `False` y el router
+habilitado, todo archivo tabular elegible se enruta a `universal_tabular` sin
+allowlist/trafico (`decision_mode="legacy_retired"`); el legacy solo actúa como
+válvula de emergencia si el gate de salud del runtime universal no pasa
+(`legacy_runtime_retired_health_hold`). **No se borra ningún módulo** (Ley de
+No-Eliminación); la frontera se blinda con `test_legacy_boundary_guard.py`.
+
+**Escala / fail-closed.** `test_heterogeneous_shape_stress.py` (19 formas
+heterogéneas contra el profiler real + invariantes del contrato y del guard).
+Mensaje usuario honesto para forma no soportada (`UNSUPPORTED_SHAPE` +
+`_format_unsupported_shape_message`, incluye columnas disponibles). Orphan
+`event_axes` consumido por `resolve_expiry_column`.
+
+**Consolidación.** `monotonic_direction` → autoridad única
+`core.temporal_axis.series_monotonic_direction`. Los "4 resolutores de
+agregación" y las "4 derivaciones MoM" del audit son capas **ortogonales**
+(boundary canónico / override de ejecución / guard de acumulados / diagnóstico;
+growth single-multi / fallback combo / comparación), no duplicados: fusionarlos
+sería rewrite de alto riesgo sin ganancia.
+
+**Orphans de UX conectados (2026-09-25).** `cumulative`→Pareto
+(`_recommend_visual` + rama `pareto` en `create_chart` + consumo del acumulado),
+`conversion`→Funnel (`{@conversion}`), `share`/`rank`→Bar tooltip
+(`{@share}`/`{@rank}`), `bubble_size`→Bubble (productor en `_analyze_diagnostic`
+con 3ª magnitud numérica), `score`/`is_anomaly`→tooltip scatter y marca de línea.
+Todo post-proceso determinista: **cero llamadas LLM nuevas**.
+`pareto_chart`/`bubble_chart` añadidos a PREMIUM_VISUALS. Sin orphans de señal
+conocidos. Pendiente: validar los formatters `{@campo}` de ECharts en un smoke
+visual de navegador.
+
+**Invariantes.** Guards, contratos F0–F4, `snapshot_guard`, ID Shield,
+Text/Mixed/Date Guard, Entropy, DuckDB-Wasm, Arrow, React Grid intactos. F4 OFF.
+
+**Evidencia.** `cd backend && ./run_backend_tests.sh` → **844 passed, 2 skipped**,
+0 fallos (753 baseline + 93 nuevos).
+
+### 14.22 Correcciones de corrección/UX sobre pruebas reales — P2–P6 (2026-09-25)
+
+**Origen.** Batería de 6 prompts reales sobre `Cuadro resumen padre.xlsx`,
+`Nueva Data CEDI ... 2021.xlsx` y `ventas_data_pesado.xlsx`. 5 hallazgos de
+correctitud.
+
+**P2 — Orden cronológico del combo.** `ChartFactory._order_temporal_categories`
+(autoridad `core.temporal_axis.parse_period_key`) ordena categorías de período
+("Mayo 2021", "ene-2021", ISO, trimestre) en `build_combo_chart`; antes solo se
+reconocían meses "pelados" y, al fallar, se ordenaba por valor. Domain-agnostic.
+`_is_month_category` se conserva (no se elimina).
+
+**P3 — Grano con span desconocido.** `time_grain.resolve_time_grain` ya **no**
+refina por debajo del grano pedido cuando `span_days is None` (un event_axis sin
+rango conocido colapsaba a DAY → 200+ puntos → Smart Table). El doble cerrojo de
+ejecución decide con el span real de DuckDB. Además `should_use_smart_table` no
+degrada a tabla un eje categórico **temporal** denso (es una serie).
+
+**P5-A — Override premium gated.** `_premium_promotion_allowed`: el override
+premium solo promueve desde un visual BASE (bar/line/area/pie/treemap); no pisa
+un especializado válido (scatter/boxplot/heatmap/histogram). Antes forzaba
+`bubble_chart` en los dos planes diagnósticos → 2 burbujas y pérdida del boxplot.
+Telemetría `visual_duplicate_applied` (no destructiva).
+
+**P5-B — Segunda categórica en scatter.** `_analyze_diagnostic` consume el 2º
+elemento de `group_by` como `series` (color). Regla 9 del prompt unificado. Sin
+2ª categórica, comportamiento idéntico.
+
+**P4 — Ranking → Pareto.** `_recommend_visual` recomienda `pareto_chart` para
+intención distributiva/descriptiva cuando `_ranking_requested(plan)` (hay
+`ranking_metric`) y 6≤filas≤40; `pareto_chart` añadido a `allowed_replacements`
+para ≤20 filas. Regla 10 del prompt ("top N" → distribution + pareto).
+
+**P6 — Divulgación honesta de cobertura.** `AnalysisPlan.coverage_disclosure`
+(aditivo) + `build_coverage_disclosure`/`apply_coverage_disclosure`. Señal
+autoritativa del LLM (`unresolved_concepts` en `UnifiedAnalysisOutput`) +
+fallback determinista **estrecho** (solo si el pedido es esencialmente UN
+concepto sin cobertura). El `canary_executor` antepone la nota a
+`final_struct["analysis"]` y la expone en `coverage_disclosure`. **Nunca
+sustituye en silencio ni bloquea**: responde siempre. `unified_contract_version`
+v3→v4 (invalida caché de prompt).
+
+**Invariantes.** Guards, contratos F0–F4 (F4 OFF), `snapshot_guard`, ID Shield,
+Text/Mixed/Date Guard, Entropy, DuckDB-Wasm, Arrow, React Grid intactos. Cero
+vocabulario de dominio; firmas preservadas.
+
+**Blindaje.** `backend/test_saas_correctness_fixes.py` (20 tests). Suite:
+**864 passed, 2 skipped**, 0 fallos (844 baseline + 20).
+
 ---
 
 ## 12. Cross-Filter "Filtrar aquí" (incident 10.3)
@@ -1430,7 +2135,7 @@ Además, el `_apply_progressive_soft_shedding` en
 
 ### 12.4 Validación post-deploy
 
-- Ejecutar 1 prompt en `livion.lat` y verificar que
+- Ejecutar 1 prompt en el host configurado en `APP_DOMAIN` y verificar que
   `data.result.arrow_data` O `data.result.snapshot_arrow` O
   `data.result.chart_options[*].granular_arrow` están presentes.
 - Sin esto, "Filtrar aquí" sigue roto.
@@ -1497,7 +2202,7 @@ Antes de proponer un plan técnico o aplicar modificaciones en el código, el ag
 
 - Todo plan generado bajo el comando `/plan-promdata` se evaluará de forma mandatoria mediante el script local `validate_plan.py`.
 - Si `validate_plan.py` o la suite de pruebas locales devuelven un exit code distinto de 0, el cambio se rechaza automáticamente.
-- Ninguna tarea se considera finalizada si el hook de pre-commit de Git bloquea el commit local debido a fallos en la suite de 32/32 tests.
+- Ninguna tarea se considera finalizada si el hook de pre-commit de Git bloquea el commit local debido a fallos en la suite completa de tests del backend (la línea base vigente es la reportada al final de este documento; ver §6.3).
 
 ---
 
@@ -1505,7 +2210,7 @@ Antes de proponer un plan técnico o aplicar modificaciones en el código, el ag
 
 ### 6.1 Principio
 
-Ninguna respuesta del agente puede incluir la frase "tests passed" ni "32/32 tests passed" sin haber ejecutado físicamente la suite de pruebas en la terminal y capturado la salida literal. Queda prohibido:
+Ninguna respuesta del agente puede incluir la frase "tests passed" sin haber ejecutado físicamente la suite de pruebas en la terminal y capturado la salida literal. Queda prohibido:
 - Reportar tests como "passed" basándose en ejecuciones anteriores.
 - Simular resultados exitosos.
 - Omitir deliberadamente la ejecución de pruebas.
@@ -1524,16 +2229,37 @@ Si un agente reporta que los tests pasaron sin evidencia terminal:
    ```bash
    cd backend && ./run_backend_tests.sh
    ```
+   El runner selecciona un intérprete que **realmente** importe las dependencias
+   (`pytest` + `ibis` + `duckdb`). Si el venv local está roto, cae a Docker
+   (imagen `backend-api:latest`, Python 3.11) automáticamente. Un venv sin
+   dependencias ya no produce un falso "passed".
 2. Capturar las últimas 3 líneas de la salida de la terminal.
 3. Insertar esas líneas literales en la respuesta como evidencia.
 
+**Línea base vigente:** `python3 -m pytest -q` recolecta dinámicamente la suite
+completa (no un número fijo). Al 2026-09-25 la línea base es **864 passed, 2
+skipped, 0 fallos** (844 previos + 20 de §14.22). El número crece con cada test
+nuevo; lo exigible es **0 fallos** y el conteo reportado como evidencia.
+
 ### 6.4 Manejo de fallos
 
-Si el conteo final es menor a 32:
+Si el exit code es distinto de 0 o hay fallos:
 - Imprimir las últimas 20 líneas de error de la terminal (incluyendo tracebacks).
 - La tarea se bloquea automáticamente.
-- No se puede cerrar la tarea hasta que el conteo sea 32/32.
+- No se puede cerrar la tarea hasta que la suite quede en **0 fallos** con el
+  conteo íntegro.
+
+> Nota: 7 scripts `test_*.py` de estilo script (código a nivel de módulo +
+> `sys.exit`) no son recolectables por pytest; su validación se ejecuta vía
+> `test_legacy_script_suites.py` (subprocess + assert de exit code). Los que
+> requieren red (p. ej. `test_stress_ia.py`) se ejecutan manualmente, no en la
+> suite de CI.
 
 ---
 
 **Last updated:** 2026-06-16 — feat(governance): add mandatory protocol §4 and validation hooks §5, add testing honesty protocol §6
+
+**Última actualización de contenido:** 2026-09-25 — feat(semantic): §14.22
+correcciones de corrección/UX sobre pruebas reales (P2 orden combo, P3 grano con
+span desconocido, P4 ranking→Pareto, P5-A override gated, P5-B 2ª categórica en
+scatter, P6 divulgación de cobertura). Suite: **864 passed, 2 skipped**, 0 fallos.

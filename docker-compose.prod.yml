@@ -1,0 +1,165 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - promdata-net
+
+  frontend:
+    image: promdata-frontend:${APP_BUILD_SHA:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Define NEXT_PUBLIC_SUPABASE_URL en .env}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Define NEXT_PUBLIC_SUPABASE_ANON_KEY en .env}
+        NEXT_PUBLIC_API_BASE_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+        NEXT_PUBLIC_DEBUG_MIDDLEWARE: "0"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Define NEXT_PUBLIC_SUPABASE_URL en .env}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Define NEXT_PUBLIC_SUPABASE_ANON_KEY en .env}
+      NEXT_PUBLIC_API_BASE_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      NEXT_PUBLIC_DEBUG_MIDDLEWARE: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+    expose:
+      - "3000"
+    mem_limit: 1024m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - promdata-net
+
+  api:
+    image: promdata-backend:${APP_BUILD_SHA:-local}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    expose:
+      - "8000"
+    environment:
+      PYTHONPATH: /code
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      RATE_LIMIT_STORAGE_URL: redis://redis:6379/0
+      BACKEND_PUBLIC_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      FRONTEND_APP_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      ALLOWED_ORIGINS: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}/api/v1/connectors/google-drive/webhook
+      APP_BUILD_SHA: ${APP_BUILD_SHA:-local}
+      # [FASE 7.2] Redis Pools Ampliados para Hetzner VPS (AGENTS.md §4.4b)
+      REDIS_MAX_CONNECTIONS_RATE_LIMIT: "50"
+      REDIS_MAX_CONNECTIONS_AI_CACHE: "50"
+      REDIS_MAX_CONNECTIONS_HEALTHCHECK: "20"
+      REDIS_MAX_CONNECTIONS_DEFAULT: "30"
+      CELERY_BROKER_POOL_LIMIT: "50"
+      CELERY_RESULT_BACKEND_MAX_CONNECTIONS: "50"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    mem_limit: 2048m
+    mem_reservation: 512m
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request, sys; resp = urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3); sys.exit(0 if resp.getcode() == 200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - promdata-net
+
+  worker:
+    image: promdata-backend:${APP_BUILD_SHA:-local}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      PYTHONPATH: /code
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      BACKEND_PUBLIC_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      FRONTEND_APP_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}
+      GOOGLE_DRIVE_WEBHOOK_CALLBACK_URL: https://${APP_DOMAIN:?Define APP_DOMAIN en el .env de la raíz}/api/v1/connectors/google-drive/webhook
+      APP_BUILD_SHA: ${APP_BUILD_SHA:-local}
+      # [FASE 7.2] Redis Pools Ampliados para Hetzner VPS
+      REDIS_MAX_CONNECTIONS_RATE_LIMIT: "50"
+      REDIS_MAX_CONNECTIONS_AI_CACHE: "50"
+      REDIS_MAX_CONNECTIONS_HEALTHCHECK: "20"
+      REDIS_MAX_CONNECTIONS_DEFAULT: "30"
+      CELERY_BROKER_POOL_LIMIT: "50"
+      CELERY_RESULT_BACKEND_MAX_CONNECTIONS: "50"
+    command: celery -A app.celery_app worker --loglevel=info --pool=prefork --concurrency=8 --max-tasks-per-child=100 -Ofair --prefetch-multiplier=1 -Q default,analysis,background
+    mem_limit: 4096m
+    mem_reservation: 1024m
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME -t 5 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - promdata-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF conserva el broker tras reinicios; volatile-lru evita expulsar claves
+    # de cola sin TTL mientras permite desalojar cachés con expiración.
+    command: redis-server --maxmemory 256mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync everysec --save ""
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    mem_limit: 512m
+    mem_reservation: 128m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - promdata-net
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redis_data:
+
+networks:
+  promdata-net:
+    driver: bridge
