@@ -97,9 +97,6 @@ services:
 
   worker:
     image: promdata-backend:${APP_BUILD_SHA:-local}
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - ./backend/.env

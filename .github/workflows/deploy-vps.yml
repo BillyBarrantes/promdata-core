@@ -1,0 +1,67 @@
+name: Deploy VPS
+
+# Despliega la revisión de `main` en el VPS Hetzner vía SSH.
+# El build de Docker Compose ocurre en el VPS (deploy_hetzner.sh); este
+# workflow orquesta, espera la verificación interna y comprueba el HTTPS público.
+#
+# Requisitos previos (ver docs/VPS_RUNBOOK.md):
+#   Environment `production`:
+#     vars:   VPS_HOST, VPS_USER, VPS_APP_DIR, APP_DOMAIN
+#     secrets: VPS_SSH_PRIVATE_KEY, VPS_KNOWN_HOSTS
+# Mientras `VPS_HOST` no esté definido, el job se omite (skip) sin fallar.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Hetzner VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    if: ${{ vars.VPS_HOST != '' }}
+    steps:
+      - name: Checkout (referencia del SHA a desplegar)
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy revision over SSH
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
+          VPS_APP_DIR: ${{ vars.VPS_APP_DIR }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes "${VPS_USER}@${VPS_HOST}" \
+            "set -euo pipefail; cd '${VPS_APP_DIR}'; git fetch --all --prune; git checkout --force '${TARGET_SHA}'; APP_BUILD_SHA=\$(git rev-parse --short=12 HEAD) bash deploy_hetzner.sh"
+
+      - name: Verify public health over HTTPS
+        env:
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+        run: |
+          set -euo pipefail
+          for path in /health/ready /health/runtime /health/observability; do
+            echo "Verificando https://${APP_DOMAIN}${path} ..."
+            curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 6 \
+              --connect-timeout 5 --max-time 15 "https://${APP_DOMAIN}${path}" >/dev/null
+          done
