@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { LayoutDashboard, LoaderCircle, MousePointerClick, Sparkles, X } from "lucide-react"
+import { LayoutDashboard, LoaderCircle, MousePointerClick, X, Database } from "lucide-react"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useSearchParams } from "next/navigation"
 import { workspaceItemsAtom, workspaceRenderStateAtom, drillDownAtom, AnalysisComponent, activePresentationIdAtom, presentationsListAtom } from "@/lib/state"
@@ -12,22 +12,26 @@ import { SmartTable } from "@/components/smart-table"
 import { AnalysisReport } from "@/components/analysis-report"
 import { useSupabase } from "@/lib/supabase-provider"
 import { API_BASE_URL } from "@/lib/api-config"
+import { fetchPresentationsShared } from "@/components/presentations-fetch"
+import { getAccessToken } from "@/components/auth-helpers"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useCrossFilter } from "@/hooks/useCrossFilter"
 
 const WorkspaceLoadingCard = ({ compact = false }: { compact?: boolean }) => (
-  <div className={`rounded-[28px] border border-border/60 bg-card/70 p-6 shadow-sm backdrop-blur-sm ${compact ? "min-h-[220px]" : "min-h-[320px]"} animate-pulse`}>
+  <div className={`rounded-xl border border-border/50 bg-card p-6 shadow-[var(--cursor-shadow-xs)] ${compact ? "min-h-[220px]" : "min-h-[320px]"} animate-pulse transition-shadow duration-300 ease-[cubic-bezier(0.2,0,0,1)]`}>
     <div className="mb-5 flex items-center justify-between gap-4">
-      <div className="h-7 w-56 rounded-md bg-muted/60" />
-      <div className="h-8 w-28 rounded-full bg-muted/50" />
+      <div className="h-6 w-48 rounded-md bg-muted/60" />
+      <div className="h-7 w-24 rounded-md bg-muted/50" />
     </div>
     <div className="space-y-3">
-      <div className="h-4 w-40 rounded-md bg-muted/50" />
-      <div className="h-48 rounded-2xl bg-muted/35" />
+      <div className="h-4 w-36 rounded-md bg-muted/50" />
+      <div className="h-44 rounded-lg bg-muted/30" />
       <div className="grid grid-cols-3 gap-3">
-        <div className="h-10 rounded-xl bg-muted/35" />
-        <div className="h-10 rounded-xl bg-muted/30" />
-        <div className="h-10 rounded-xl bg-muted/25" />
+        <div className="h-10 rounded-lg bg-muted/30" />
+        <div className="h-10 rounded-lg bg-muted/25" />
+        <div className="h-10 rounded-lg bg-muted/20" />
       </div>
     </div>
   </div>
@@ -68,6 +72,7 @@ export function WorkspaceCanvas() {
   const supabase = useSupabase();
   const setActivePresentationId = useSetAtom(activePresentationIdAtom);
   const setPresentations = useSetAtom(presentationsListAtom);
+  const { activeSelection, applyCrossFilter, clearCrossFilter } = useCrossFilter();
 
   // Estados para el modal de guardar reporte
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -77,19 +82,10 @@ export function WorkspaceCanvas() {
   const [isSaveActionLoading, setIsSaveActionLoading] = useState(false);
   const [isSaveDestinationsLoading, setIsSaveDestinationsLoading] = useState(false);
 
-  const getWorkspaceAccessToken = useCallback(async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) return session.access_token;
-
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('__qa_chat') === '1') {
-        return params.get('__qa_chat_token') || 'qa-chat-token';
-      }
-    }
-
-    return null;
-  }, [supabase]);
+  const getWorkspaceAccessToken = useCallback(
+    () => getAccessToken(supabase, "chat"),
+    [supabase]
+  );
 
   const refreshSaveDestinations = useCallback(async () => {
     setIsSaveDestinationsLoading(true);
@@ -97,17 +93,8 @@ export function WorkspaceCanvas() {
       const accessToken = await getWorkspaceAccessToken();
       if (!accessToken) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/presentations?_t=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        },
-        cache: 'no-store'
-      });
-
-      if (!response.ok) return;
-      const payload = await response.json().catch(() => []);
-      setPresentations(Array.isArray(payload) ? payload : []);
+      const payload = await fetchPresentationsShared(accessToken);
+      setPresentations(payload as any);
     } catch (error) {
       console.error("Error cargando presentaciones para guardado:", error);
     } finally {
@@ -115,8 +102,8 @@ export function WorkspaceCanvas() {
     }
   }, [getWorkspaceAccessToken, setPresentations]);
 
-  const handleOpenSaveDialog = (data: any, type: string, defaultTitle?: string) => {
-    setReportToSave({ type, content: data });
+  const handleOpenSaveDialog = (data: any, type: string, defaultTitle?: string, layout?: { w: number; h: number; minW?: number; minH?: number }) => {
+    setReportToSave({ type, content: data, ...(layout ? { layout } : {}) });
     setReportTitle(defaultTitle || ""); 
     setSelectedSavePresentationId("");
     setIsSaveDialogOpen(true);
@@ -228,7 +215,7 @@ export function WorkspaceCanvas() {
     setPresentations,
   ]);
 
-  const handleChartDrillDown = useCallback((params: any, tableName?: string) => {
+  const handleChartDrillDown = useCallback((params: any, tableName?: string, option?: any) => {
     const rawCategory = extractRawChartCategory(params);
     if (rawCategory) {
       const rawSecondaryCategory = typeof params?.rawSecondaryCategory === 'string'
@@ -249,6 +236,14 @@ export function WorkspaceCanvas() {
       const safeCategory = String(category).replace(/\0/g, '');
       const safeSeries = String(seriesName).replace(/\0/g, '');
 
+      // [FASE 6.3] Emitir automáticamente al store reactivo de Cross-Filter con Anti-Self-Filter y Toggle
+      const chartOption = option;
+      const contractDimension = typeof chartOption?.query_contract?.dimension === 'string'
+        ? chartOption.query_contract.dimension.trim()
+        : (typeof chartOption?.xAxis?.name === 'string' ? chartOption.xAxis.name : 'categoria');
+
+      applyCrossFilter(contractDimension || 'categoria', safeCategory, tableName, safeSeries);
+
       setDrillDown({
         isVisible: true,
         position: { x, y },
@@ -258,189 +253,206 @@ export function WorkspaceCanvas() {
           series: safeSeries,
           tableName: tableName,
           secondaryCategory: rawSecondaryCategory || undefined,
+          option: option,
         }
       });
     }
-  }, [setDrillDown]);
+  }, [applyCrossFilter, setDrillDown]);
 
   const isWorkspaceBusy = workspaceRenderState.status === "analyzing" || workspaceRenderState.status === "staging";
-
-  // Si no hay items en el workspace, mostramos el placeholder
-  if ((!items || items.length === 0) && !isWorkspaceBusy) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-muted/10 relative overflow-hidden">
-        {/* Radial glow */}
-        <div
-          className="absolute inset-0"
-          style={{ background: 'radial-gradient(circle at center, rgba(59,130,246,0.04) 0%, transparent 60%)' }}
-        />
-        {/* Center content */}
-        <div className="relative z-10 flex flex-col items-center gap-6 max-w-md px-8">
-          {/* Icon cluster */}
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 dark:border-blue-400/20 flex items-center justify-center backdrop-blur-sm">
-              <LayoutDashboard className="w-9 h-9 text-blue-500/60 dark:text-blue-400/50" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-          </div>
-          {/* Text */}
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-foreground/80 tracking-tight">
-              Centro de Comando
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Aquí podrás anclar gráficos, arrastrar visualizaciones y construir dashboards
-              personalizados desde el chat.
-            </p>
-          </div>
-          {/* Hint */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground/60 bg-muted/50 px-4 py-2 rounded-full border border-border/50">
-            <MousePointerClick className="w-3.5 h-3.5" />
-            <span>Usa el chat para generar tu primer análisis</span>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const hasItems = Array.isArray(items) && items.length > 0;
 
   return (
-    <div className="h-full w-full p-6 overflow-y-auto bg-muted/5">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {isWorkspaceBusy && (
-          <div className="sticky top-0 z-10 rounded-[24px] border border-border/60 bg-background/92 px-5 py-4 shadow-sm backdrop-blur-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <LoaderCircle className="h-5 w-5 animate-spin" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-foreground">
-                    {workspaceRenderState.status === "analyzing" ? "Preparando análisis visual" : "Render progresivo en curso"}
+    <div className="h-full w-full p-6 overflow-y-auto bg-muted/30">
+      {!hasItems && !isWorkspaceBusy ? (
+        <div className="h-full min-h-[400px] w-full flex items-center justify-center transition-opacity duration-300 ease-[cubic-bezier(0.2,0,0,1)] animate-in fade-in">
+          <div className="flex flex-col items-center gap-5 max-w-sm px-6 text-center animate-premium-entrance">
+            <div className="w-14 h-14 rounded-xl bg-muted/80 flex items-center justify-center transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-muted hover:shadow-[var(--cursor-shadow-sm)] hover:scale-105">
+              <LayoutDashboard className="h-7 w-7 text-muted-foreground/60" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-medium text-foreground tracking-tight">
+                Centro de Comando
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Ancla gráficos, arrastra visualizaciones y construye dashboards personalizados desde el chat.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md border border-border/50">
+              <MousePointerClick className="h-3.5 w-3.5" />
+              <span>Usa el chat para generar tu primer análisis</span>
+            </div>
+            <Button
+              variant="outline"
+              className="mt-4 gap-2 text-sm transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:shadow-xs hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => router.push('/cargar-datos')}
+            >
+              <Database className="h-4 w-4" />
+              Cargar datos
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-6xl mx-auto space-y-6 transition-opacity duration-200 animate-in fade-in">
+          {isWorkspaceBusy && (
+            <div className="sticky top-0 z-10 rounded-xl border border-border/50 bg-background/95 px-5 py-4 shadow-[var(--cursor-shadow-sm)] backdrop-blur-sm animate-premium-fade">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {workspaceRenderState.message || "Priorizando el visual principal para mantener fluidez real."}
+                  <div>
+                    <div className="text-sm font-medium text-foreground">
+                      {workspaceRenderState.status === "analyzing" ? "Preparando análisis visual" : "Render progresivo en curso"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {workspaceRenderState.message || "Priorizando el visual principal para mantener fluidez real."}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {workspaceRenderState.pendingVisuals > 0
-                  ? `${workspaceRenderState.renderedVisuals}/${workspaceRenderState.pendingVisuals} bloques listos`
-                  : "Esperando resultado del motor analítico"}
+                <div className="text-xs text-muted-foreground">
+                  {workspaceRenderState.pendingVisuals > 0
+                    ? `${workspaceRenderState.renderedVisuals}/${workspaceRenderState.pendingVisuals} bloques listos`
+                    : "Esperando resultado del motor analítico"}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {(!items || items.length === 0) && isWorkspaceBusy && (
-          <>
-            <WorkspaceLoadingCard />
-            <WorkspaceLoadingCard compact />
-          </>
-        )}
+          {!hasItems && isWorkspaceBusy && (
+            <>
+              <WorkspaceLoadingCard />
+              <WorkspaceLoadingCard compact />
+            </>
+          )}
 
-        {items.map((component, index) => {
-          const componentKey = `canvas-item-${index}`;
-          
-          switch(component.type) {
-            case 'metricas_clave':
-              if (component.data && Object.keys(component.data).length > 0) {
-                return (
-                  <div key={componentKey} className="w-full">
-                    <AnalysisReport
-                      data={{ metrics: component.data, tableData: [] }}
-                      onSave={() => handleOpenSaveDialog(component.data, "metrics", component.title || "Métricas Clave")}
+          {/* 🦆 [FASE 6.3] Banner Reactivo de Filtro Cruzado Activo */}
+          {activeSelection && (
+            <div className="rounded-2xl border border-primary/40 bg-primary/10 px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-primary shadow-sm backdrop-blur-sm transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                <span>
+                  Filtro interactivo: <strong>{activeSelection.dimension} = {activeSelection.value}</strong>
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-3 text-xs font-medium border-primary/40 text-primary hover:bg-primary/20 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
+                onClick={clearCrossFilter}
+              >
+                Restablecer todo
+              </Button>
+            </div>
+          )}
+
+          {!isWorkspaceBusy && items.map((component, index) => {
+            const componentKey = component.task_id
+              ? `${component.type}-${component.task_id}-${index}`
+              : (component.title
+                  ? `${component.type}-${component.title}`
+                  : (component.table_name
+                      ? `${component.type}-${component.table_name}`
+                      : `canvas-item-${component.type}-${index}`
+                    )
+                );
+            
+            switch(component.type) {
+              case 'metricas_clave':
+                if (component.data && Object.keys(component.data).length > 0) {
+                  return (
+                    <div key={componentKey} className="w-full animate-fade-slide-in">
+                      <AnalysisReport
+                        data={{ metrics: component.data, tableData: [] }}
+                        onSave={() => handleOpenSaveDialog(component.data, "metrics", component.title || "Métricas Clave", { w: 2, h: 1, minW: 2, minH: 1 })}
+                      />
+                    </div>
+                  );
+                }
+                return null;
+
+              case 'configuracion_echarts':
+                if (component.option) {
+                  return (
+                    <ChartsReport 
+                      key={componentKey} 
+                      option={component.option} 
+                      title={component.title} 
+                      onSave={(optionOverride) => handleOpenSaveDialog(optionOverride || component.option, "chart", component.title)} 
+                      onChartClick={(params) => handleChartDrillDown(params, component.table_name, component.option)} 
                     />
-                  </div>
-                );
-              }
-              return null;
+                  );
+                }
+                return null;
+                
+              case 'smart_table':
+                if (component.columns && component.data) {
+                  return (
+                    <SmartTable
+                      key={componentKey}
+                      title={component.title}
+                      columns={component.columns}
+                      data={component.data}
+                      sortBy={component.sort_by}
+                      sortOrder={component.sort_order}
+                      originalChartOption={component.original_chart_option}
+                      defaultViewMode={component.default_view_mode}
+                      onSave={() => handleOpenSaveDialog(component, "table", component.title)}
+                      onChartClick={(params) => handleChartDrillDown(params, component.table_name, component.original_chart_option || component.option)}
+                    />
+                  );
+                }
+                return null;
+                
+              case 'tabla_datos':
+                 if (component.data && Array.isArray(component.data) && component.data.length > 0) {
+                   return (
+                     <div key={componentKey} className="w-full animate-fade-slide-in">
+                       <AnalysisReport 
+                         data={{ tableData: component.data, title: component.title, metrics: {} }} 
+                         onSave={() => handleOpenSaveDialog({ data: component.data, title: component.title }, "table", component.title)} 
+                       />
+                     </div>
+                   );
+                 }
+                 return null;
 
-            case 'configuracion_echarts':
-              if (component.option) {
-                return (
-                  <ChartsReport 
-                    key={componentKey} 
-                    option={component.option} 
-                    title={component.title} 
-                    onSave={(optionOverride) => handleOpenSaveDialog(optionOverride || component.option, "chart", component.title)} 
-                    onChartClick={(params) => handleChartDrillDown(params, component.table_name)} 
-                  />
-                );
-              }
-              return null;
-              
-            case 'smart_table':
-              if (component.columns && component.data) {
-                return (
-                  <SmartTable
-                    key={componentKey}
-                    title={component.title}
-                    columns={component.columns}
-                    data={component.data}
-                    sortBy={component.sort_by}
-                    sortOrder={component.sort_order}
-                    originalChartOption={component.original_chart_option}
-                    defaultViewMode={component.default_view_mode}
-                    onSave={() => handleOpenSaveDialog(component, "table", component.title)}
-                    onChartClick={(params) => handleChartDrillDown(params, component.table_name)}
-                  />
-                );
-              }
-              return null;
-              
-            case 'tabla_datos':
-               if (component.data && Array.isArray(component.data) && component.data.length > 0) {
-                 return (
-                   <div key={componentKey} className="w-full">
-                     <AnalysisReport 
-                       data={{ tableData: component.data, title: component.title, metrics: {} }} 
-                       onSave={() => handleOpenSaveDialog({ data: component.data, title: component.title }, "table", component.title)} 
-                     />
-                   </div>
-                 );
-               }
-               return null;
-
-            default:
-              return null;
-          }
-        })}
-        {isWorkspaceBusy && items.length > 0 && workspaceRenderState.pendingVisuals > workspaceRenderState.renderedVisuals && (
-          <WorkspaceLoadingCard compact />
-        )}
-      </div>
+              default:
+                return null;
+            }
+          })}
+          {isWorkspaceBusy && hasItems && workspaceRenderState.pendingVisuals > workspaceRenderState.renderedVisuals && (
+            <WorkspaceLoadingCard compact />
+          )}
+        </div>
+      )}
 
       {/* Modal de Guardado */}
-      {isSaveDialogOpen && reportToSave && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-testid="save-report-dialog">
-          <div className="bg-card border shadow-xl rounded-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Guardar Reporte</h3>
-              <button onClick={() => setIsSaveDialogOpen(false)} className="p-1 hover:bg-muted rounded-full" disabled={isSaveActionLoading}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Dialog open={isSaveDialogOpen && !!reportToSave} onOpenChange={(open) => { if (!open) setIsSaveDialogOpen(false) }}>
+        <DialogContent className="sm:max-w-md" data-testid="save-report-dialog">
+          <DialogHeader>
+            <DialogTitle>Guardar Reporte</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Título del Reporte</label>
+              <label className="text-sm font-medium text-foreground">Título del Reporte</label>
               <input
                 type="text"
                 value={reportTitle}
                 onChange={(e) => setReportTitle(e.target.value)}
                 placeholder="Ej: Análisis de Ventas Q3"
-                className="w-full px-3 py-2 rounded-md border text-sm outline-none focus:ring-2 ring-primary/30 bg-background"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring/30"
                 autoFocus
                 data-testid="save-report-title-input"
                 disabled={isSaveActionLoading}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Presentación destino (Opcional)</label>
+              <label className="text-sm font-medium text-foreground">Presentación destino (Opcional)</label>
               <select
                 value={selectedSavePresentationId}
                 onChange={(event) => setSelectedSavePresentationId(event.target.value)}
-                className="w-full px-3 py-2 rounded-md border text-sm outline-none focus:ring-2 ring-primary/30 bg-background"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring/30"
                 disabled={isSaveActionLoading || isSaveDestinationsLoading}
               >
                 <option value="">Automático (por archivo)</option>
@@ -451,15 +463,15 @@ export function WorkspaceCanvas() {
                 ))}
               </select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)} disabled={isSaveActionLoading}>Cancelar</Button>
-              <Button onClick={handleConfirmSave} data-testid="save-report-confirm" disabled={isSaveActionLoading}>
-                {isSaveActionLoading ? "Guardando..." : "Guardar Reporte"}
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)} disabled={isSaveActionLoading}>Cancelar</Button>
+            <Button onClick={handleConfirmSave} data-testid="save-report-confirm" disabled={isSaveActionLoading}>
+              {isSaveActionLoading ? "Guardando..." : "Guardar Reporte"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

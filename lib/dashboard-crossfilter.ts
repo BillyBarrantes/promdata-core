@@ -174,10 +174,15 @@ function looksLikeDateColumn(columnName: string, rows: Record<string, unknown>[]
     if (value instanceof Date) return true;
     const asText = String(value).trim();
     if (!asText) return false;
-    if (/^\d{4}-\d{2}-\d{2}/.test(asText) || /^\d{2}\/\d{2}\/\d{4}/.test(asText)) {
+    if (
+      /^\d{4}[-/]\d{1,2}([-/]\d{1,2})?/.test(asText) ||
+      /^\d{1,2}[-/]\d{1,2}[-/]\d{4}/.test(asText) ||
+      toTemporalMonthKey(asText) !== null ||
+      toTemporalWeekKey(asText) !== null
+    ) {
       return true;
     }
-    return !Number.isNaN(Date.parse(asText));
+    return false;
   }).length;
 
   return dateLikeCount / sample.length >= 0.6;
@@ -793,7 +798,7 @@ function normalizeVisualDomainValue(rawValue: unknown): string {
   return normalized;
 }
 
-function toTemporalMonthKey(rawValue: unknown): string | null {
+export function toTemporalMonthKey(rawValue: unknown): string | null {
   if (rawValue === null || rawValue === undefined) return null;
 
   const toKey = (date: Date): string | null => {
@@ -878,14 +883,7 @@ function toTemporalMonthKey(rawValue: unknown): string | null {
     return null;
   }
 
-  // ISO / parseable estándar.
-  const parsed = Date.parse(text);
-  if (!Number.isNaN(parsed)) {
-    const key = toKey(new Date(parsed));
-    if (key) return key;
-  }
-
-  // Mes abreviado + año (es/en), ej: Mar-2021, Abr 2021, Sep_2021
+  // 1. Mes abreviado + año (es/en), ej: Mar-2021, Abr-2026, Sep_2021, 2026-04
   const normalized = text
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
@@ -916,6 +914,7 @@ function toTemporalMonthKey(rawValue: unknown): string | null {
     if (month && Number.isFinite(year)) {
       return `${year}-${String(month).padStart(2, '0')}`;
     }
+    return null;
   }
 
   match = normalized.match(/^(\d{4})-([a-z]+)$/);
@@ -925,6 +924,7 @@ function toTemporalMonthKey(rawValue: unknown): string | null {
     if (month && Number.isFinite(year)) {
       return `${year}-${String(month).padStart(2, '0')}`;
     }
+    return null;
   }
 
   match = normalized.match(/^(\d{4})-(\d{1,2})$/);
@@ -936,10 +936,17 @@ function toTemporalMonthKey(rawValue: unknown): string | null {
     }
   }
 
+  // 2. ISO / parseable estándar completo (ej. 2026-04-15, timestamps)
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) {
+    const key = toKey(new Date(parsed));
+    if (key) return key;
+  }
+
   return null;
 }
 
-function toTemporalWeekKey(rawValue: unknown): string | null {
+export function toTemporalWeekKey(rawValue: unknown): string | null {
   if (rawValue === null || rawValue === undefined) return null;
 
   const toWeekKey = (date: Date): string | null => {
@@ -1012,6 +1019,11 @@ function toTemporalWeekKey(rawValue: unknown): string | null {
     .replace(/_/g, '-')
     .replace(/\s+/g, '-')
     .toUpperCase();
+
+  // Si es un patrón explícito de mes-año, NO es una semana:
+  if (/^[A-Z]+-\d{4}$/.test(normalized) || /^\d{4}-[A-Z]+$/.test(normalized) || /^\d{4}-\d{1,2}$/.test(normalized)) {
+    return null;
+  }
 
   const weekMatch = normalized.match(/^(\d{4})-?W(\d{1,2})$/);
   if (weekMatch) {

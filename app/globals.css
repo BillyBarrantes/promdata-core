@@ -4,82 +4,144 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.985 0 0);
-  /* Slightly off-white for contrast with white cards */
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Cursor-inspired warm palette — refined for softness */
+  --background: oklch(0.968 0.004 80);        /* #f4f3ef warm off-white */
+  --foreground: oklch(0.263 0.012 72);        /* #26251e warm near-black */
+  --card: oklch(0.992 0.002 80);              /* #fdfcfb near-white — lifts clearly from background */
+  --card-foreground: oklch(0.263 0.012 72);
+  --popover: oklch(0.992 0.002 80);
+  --popover-foreground: oklch(0.263 0.012 72);
+  --primary: oklch(0.263 0.012 72);           /* warm near-black */
+  --primary-foreground: oklch(0.968 0.004 80);
+  --secondary: oklch(0.955 0.005 80);         /* warm surface — between bg and card */
+  --secondary-foreground: oklch(0.263 0.012 72);
+  --muted: oklch(0.972 0.003 80);             /* warm muted — close to background */
+  --muted-foreground: oklch(0.55 0.012 72);   /* warm secondary text */
+  --accent: oklch(0.72 0.14 28);              /* #f97316 softened orange — less aggressive */
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.555 0.195 15);       /* #cf2d56 warm crimson */
+  --destructive-foreground: oklch(0.555 0.195 15);
+  --border: oklch(0.895 0.007 78);            /* warm border — soft against card surfaces */
+  --input: oklch(0.895 0.007 78);
+  --ring: oklch(0.55 0.012 72);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 1rem;
-  /* More rounded 16px */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+  /* Cursor-aligned radius: 10px base */
+  --sidebar: oklch(0.968 0.004 80);
+  --sidebar-foreground: oklch(0.263 0.012 72);
+  --sidebar-primary: oklch(0.263 0.012 72);
+  --sidebar-primary-foreground: oklch(0.968 0.004 80);
+  --sidebar-accent: oklch(0.955 0.005 80);
+  --sidebar-accent-foreground: oklch(0.263 0.012 72);
+  --sidebar-border: oklch(0.895 0.007 78);
+  --sidebar-ring: oklch(0.55 0.012 72);
+
+  /* Cursor-specific: warm elevation shadows — layered for realism */
+  --cursor-shadow-xs: 0 1px 2px rgba(38, 37, 30, 0.03);
+  --cursor-shadow-sm: 0 1px 3px rgba(38, 37, 30, 0.04), 0 1px 2px rgba(38, 37, 30, 0.02);
+  --cursor-shadow-md: 0 4px 16px rgba(38, 37, 30, 0.07), 0 1px 4px rgba(38, 37, 30, 0.04);
+  --cursor-shadow-lg: 0 12px 40px rgba(38, 37, 30, 0.1), 0 4px 12px rgba(38, 37, 30, 0.05), 0 0 0 1px rgba(38, 37, 30, 0.04);
+  --cursor-shadow-elevated: 0 24px 64px rgba(38, 37, 30, 0.12), 0 12px 32px rgba(38, 37, 30, 0.08), 0 4px 12px rgba(38, 37, 30, 0.04), 0 0 0 1px rgba(38, 37, 30, 0.04);
+
+  /* Cursor focus: depth-based, subtle warm halo */
+  --cursor-focus: 0 0 0 2px var(--background), 0 0 0 4px oklch(0.55 0.012 72 / 0.25);
+
+  /* Cursor accent hover (text → crimson) */
+  --cursor-danger: oklch(0.555 0.195 15);
+
+  /* Cursor glow: accent-based glow for active/selected states */
+  --cursor-glow: 0 0 0 1px oklch(0.662 0.178 28 / 0.15), 0 0 12px oklch(0.662 0.178 28 / 0.08);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Refined dark: warm-shifted, low-contrast, atmospheric */
+  --background: oklch(0.135 0.005 65);         /* deep warm charcoal, not pure black */
+  --foreground: oklch(0.935 0.006 80);          /* warm off-white, reduced from peak */
+  --card: oklch(0.195 0.007 68);                /* clear lift from background */
+  --card-foreground: oklch(0.935 0.006 80);
+  --popover: oklch(0.155 0.006 68);             /* between bg and card */
+  --popover-foreground: oklch(0.935 0.006 80);
+  --primary: oklch(0.935 0.006 80);
+  --primary-foreground: oklch(0.135 0.005 65);
+  --secondary: oklch(0.205 0.008 68);           /* warm mid-surface */
+  --secondary-foreground: oklch(0.935 0.006 80);
+  --muted: oklch(0.185 0.006 68);               /* slightly above bg */
+  --muted-foreground: oklch(0.62 0.008 72);     /* visible but not harsh */
+  --accent: oklch(0.68 0.165 28);               /* cursor orange, slightly softened */
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.42 0.135 25);          /* muted crimson */
+  --destructive-foreground: oklch(0.68 0.18 25);
+  --border: oklch(0.285 0.008 70 / 0.6);       /* warm edge — softer against dark card surfaces */
+  --input: oklch(0.235 0.008 68);
+  --ring: oklch(0.50 0.01 72);
+  --chart-1: oklch(0.52 0.22 264);
+  --chart-2: oklch(0.72 0.15 162);
+  --chart-3: oklch(0.78 0.17 70);
+  --chart-4: oklch(0.65 0.24 304);
+  --chart-5: oklch(0.67 0.22 16);
+  --sidebar: oklch(0.150 0.006 65);             /* darkest surface, anchoring */
+  --sidebar-foreground: oklch(0.88 0.005 80);
+  --sidebar-primary: oklch(0.52 0.22 264);
+  --sidebar-primary-foreground: oklch(0.935 0.006 80);
+  --sidebar-accent: oklch(0.20 0.007 68);
+  --sidebar-accent-foreground: oklch(0.88 0.005 80);
+  --sidebar-border: oklch(0.265 0.008 70);
+  --sidebar-ring: oklch(0.40 0.008 72);
+
+  /* Extended dark tokens (from promdata-dark.tokens.css spec) */
+  --surface-base: oklch(0.135 0.005 65);
+  --surface-inset: oklch(0.155 0.006 68);
+  --surface-raised: oklch(0.185 0.007 68);
+  --surface-overlay: oklch(0.22 0.008 68);
+
+  /* Border scale: subtle → default → strong */
+  --border-subtle: oklch(0.265 0.008 70 / 0.55);
+  --border-strong: oklch(0.265 0.008 70 / 1);
+
+  /* Text scale: primary → secondary → muted → faint */
+  --text-primary: oklch(0.935 0.006 80);
+  --text-secondary: oklch(0.72 0.008 72);
+  --text-muted: oklch(0.55 0.008 72);
+  --text-faint: oklch(0.40 0.006 72);
+
+  /* Data series: luminance-separated for chart readability — brightened for dark surfaces */
+  --series-1: oklch(0.75 0.14 258);
+  --series-2: oklch(0.82 0.11 238);
+  --series-3: oklch(0.68 0.07 222);
+  --series-4: oklch(0.72 0.15 276);
+  --series-5: oklch(0.60 0.15 294);
+  --series-6: oklch(0.52 0.12 310);
+
+  /* Chart anatomy */
+  --chart-plate: oklch(0.155 0.006 68);
+  --chart-grid: oklch(1 0 0 / 0.04);
+  --chart-axis: oklch(1 0 0 / 0.10);
+
+  /* Density tokens */
+  --pad-card: 20px;
+  --gap: 14px;
+  --row-h: 40px;
+
+  /* Atmospheric shadows for dark mode — diffused, warm-tinted */
+  --cursor-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --cursor-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --cursor-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.24), 0 2px 6px rgba(0, 0, 0, 0.12);
+  --cursor-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --cursor-shadow-elevated: 0 24px 72px rgba(0, 0, 0, 0.38), 0 12px 32px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --cursor-focus: 0 0 0 2px var(--background), 0 0 0 4px oklch(0.50 0.01 72 / 0.3);
+  --cursor-glow: 0 0 0 1px oklch(0.68 0.165 28 / 0.2), 0 0 16px oklch(0.68 0.165 28 / 0.1);
 }
 
 @theme inline {
-  /* Force System Font Stack for Apple Feel */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Cursor typography: three-voice system */
+  --font-sans: "CursorGothic", "CursorGothic Fallback", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "CursorGothic", "CursorGothic Fallback", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: "jjannon", "Iowan Old Style", "Palatino Linotype", "URW Palladio L", P052, ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "berkeleyMono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -104,9 +166,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -120,55 +182,312 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50 tracking-tight;
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    transition: color-scheme 0.3s ease;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-background text-foreground font-light antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+    font-feature-settings: "cv11", "ss01", "cswh";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 350ms cubic-bezier(0.2, 0, 0, 1), color 280ms ease;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Apple-style readability enhancements */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply tracking-tight font-medium text-foreground/90;
+  /* Premium text selection */
+  ::selection {
+    background: oklch(0.662 0.178 28 / 0.2);
+    color: var(--foreground);
+  }
+  ::-moz-selection {
+    background: oklch(0.662 0.178 28 / 0.2);
+    color: var(--foreground);
+  }
+
+  /* Cursor-style headings: semibold weight, tight tracking, balanced wrap */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  h1 {
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  h2 {
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
   }
 
   p {
     @apply leading-relaxed;
+    font-family: var(--font-body);
   }
 }
 
-/* --- AÑADE ESTAS LÍNEAS --- */
-.font-semibold {
-  @apply font-medium;
+/* ─── Cursor UI Utilities ───────────────────────────────────────── */
+
+/* Smooth dark mode transitions on surfaces */
+.dark-mode-transition,
+.dark-mode-transition *,
+.dark-mode-transition *::before,
+.dark-mode-transition *::after {
+  transition: background-color 0.3s ease, color 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
 
-strong,
-b {
-  @apply font-medium;
+/* Warm hover state: text shifts to crimson (Cursor signature) */
+.cursor-hover-danger:hover {
+  color: var(--cursor-danger);
 }
+
+/* Cursor-style focus ring: depth-based shadow, no halo */
+.cursor-focus:focus-visible {
+  outline: none;
+  box-shadow: var(--cursor-focus);
+}
+
+/* Warm elevated card shadow — smooth layered transition */
+.cursor-shadow-card {
+  box-shadow: var(--cursor-shadow-sm);
+  transition: box-shadow 250ms cubic-bezier(0.2, 0, 0, 1), transform 250ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-shadow-card:hover {
+  box-shadow: var(--cursor-shadow-lg);
+  transform: translateY(-1px);
+}
+
+/* Cursor pill shape for tags/badges */
+.cursor-pill {
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: var(--text-xs, 11px);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+/* Cursor button primary: warm surface background with refined press */
+.cursor-btn-primary {
+  background: var(--secondary);
+  color: var(--foreground);
+  border: 1px solid transparent;
+  transition: color 180ms cubic-bezier(0.2, 0, 0, 1), background-color 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 220ms cubic-bezier(0.2, 0, 0, 1), transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-btn-primary:hover {
+  color: var(--cursor-danger);
+  box-shadow: var(--cursor-shadow-sm);
+}
+.cursor-btn-primary:active {
+  background: var(--border);
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+/* Cursor button secondary: ghost on warm surface */
+.cursor-btn-secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  transition: color 180ms cubic-bezier(0.2, 0, 0, 1), border-color 180ms cubic-bezier(0.2, 0, 0, 1), background-color 180ms cubic-bezier(0.2, 0, 0, 1), transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-btn-secondary:hover {
+  color: var(--cursor-danger);
+  border-color: rgba(38, 37, 30, 0.2);
+  background: oklch(0.938 0.008 80 / 0.5);
+}
+.cursor-btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Cursor button accent: orange pill (used at most once per screen) */
+.cursor-btn-accent {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: 9999px;
+  transition: background-color 180ms cubic-bezier(0.2, 0, 0, 1), box-shadow 220ms cubic-bezier(0.2, 0, 0, 1), transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-btn-accent:hover {
+  background: color-mix(in oklab, var(--accent), black 8%);
+  box-shadow: 0 2px 12px oklch(0.662 0.178 28 / 0.2);
+}
+.cursor-btn-accent:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+/* Cursor card with warm elevation — smooth layered transitions */
+.cursor-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: var(--cursor-shadow-xs);
+  transition: box-shadow 250ms cubic-bezier(0.2, 0, 0, 1), border-color 200ms ease, transform 250ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-card:hover {
+  box-shadow: var(--cursor-shadow-md);
+  border-color: oklch(0.865 0.009 78 / 0.8);
+}
+
+/* Cursor input with warm focus — refined border + subtle glow */
+.cursor-input {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  transition: border-color 200ms cubic-bezier(0.2, 0, 0, 1), box-shadow 250ms cubic-bezier(0.2, 0, 0, 1), background-color 200ms ease;
+}
+.cursor-input:hover {
+  border-color: oklch(0.865 0.009 78 / 0.7);
+}
+.cursor-input:focus {
+  outline: none;
+  border-color: oklch(0.55 0.012 72 / 0.4);
+  box-shadow: var(--cursor-focus);
+  background: var(--background);
+}
+
+/* Cursor badge with warm surface */
+.cursor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 2px 12px;
+  border-radius: 9999px;
+  font-size: var(--text-xs, 11px);
+  font-weight: 500;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+/* Cursor-style link decoration — smooth underline animation */
+.cursor-link {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+.cursor-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--muted);
+}
+
+/* ─── Premium Micro-Interactions ──────────────────────────────── */
+
+/* Press scale effect — universal for interactive elements */
+.cursor-press {
+  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+.cursor-press:active {
+  transform: scale(0.97);
+}
+
+/* Premium entrance: subtle scale + fade from below */
+@keyframes premiumEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-premium-entrance {
+  animation: premiumEntrance 500ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Premium fade: subtle opacity with slight upward drift */
+@keyframes premiumFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-premium-fade {
+  animation: premiumFade 350ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Premium scale-in: for modals, dialogs, popovers */
+@keyframes premiumScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-premium-scale-in {
+  animation: premiumScaleIn 250ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Smooth content reveal for conditional elements */
+@keyframes contentReveal {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-reveal {
+  animation: contentReveal 300ms cubic-bezier(0.2, 0, 0, 1) both;
+  overflow: hidden;
+}
+
+/* Stagger delays — premium entrance for lists */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
 
 /* Utility to hide scrollbar but keep functionality */
 .scrollbar-hide {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
 }
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-  /* Chrome, Safari and Opera */
 }
 
+/* Chart toolbar: horizontal scroll row for mode-switch buttons */
 .chart-toolbar-row {
   display: flex;
-  flex-wrap: nowrap !important;
+  flex-wrap: nowrap;
   align-items: center;
+  gap: 0.5rem;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
@@ -176,9 +495,257 @@ b {
 }
 
 .chart-toolbar-row > * {
-  flex: 0 0 auto !important;
+  flex: 0 0 auto;
 }
 
 .chart-toolbar-row [data-slot="button"] {
   white-space: nowrap;
+}
+
+/* ─── Warm Scrollbar (universal) ──────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.263 0.012 72 / 0.15);
+  border-radius: 999px;
+  transition: background 200ms ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.263 0.012 72 / 0.3);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.263 0.012 72 / 0.15) transparent;
+}
+
+/* Dark mode scrollbar refinement */
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.935 0.006 80 / 0.12);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.935 0.006 80 / 0.25);
+}
+.dark * {
+  scrollbar-color: oklch(0.935 0.006 80 / 0.12) transparent;
+}
+
+/* ─── Content Card Entrance ───────────────────────────────────── */
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-in {
+  animation: fadeSlideIn 300ms ease-out both;
+}
+
+/* ─── Unified Focus Ring (Cursor-style, double-ring) ──────────────────── */
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--cursor-focus);
+}
+
+/* Smooth entrance animation for content cards */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Subtle shimmer for loading states */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, oklch(0.950 0.007 80 / 0.6) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ─── Extended Presentation Utilities ──────────────────────────── */
+
+/* Chart plate: inset surface for chart containers */
+.pd-plate {
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--chart-plate, var(--muted));
+  box-shadow: inset 0 0 0 1px var(--border-subtle, var(--border));
+  padding: 8px 10px 4px;
+}
+
+/* Card: luminance-based separation, no border needed */
+.pd-card {
+  border-radius: calc(var(--radius) + 6px);
+  background: var(--surface-raised, var(--card));
+  box-shadow: var(--shadow-raised, var(--cursor-shadow-xs));
+}
+
+/* Tabular numbers: columns never dance */
+.pd-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ─── Motion: Subtle Entrance Animations ──────────────────────── */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 400ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Stagger delays for list items */
+.animate-delay-75 { animation-delay: 75ms; }
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-150 { animation-delay: 150ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+
+/* Card entrance: subtle lift from below */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-entrance {
+  animation: cardEntrance 350ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Resize snap: smooth return after drag */
+@keyframes resizeSnap {
+  from {
+    transform: scale(0.985);
+    opacity: 0.92;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.react-grid-item.react-resizable:not(.resizing) > div {
+  animation: resizeSnap 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ─── Premium Dialog/Popover Animation ────────────────────────── */
+
+@keyframes dialogOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialogContentIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+[data-slot="dialog-content"] {
+  animation: dialogContentIn 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* ─── Smooth Page Transitions ─────────────────────────────────── */
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: pageEnter 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* ─── Reduced Motion ──────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in-up,
+  .animate-fade-slide-up,
+  .animate-fade-slide-in,
+  .animate-card-entrance,
+  .animate-premium-entrance,
+  .animate-premium-fade,
+  .animate-premium-scale-in,
+  .animate-content-reveal {
+    animation: none;
+  }
+
+  .react-grid-item.react-resizable:not(.resizing) > div {
+    animation: none;
+  }
+
+  .cursor-shadow-card:hover {
+    transform: none;
+  }
+
+  .cursor-press:active {
+    transform: none;
+  }
 }

@@ -45,13 +45,11 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error("CALLBACK ERROR: Supabase devolvió un error:", error.message);
-    } else {
-      console.log("CALLBACK ÉXITO: Sesión obtenida de Supabase. ¿Contiene usuario?", !!data.user);
+      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
     }
-    // --- FIN DEL BLOQUE DE DIAGNÓSTICO ---
 
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
-    }
+    return NextResponse.redirect(`${origin}${next}`)
   }
+
+  return NextResponse.redirect(`${origin}/login`)
 }

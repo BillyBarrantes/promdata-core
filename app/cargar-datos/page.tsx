@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSupabase } from '@/lib/supabase-provider';
 import { toast } from "sonner"; // Usaremos toast para notificaciones
-import { AlertTriangle, RefreshCw, Search, ShieldAlert, ShieldCheck, Table2, Trash2, Unplug, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Loader2, MoreVertical, Plus, RefreshCw, Search, ShieldAlert, ShieldCheck, Trash2, Unplug, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { API_BASE_URL } from "@/lib/api-config";
 
 // El tipo de archivo que esperamos de la base de datos
@@ -216,8 +217,19 @@ interface FilePreviewResponse {
 }
 
 function ExcelMiniIcon() {
+  const [hasError, setHasError] = useState(false);
+  if (!hasError) {
+    return (
+      <img
+        src="/Excel.svg"
+        alt="Excel"
+        className="h-5 w-5 shrink-0 object-contain"
+        onError={() => setHasError(true)}
+      />
+    );
+  }
   return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0" aria-hidden="true">
       <rect x="3" y="2.5" width="12.5" height="15" rx="3" fill="#16A34A" />
       <path d="M7 6.2h4.8v1.1H8.3V9h3.2v1.05H8.3v2h3.7v1.1H7V6.2Z" fill="white" />
       <rect x="1.5" y="5" width="6" height="10" rx="1.8" fill="#15803D" />
@@ -227,13 +239,23 @@ function ExcelMiniIcon() {
 }
 
 function CsvMiniIcon() {
+  const [hasError, setHasError] = useState(false);
+  if (!hasError) {
+    return (
+      <img
+        src="/CSV.svg"
+        alt="CSV"
+        className="h-5 w-5 shrink-0 object-contain"
+        onError={() => setHasError(true)}
+      />
+    );
+  }
   return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
-      <path d="M5 2.5h6.4L15.5 6v10.4A1.6 1.6 0 0 1 13.9 18H5A1.5 1.5 0 0 1 3.5 16.5V4A1.5 1.5 0 0 1 5 2.5Z" fill="#F59E0B" />
-      <path d="M11.4 2.5V5a1 1 0 0 0 1 1h3.1" fill="#FCD34D" />
-      <path d="M6.1 8.1h7.3v1H6.1v-1Zm0 2h7.3v1H6.1v-1Zm0 2h5.2v1H6.1v-1Z" fill="white" />
-      <rect x="5.8" y="13.5" width="8.1" height="2.2" rx="1.1" fill="#B45309" />
-      <text x="9.85" y="15.1" textAnchor="middle" fontSize="3.1" fill="white" fontWeight="700">CSV</text>
+    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0" aria-hidden="true">
+      <rect x="3" y="2.5" width="12.5" height="15" rx="3" fill="#16A34A" />
+      <path d="M7 6.2h4.8v1.1H8.3V9h3.2v1.05H8.3v2h3.7v1.1H7V6.2Z" fill="white" />
+      <rect x="1.5" y="5" width="6" height="10" rx="1.8" fill="#15803D" />
+      <path d="m3.3 8 1.15 1.8L5.6 8h1.15l-1.7 2.48 1.78 2.52H5.67L4.45 11.1 3.2 13H2.05l1.8-2.58L2.17 8H3.3Z" fill="white" />
     </svg>
   );
 }
@@ -250,25 +272,55 @@ function GoogleSheetMiniIcon() {
 }
 
 function ProviderIdentityIcon({ providerId }: { providerId: string }) {
+  const [useFallback, setUseFallback] = useState(false);
+
   if (providerId === 'google_drive') {
+    if (!useFallback) {
+      return (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+          <img
+            src="/google-drive.svg"
+            alt="Google Drive"
+            className="h-8 w-8 object-contain"
+            onError={() => setUseFallback(true)}
+          />
+        </div>
+      );
+    }
     return (
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm" aria-hidden="true">
-        <svg viewBox="0 0 20 20" className="h-5 w-5">
-          <path d="M3.7 13.6 7.8 6.5h3.1l-4.1 7.1H3.7Z" fill="#34A853" />
-          <path d="M12 13.6H6.8l-1.6 2.7H13c.6 0 1.1-.3 1.4-.8l.2-.3-2.6-1.6Z" fill="#188038" />
-          <path d="m8 6.5 1.6-2.8c.3-.5.8-.8 1.4-.8h.4l2.5 4.3-1.6 2.8H8Z" fill="#4285F4" />
-          <path d="M16.2 13.5 14 9.8l1.6-2.8 2.2 3.8c.3.5.3 1.1 0 1.6l-.2.4-1.4-.3Z" fill="#FBBC04" />
-          <path d="M14 9.8H7.8L6.2 7h9.4c.6 0 1.1.3 1.4.8l.2.4L14 9.8Z" fill="#EA4335" />
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+        <svg viewBox="0 0 87.3 78" className="h-8 w-8">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00AC47"/>
+          <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.6 9.8z" fill="#EA4335"/>
+          <path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832D"/>
+          <path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h22.9c1.6 0 3.15-.45 4.5-1.2z" fill="#2684FC"/>
+          <path d="M73.4 26.5 60.65 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.6 25l16.2 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#FFBA00"/>
         </svg>
       </div>
     );
   }
 
+  if (!useFallback) {
+    return (
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+        <img
+          src="/onedrive.svg"
+          alt="Microsoft OneDrive"
+          className="h-8 w-8 object-contain"
+          onError={() => setUseFallback(true)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm" aria-hidden="true">
-      <svg viewBox="0 0 20 20" className="h-5 w-5">
-        <path d="M7.1 14.6h7.7a3.05 3.05 0 0 0 .4-6.1A4.8 4.8 0 0 0 6 7.5a3.35 3.35 0 0 0 1.1 7.1Z" fill="#2563EB" />
-        <path d="M7.1 14.6h7.7a3.05 3.05 0 0 0 .4-6.1A4.15 4.15 0 0 0 7.5 10c0 1.7 1.3 3.1 2.9 3.1h4.4" fill="#60A5FA" opacity=".9" />
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+      <svg viewBox="0 0 24 24" className="h-8 w-8">
+        <path d="M14.27 14.73L9.64 10.8a5.38 5.38 0 0 1 7.8-1.96l.02.01a4.07 4.07 0 0 1 4.46.84L14.27 14.73z" fill="#0364B8"/>
+        <path d="M9.64 10.8l4.63 3.93H4.5a3.5 3.5 0 0 1-1.13-6.82A4.5 4.5 0 0 1 9.64 10.8z" fill="#0078D4"/>
+        <path d="M21.92 9.69a4.07 4.07 0 0 0-4.46-.84A5.38 5.38 0 0 0 9.64 10.8l4.63 3.93 7.65-5.04z" fill="#1490DF"/>
+        <path d="M14.27 14.73l7.65-5.04A4.07 4.07 0 0 1 24 13.5a4.07 4.07 0 0 1-4.07 4.07H4.5A3.5 3.5 0 0 1 4.5 14h9.77v.73z" fill="#28A8EA"/>
       </svg>
     </div>
   );
@@ -455,7 +507,8 @@ function CargarDatosPageContent() {
       .from('team_members')
       .select('team_id')
       .eq('user_id', user.id)
-      .single(); // .single() espera solo un resultado, que es lo correcto.
+      .limit(1)
+      .maybeSingle();
 
     if (teamError || !teamData) {
       toast.error("Error: No se pudo encontrar el equipo del usuario.");
@@ -488,6 +541,12 @@ function CargarDatosPageContent() {
       });
 
     if (dbError) {
+      // Rollback: limpiar el archivo huérfano en Storage si la inserción en DB falló
+      try {
+        await supabase.storage.from('dash-uploads').remove([filePath]);
+      } catch (cleanupErr) {
+        console.error("Error al limpiar archivo huérfano de storage:", cleanupErr);
+      }
       toast.error(`Error al registrar en DB: ${dbError.message}`);
     } else {
       toast.success("¡Archivo subido con éxito!");
@@ -914,10 +973,10 @@ function CargarDatosPageContent() {
       };
     }
     return {
-      border: 'border-slate-200',
-      bg: 'bg-slate-50/70',
-      text: 'text-slate-700',
-      chip: 'bg-white text-slate-700 border-slate-200',
+      border: 'border-border/40',
+      bg: 'bg-muted/30',
+      text: 'text-foreground',
+      chip: 'bg-card text-foreground border-border/40',
       icon: <ShieldCheck className="h-4 w-4" />,
     };
   })();
@@ -945,8 +1004,8 @@ function CargarDatosPageContent() {
       };
     }
     return {
-      wrapper: 'border-slate-200 bg-slate-50 text-slate-700',
-      chip: 'border-slate-200 bg-slate-50 text-slate-700',
+      wrapper: 'border-border/40 bg-muted/30 text-foreground',
+      chip: 'border-border/40 bg-muted/30 text-foreground',
     };
   };
 
@@ -1232,251 +1291,310 @@ function CargarDatosPageContent() {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 flex flex-col">
-        <header className="border-b border-border/40 px-6 py-4 bg-background/50 backdrop-blur-md sticky top-0 z-10">
-          <h1 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Espacio de Trabajo</h1>
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="border-b border-border/20 px-6 py-5 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 shrink-0">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div>
+              <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground leading-tight">Cargar Datos</h1>
+              <p className="mt-1.5 text-base font-light text-muted-foreground">Gestiona tus fuentes de datos para el análisis</p>
+            </div>
+            <Button
+              size="default"
+              className="px-4 text-sm font-medium rounded-lg gap-1.5 shadow-xs transition-all tracking-tight active:scale-[0.98]"
+              onClick={handleAddNewClick}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10"/></svg>
+              Subir archivo
+            </Button>
+          </div>
         </header>
 
-        <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-4xl font-normal tracking-tight text-foreground mb-2">Cargar Datos</h2>
-                <p className="text-muted-foreground font-light text-lg">Gestiona tus archivos de datos para el análisis.</p>
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+            {/* ── Hero Upload Zone ─────────────────────────────────── */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleAddNewClick}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAddNewClick(); } }}
+              className="group relative flex flex-col items-center justify-center gap-3.5 rounded-2xl border border-border/60 bg-card px-6 py-9 text-center cursor-pointer transition-all duration-200 hover:border-border hover:bg-card/80 hover:shadow-[var(--cursor-shadow-sm)] shadow-[var(--cursor-shadow-xs)]"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary/80 border border-border/50 text-muted-foreground transition-all duration-200 group-hover:text-foreground group-hover:scale-105 group-hover:border-foreground/20 shadow-2xs">
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M10 3v10M6 9l4-4 4 4" />
+                  <path d="M3 13v2a1 1 0 001 1h12a1 1 0 001-1v-2" />
+                </svg>
               </div>
-              <Button variant="outline" size="sm" onClick={handleAddNewClick}>
-                Subir nuevo archivo
-              </Button>
+              <div className="flex flex-col items-center gap-1.5">
+                <p className="text-sm font-medium text-foreground tracking-tight">Arrastra un archivo aquí o haz clic para seleccionar</p>
+                <span className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground/80 px-2.5 py-0.5 rounded-full bg-secondary/60 border border-border/40">
+                  .xlsx, .xls, .csv
+                </span>
+              </div>
             </div>
 
-            <div className="mb-8">
-              <div className="mb-4">
+            {/* ── Cloud Connectors Section ──────────────────────────── */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h3 className="text-xl font-medium text-foreground">Fuentes Cloud</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Conecta una cuenta y explora solo archivos listos para análisis.
-                  </p>
+                  <h2 className="text-sm font-semibold text-foreground tracking-tight">Fuentes Cloud</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Conecta cuentas para sincronizar y explorar archivos directamente</p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-2.5 py-1 shadow-2xs">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${watchdogRuntimeStatus?.operational_state === 'healthy' || !watchdogRuntimeStatus ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${watchdogRuntimeStatus?.operational_state === 'healthy' || !watchdogRuntimeStatus ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    </span>
+                    <span className="font-medium text-foreground">Watchdog</span>
+                    <span className="text-muted-foreground font-mono">{watchdogPollIntervalSeconds}s</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground/60" />
+                  </div>
+                  <span>{watchdogRuntimeStatus?.connected_provider_count ?? 0} conectados</span>
+                  <span>{watchdogRuntimeStatus?.active_target_count ?? 2} vigilados</span>
                 </div>
               </div>
 
-              {watchdogRuntimeStatus && (
-                <Card className={`mb-4 rounded-2xl border ${watchdogTone.border} ${watchdogTone.bg} px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)]`}>
-                  <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                    <div className={`flex items-center gap-2 text-sm font-medium ${watchdogTone.text}`}>
-                      {watchdogTone.icon}
-                      <span>Estado operativo del Watchdog Cloud</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${watchdogTone.chip}`}>
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                        {watchdogRuntimeStatus.connected_provider_count} Conectados
-                      </span>
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${watchdogTone.chip}`}>
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                        {watchdogRuntimeStatus.active_target_count} Vigilados
-                      </span>
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${watchdogTone.chip}`}>
-                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                        {watchdogRuntimeStatus.pending_target_count} Pendiente{watchdogRuntimeStatus.pending_target_count === 1 ? '' : 's'}
-                      </span>
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${watchdogTone.chip}`}>
-                        <span className="h-2.5 w-2.5 rounded-full bg-yellow-300" />
-                        {watchdogRuntimeStatus.fallback_provider_count} Fallback
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cloudProviders.map((provider) => {
                   const runtimeState = getRuntimeStateForProvider(provider.id);
-                  const providerTone = getProviderStateTone(runtimeState?.operational_state);
                   return (
-                  <Card key={provider.id} className="rounded-2xl border border-border/50 bg-card/70 p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] backdrop-blur-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex items-start gap-3">
-                        <ProviderIdentityIcon providerId={provider.id} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="truncate text-[15px] font-medium leading-none text-foreground">{provider.name}</h4>
+                    <div key={provider.id} className="group rounded-2xl border border-border/70 bg-card p-5 shadow-2xs hover:border-border transition-all duration-150 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3.5">
+                            <ProviderIdentityIcon providerId={provider.id} />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-foreground">{provider.name}</h3>
+                                <span className="rounded-full bg-secondary/80 border border-border/50 px-2 py-0.5 text-xs text-muted-foreground font-normal">
+                                  {provider.connected ? 'Conectado' : 'Desconectado'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {provider.connected
+                                  ? (provider.connected_account_email || 'Cuenta activa')
+                                  : 'Sin conexión'}
+                              </p>
+                            </div>
                           </div>
-                          <p className="mt-1 truncate text-[12px] leading-none text-muted-foreground">
-                            {provider.connected ? (provider.connected_account_email || 'Cuenta conectada') : 'Sin conectar'}
-                            {provider.connected && provider.watch_target_count > 0 && (
-                              <span className="ml-1.5">
-                                | {provider.watch_target_count} {provider.watch_target_count === 1 ? 'archivo vigilado' : 'archivos vigilados'}
-                              </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground/60 hover:text-foreground rounded-lg -mr-1 -mt-1"
+                            title="Opciones"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {provider.connected && (
+                          <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                            {provider.watch_target_count > 0 && (
+                              <>
+                                <span className="inline-flex items-center gap-1">
+                                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  {provider.watch_target_count} vigilado{provider.watch_target_count === 1 ? '' : 's'}
+                                </span>
+                                <span className="text-border">·</span>
+                              </>
                             )}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] ${
-                        provider.connected
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : provider.configured
-                            ? 'bg-slate-50 text-slate-700 border-slate-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
-                        {provider.connected ? 'Conectado' : provider.status === 'configured' ? 'Listo' : 'Pendiente'}
-                      </span>
-                    </div>
-
-                    {runtimeState && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] ${providerTone.wrapper}`}>
-                            {runtimeState.operational_state === 'healthy'
-                              ? 'Sincronizado'
-                              : runtimeState.operational_state === 'degraded'
-                                ? 'Degradado'
-                                : runtimeState.operational_state === 'attention'
-                                  ? 'Atención'
-                                  : 'En espera'}
-                          </span>
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-700">
-                            {runtimeState.runtime_mode === 'webhook' ? 'Webhook' : 'Polling'}
-                          </span>
-                          {runtimeState.pending_target_count > 0 && (
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] ${providerTone.chip}`}>
-                              {runtimeState.pending_target_count} pend.
-                            </span>
-                          )}
-                          {runtimeState.fallback_target_count > 0 && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
-                              Fallback
-                            </span>
-                          )}
-                          {runtimeState.stale_target_count > 0 && (
-                            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-700">
-                              Desact. x{runtimeState.stale_target_count}
-                            </span>
-                          )}
-                        </div>
-                        {runtimeState.sync_summary && (
-                          <p className="text-[11px] leading-snug text-muted-foreground">
-                            {runtimeState.sync_summary}
-                          </p>
+                            {runtimeState && (
+                              <>
+                                <span className="inline-flex items-center gap-1">
+                                  <span className={`h-1.5 w-1.5 rounded-full ${runtimeState.operational_state === 'healthy' ? 'bg-emerald-500' : runtimeState.operational_state === 'degraded' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                                  {runtimeState.operational_state === 'healthy' ? 'Sincronizado' : runtimeState.operational_state === 'degraded' ? 'Degradado' : 'Atención'}
+                                </span>
+                                <span className="text-border">·</span>
+                                <span>{runtimeState.runtime_mode === 'webhook' ? 'Webhook' : 'Polling'}</span>
+                              </>
+                            )}
+                          </div>
                         )}
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-                          <span>Act.: {formatRuntimeTimeShort(runtimeState.last_activity_at)}</span>
-                          <span>Re-sync: {formatRuntimeTimeShort(runtimeState.next_check_due_at)}</span>
+                      </div>
+
+                      <div className="mt-5 pt-0">
+                        {provider.connected ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              className="h-9 flex-1 px-3 text-xs font-medium rounded-xl shadow-xs transition-all tracking-tight active:scale-[0.98] gap-1.5"
+                              onClick={() => handleOpenExplorer(provider)}
+                            >
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                              Explorar archivos
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 rounded-xl"
+                              disabled={manualProviderPollingId === provider.id || Boolean(autoSyncMonitoringProviderIds[provider.id])}
+                              onClick={() => void pollWatchdogTargets(provider.id)}
+                              title={runtimeState?.recommended_action || 'Verificar estado del proveedor ahora'}
+                            >
+                              <RefreshCw className={`h-3.5 w-3.5 ${(manualProviderPollingId === provider.id || autoSyncMonitoringProviderIds[provider.id]) ? 'animate-spin' : ''}`} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              disabled={disconnectingProviderId === provider.id}
+                              onClick={() => handleDisconnectProvider(provider)}
+                              title="Desconectar"
+                            >
+                              <Unplug className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-9 rounded-xl border border-border/70 bg-transparent hover:bg-secondary/60 active:scale-[0.98] text-xs font-medium text-foreground transition-all duration-150 flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-60"
+                            disabled={!provider.oauth_ready || connectingProviderId === provider.id}
+                            onClick={() => handleConnectProvider(provider.id)}
+                          >
+                            {provider.oauth_ready ? (
+                              connectingProviderId === provider.id ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  <span>Conectando...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-3.5 w-3.5" />
+                                  <span>Conectar cuenta</span>
+                                </>
+                              )
+                            ) : (
+                              'Configurar credenciales'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* ── Files List Section ─────────────────────────────── */}
+            <section className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground tracking-tight">Archivos Cargados</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Haz clic en &quot;Analizar&quot; para iniciar una conversación con tus datos</p>
+                </div>
+                {!isLoading && uploadedFiles.length > 0 && (
+                  <span className="font-mono text-xs text-muted-foreground px-2.5 py-0.5 rounded-full bg-secondary/60 border border-border/50">
+                    {uploadedFiles.length} {uploadedFiles.length === 1 ? 'archivo' : 'archivos'}
+                  </span>
+                )}
+              </div>
+
+              {isLoading && (
+                <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                  <svg className="h-4 w-4 mr-2 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                  Cargando archivos...
+                </div>
+              )}
+
+              {!isLoading && uploadedFiles.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-border/80 bg-card/40 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/80 border border-border/40 mb-3 shadow-2xs">
+                    <svg className="h-6 w-6 text-muted-foreground/60" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="14" height="14" rx="2" />
+                      <path d="M7 7h6M7 10h4" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-foreground tracking-tight">Sin archivos aún</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">Sube tu primer archivo .xlsx o .csv para comenzar a analizar tus datos.</p>
+                </div>
+              )}
+
+              {!isLoading && uploadedFiles.length > 0 && (
+                <div className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs">
+                  {/* Table Header */}
+                  <div className="flex items-center px-6 py-3 border-b border-border/60 text-xs font-medium text-muted-foreground">
+                    <div className="flex-1 min-w-0">Archivo</div>
+                    <div className="w-48 shrink-0">Fecha</div>
+                    <div className="w-40 shrink-0 text-right pr-1 sr-only">Acciones</div>
+                  </div>
+
+                  {/* Table Rows */}
+                  {uploadedFiles.map((file) => {
+                    const formattedDate = file.created_at
+                      ? new Date(file.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : null;
+                    return (
+                      <div
+                        key={file.id}
+                        className="group flex items-center px-6 py-3.5 border-b border-border/40 last:border-b-0 hover:bg-muted/40 transition-colors duration-150"
+                      >
+                        {/* Col 1: Archivo */}
+                        <div className="flex items-center gap-3 flex-1 min-w-0 pr-6">
+                          {file.file_name?.toLowerCase().endsWith('.csv') ? <CsvMiniIcon /> : <ExcelMiniIcon />}
+                          <span className="text-sm font-medium text-foreground truncate tracking-tight" title={file.file_name}>
+                            {file.file_name}
+                          </span>
+                        </div>
+
+                        {/* Col 2: Fecha */}
+                        <div className="w-48 shrink-0 text-xs text-muted-foreground font-normal">
+                          {formattedDate || '—'}
+                        </div>
+
+                        {/* Col 3: Acciones */}
+                        <div className="w-40 shrink-0 flex items-center justify-end gap-2">
+                          <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground/70 hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+                                  onClick={(e) => { e.stopPropagation(); void handleOpenPreview(file); }}
+                                >
+                                  <img src="/Vista previa.svg" alt="Vista previa" className="h-4 w-4 shrink-0 object-contain dark:invert" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs py-1 px-2.5 rounded-md shadow-md">
+                                Vista previa
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteFile(file.id, file.storage_path); }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs py-1 px-2.5 rounded-md shadow-md">
+                                Eliminar archivo
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7.5 px-3.5 text-xs font-medium rounded-lg border-border/80 text-foreground hover:bg-secondary active:scale-[0.98] transition-all ml-1"
+                            onClick={() => handleIniciarChat(file.id)}
+                          >
+                            Analizar
+                          </Button>
                         </div>
                       </div>
-                    )}
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {provider.connected ? (
-                        <>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-8 min-w-[9.5rem] flex-1 rounded-xl px-3 text-[11px] shadow-sm"
-                            onClick={() => handleOpenExplorer(provider)}
-                          >
-                            Explorar archivos
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 rounded-xl px-3 text-[11px]"
-                            disabled={manualProviderPollingId === provider.id || Boolean(autoSyncMonitoringProviderIds[provider.id])}
-                            onClick={() => void pollWatchdogTargets(provider.id)}
-                            title={runtimeState?.recommended_action || 'Verificar estado del proveedor ahora'}
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${(manualProviderPollingId === provider.id || autoSyncMonitoringProviderIds[provider.id]) ? 'animate-spin' : ''}`} />
-                            {manualProviderPollingId === provider.id
-                              ? 'Verificando...'
-                              : autoSyncMonitoringProviderIds[provider.id]
-                                ? 'Sincronizando...'
-                                : 'Verificar ahora'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 min-w-[9rem] flex-1 rounded-xl px-3 text-[11px]"
-                            disabled={disconnectingProviderId === provider.id}
-                            onClick={() => handleDisconnectProvider(provider)}
-                          >
-                            <Unplug className="h-3.5 w-3.5 mr-1.5" />
-                            {disconnectingProviderId === provider.id ? 'Desconectando...' : 'Desconectar'}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full rounded-xl px-3 text-[11px]"
-                          disabled={!provider.oauth_ready || connectingProviderId === provider.id}
-                          onClick={() => handleConnectProvider(provider.id)}
-                        >
-                          {provider.oauth_ready
-                            ? (connectingProviderId === provider.id ? 'Redirigiendo...' : 'Conectar')
-                            : 'Configurar credenciales'}
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                )})}
-              </div>
-            </div>
-
-            {isLoading && <p className="text-muted-foreground">Cargando archivos...</p>}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {!isLoading && uploadedFiles.map((file) => (
-                <Card key={file.id} className="aspect-square p-6 flex flex-col justify-between relative group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-border/60 rounded-[2rem] bg-card/50 backdrop-blur-sm">
-
-                  {/* Botón de eliminar (visible en hover) */}
-                  <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-all group-hover:opacity-100">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 rounded-xl border-border/70 px-2.5 text-[11px] shadow-sm"
-                      title="Vista previa del archivo"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleOpenPreview(file);
-                      }}
-                    >
-                      <Table2 className="mr-1.5 h-3.5 w-3.5" />
-                      Vista previa
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
-                      title="Eliminar archivo"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFile(file.id, file.storage_path);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex-1 flex flex-col items-center justify-center pt-2">
-                    <div className="w-16 h-16 flex items-center justify-center mb-3">
-                      <img src={file.file_name.endsWith('.csv') ? "/CSV.svg" : "/Excel.svg"} alt="Icono" className="h-14 w-14 object-contain" />
-                    </div>
-                    <h3 className="font-medium text-foreground text-sm text-center px-1 line-clamp-2" title={file.file_name}>
-                      {file.file_name}
-                    </h3>
-                  </div>
-
-                  <div className="w-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-                    <Button size="sm" className="w-full rounded-xl bg-primary/90 hover:bg-primary" onClick={() => handleIniciarChat(file.id)}>
-                      Iniciar Chat
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            {!isLoading && uploadedFiles.length === 0 && (
-              <p className="text-center text-muted-foreground mt-8">No se encontraron archivos cargados.</p>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
             <input
               ref={fileInputRef}
@@ -1486,6 +1604,7 @@ function CargarDatosPageContent() {
               className="hidden"
             />
 
+            {/* ── Cloud Explorer Panel ────────────────────────────── */}
             {isExplorerOpen && (
               <div className="fixed inset-0 z-50">
                 <button
@@ -1494,12 +1613,11 @@ function CargarDatosPageContent() {
                   className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all duration-200"
                   onClick={() => setIsExplorerOpen(false)}
                 />
-
-                <aside className="fixed top-0 right-0 z-50 flex h-full w-full flex-col bg-background shadow-2xl border-l border-border sm:max-w-[500px]">
-                  <div className="flex shrink-0 items-start justify-between border-b border-border/50 bg-background/95 p-5 backdrop-blur">
+                <aside className="fixed top-0 right-0 z-50 flex h-full w-full flex-col bg-background shadow-[var(--cursor-shadow-elevated)] border-l border-border/30 sm:max-w-[500px]">
+                  <div className="flex shrink-0 items-start justify-between border-b border-border/30 bg-background/95 p-5 backdrop-blur">
                     <div className="min-w-0 pr-4">
                       <h3 className="truncate text-lg font-medium text-foreground">
-                        {activeExplorerProvider ? `Explorar archivos de ${activeExplorerProvider.name}` : 'Explorar archivos'}
+                        {activeExplorerProvider ? `Explorar · ${activeExplorerProvider.name}` : 'Explorar archivos'}
                       </h3>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Archivos analizables listos para importar.
@@ -1508,32 +1626,32 @@ function CargarDatosPageContent() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
                       onClick={() => setIsExplorerOpen(false)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  <div className="shrink-0 border-b border-border/50 bg-background/95 p-5 backdrop-blur">
+                  <div className="shrink-0 border-b border-border/30 bg-background/95 p-5 backdrop-blur">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={explorerSearch}
                         onChange={(event) => setExplorerSearch(event.target.value)}
                         placeholder="Buscar por nombre (.xlsx, .csv, Google Sheets)"
-                        className="h-10 rounded-2xl border-border/60 bg-muted/30 pl-9 text-sm"
+                        className="h-10 rounded-lg border-border bg-background pl-9 text-sm"
                       />
                     </div>
                     {activeExplorerProvider && (
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-full border border-border/40 bg-secondary px-2.5 py-0.5 font-medium">
                           {activeExplorerWatchTargets.length} vigilado{activeExplorerWatchTargets.length === 1 ? '' : 's'}
                         </span>
-                        <span className={`rounded-full border px-2.5 py-1 ${
+                        <span className={`rounded-full border px-2.5 py-0.5 font-medium ${
                           activeExplorerPendingCount > 0
-                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
                         }`}>
                           {activeExplorerPendingCount} pendiente{activeExplorerPendingCount === 1 ? '' : 's'} de re-sync
                         </span>
@@ -1543,19 +1661,19 @@ function CargarDatosPageContent() {
 
                   <div className="flex-1 min-h-0 space-y-1 overflow-y-auto p-5 overscroll-contain">
                     {explorerError && (
-                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                         {explorerError}
                       </div>
                     )}
 
                     {explorerLoading && (
-                      <div className="py-6 text-sm text-muted-foreground">
+                      <div className="py-6 text-sm text-muted-foreground text-center">
                         {explorerSearch.trim() ? 'Buscando archivos...' : 'Cargando archivos recientes...'}
                       </div>
                     )}
 
                     {!explorerLoading && explorerItems.length === 0 && !explorerError && (
-                      <div className="rounded-2xl border border-border/60 bg-card/40 px-4 py-6 text-sm text-muted-foreground">
+                      <div className="rounded-lg border border-border/40 bg-card px-4 py-8 text-sm text-muted-foreground text-center">
                         {explorerSearch.trim()
                           ? 'No se encontraron archivos analizables con ese nombre.'
                           : 'No se encontraron archivos analizables recientes en esta cuenta.'}
@@ -1563,21 +1681,21 @@ function CargarDatosPageContent() {
                     )}
 
                     {!explorerLoading && explorerItems.length > 0 && (
-                      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                      <div className="rounded-xl border border-border/40 bg-card overflow-hidden shadow-[var(--cursor-shadow-xs)]">
                         {explorerItems.map((item, index) => (
                           <div
                             key={item.id}
-                            className={`group flex cursor-default items-start justify-between border-slate-100 px-6 py-3 transition-colors hover:bg-slate-50/80 ${
-                              index !== explorerItems.length - 1 ? 'border-b' : ''
+                            className={`flex items-start justify-between px-4 py-3 transition-colors hover:bg-secondary/50 ${
+                              index !== explorerItems.length - 1 ? 'border-b border-border/50' : ''
                             }`}
                           >
-                            <div className="flex min-w-0 flex-1 items-start gap-4 overflow-hidden">
-                              <div className="shrink-0">
+                            <div className="flex min-w-0 flex-1 items-start gap-3 overflow-hidden">
+                              <div className="shrink-0 mt-0.5">
                                 {getRemoteFileIcon(item)}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-medium text-slate-800">{item.name}</div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] leading-tight text-slate-400 tabular-nums">
+                                <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground tabular-nums">
                                   <span>{formatFileSize(item.size_bytes)}</span>
                                   <span>{item.modified_at ? new Date(item.modified_at).toLocaleDateString() : 'Sin fecha'}</span>
                                   {activeExplorerProvider && (() => {
@@ -1585,12 +1703,12 @@ function CargarDatosPageContent() {
                                     if (!watchTarget) return null;
                                     const isPending = Boolean(watchTarget.pending_change);
                                     return (
-                                      <span className={`rounded-full border px-2 py-0.5 font-medium ${
+                                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${
                                         isPending
-                                          ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                          ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+                                          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
                                       }`}>
-                                        {isPending ? 'Pendiente de reimportación' : 'Vigilado y sincronizado'}
+                                        {isPending ? 'Pendiente' : 'Vigilado'}
                                       </span>
                                     );
                                   })()}
@@ -1602,17 +1720,14 @@ function CargarDatosPageContent() {
                                   const helperText = isPending
                                     ? (watchTarget.pending_change_summary || 'Cambio remoto detectado. Requiere reimportación.')
                                     : (watchTarget.linked_file_id
-                                        ? 'Archivo vigilado, enlazado y listo para re-sync cuando cambie.'
-                                        : 'Archivo vigilado y sincronizado.');
-
+                                        ? 'Vigilado y listo para re-sync.'
+                                        : 'Vigilado y sincronizado.');
                                   return (
-                                    <div className="mt-1.5">
-                                      <p className={`text-[11px] leading-snug ${
-                                        isPending ? 'text-amber-700' : 'text-slate-500'
-                                      }`}>
+                                    <div className="mt-1">
+                                      <p className={`text-xs leading-snug ${isPending ? 'text-amber-700' : 'text-muted-foreground'}`}>
                                         {helperText}
                                       </p>
-                                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground/70">
                                         {watchTarget.last_change_detected_at && (
                                           <span>Cambio: {formatRuntimeTimeShort(watchTarget.last_change_detected_at)}</span>
                                         )}
@@ -1626,7 +1741,7 @@ function CargarDatosPageContent() {
                               </div>
                             </div>
 
-                            <div className="ml-4 flex shrink-0 items-center gap-2 self-center">
+                            <div className="ml-3 flex shrink-0 items-center gap-1.5 self-center">
                               {activeExplorerProvider && (() => {
                                 const watchTarget = getWatchTargetForItem(activeExplorerProvider.id, item.id);
                                 const isPending = Boolean(watchTarget?.pending_change);
@@ -1634,19 +1749,19 @@ function CargarDatosPageContent() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className={`h-7 rounded-lg px-3 text-xs font-medium shadow-sm ${
+                                    className={`h-7 rounded-lg px-2.5 text-xs font-medium ${
                                       isPending
-                                        ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15'
                                         : watchTarget
-                                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                          : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15'
+                                          : ''
                                     }`}
                                     disabled={watchTargetMutationItemId === item.id}
                                     onClick={() => handleToggleWatchTarget(item)}
                                     title={watchTarget?.pending_change_summary || undefined}
                                   >
                                     {watchTargetMutationItemId === item.id
-                                      ? 'Guardando...'
+                                      ? '...'
                                       : isPending
                                         ? 'Pendiente'
                                         : watchTarget
@@ -1658,7 +1773,7 @@ function CargarDatosPageContent() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                                className="h-7 rounded-lg px-2.5 text-xs font-medium"
                                 disabled={!item.supports_analysis || importingRemoteFileId === item.id}
                                 onClick={() => handleImportRemoteFile(item)}
                               >
@@ -1678,6 +1793,7 @@ function CargarDatosPageContent() {
               </div>
             )}
 
+            {/* ── Preview Panel ───────────────────────────────────── */}
             {isPreviewOpen && (
               <div className="fixed inset-0 z-50">
                 <button
@@ -1686,45 +1802,34 @@ function CargarDatosPageContent() {
                   className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all duration-200"
                   onClick={() => setIsPreviewOpen(false)}
                 />
-
-                <aside className="fixed top-0 right-0 z-50 flex h-full w-full flex-col border-l border-border bg-background shadow-2xl sm:max-w-5xl">
-                  <div className="shrink-0 border-b border-border/50 bg-background/95 p-6 backdrop-blur">
+                <aside className="fixed top-0 right-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background shadow-[var(--cursor-shadow-elevated)] sm:max-w-5xl">
+                  <div className="shrink-0 border-b border-border/30 bg-background/95 p-6 backdrop-blur">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <h3 className="truncate text-2xl font-medium tracking-tight text-foreground">
+                        <h3 className="truncate text-lg font-medium text-foreground">
                           {previewData?.file_name || previewSourceFile?.file_name || 'Vista previa del archivo'}
                         </h3>
-                        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                          <span>
-                            Filas: <span className="font-medium text-foreground">{previewData?.row_count ?? '...'}</span>
-                          </span>
-                          <span>
-                            Columnas: <span className="font-medium text-foreground">{previewData?.column_count ?? '...'}</span>
-                          </span>
-                          <span>
-                            Tamaño: <span className="font-medium text-foreground">{previewData ? formatFileSize(previewData.file_size_bytes) : '...'}</span>
-                          </span>
-                          <span>
-                            Fecha: <span className="font-medium text-foreground">
-                              {previewData?.created_at
-                                ? new Date(previewData.created_at).toLocaleString()
-                                : (previewSourceFile?.created_at ? new Date(previewSourceFile.created_at).toLocaleString() : 'Sin fecha')}
-                            </span>
-                          </span>
+                        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                          <span>Filas: <span className="font-medium text-foreground">{previewData?.row_count ?? '...'}</span></span>
+                          <span>Columnas: <span className="font-medium text-foreground">{previewData?.column_count ?? '...'}</span></span>
+                          <span>Tamaño: <span className="font-medium text-foreground">{previewData ? formatFileSize(previewData.file_size_bytes) : '...'}</span></span>
+                          <span>Fecha: <span className="font-medium text-foreground">
+                            {previewData?.created_at
+                              ? new Date(previewData.created_at).toLocaleString()
+                              : (previewSourceFile?.created_at ? new Date(previewSourceFile.created_at).toLocaleString() : 'Sin fecha')}
+                          </span></span>
                           {previewData?.selected_sheet && (
-                            <span>
-                              Hoja: <span className="font-medium text-foreground">{previewData.selected_sheet}</span>
-                            </span>
+                            <span>Hoja: <span className="font-medium text-foreground">{previewData.selected_sheet}</span></span>
                           )}
                         </div>
-                        <p className="mt-3 text-xs italic text-slate-400">
-                          Mostrando una vista previa de las primeras 100 filas.
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Mostrando vista previa de las primeras 100 filas.
                         </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
                         onClick={() => setIsPreviewOpen(false)}
                       >
                         <X className="h-4 w-4" />
@@ -1734,12 +1839,12 @@ function CargarDatosPageContent() {
 
                   <div className="flex-1 min-h-0 overflow-hidden bg-background">
                     {previewLoading && (
-                      <div className="p-6 text-sm text-muted-foreground">Cargando vista previa...</div>
+                      <div className="p-6 text-sm text-muted-foreground text-center">Cargando vista previa...</div>
                     )}
 
                     {!previewLoading && previewError && (
                       <div className="p-6">
-                        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                           {previewError}
                         </div>
                       </div>
@@ -1751,18 +1856,15 @@ function CargarDatosPageContent() {
                           {previewData.quality_profile && (
                             <div className="mb-6 space-y-4">
                               <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-                                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                                {/* Health Score */}
+                                <div className="rounded-xl border border-border/40 bg-card p-5 shadow-[var(--cursor-shadow-xs)]">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                                        Salud del dataset
-                                      </div>
-                                      <div className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">
+                                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Salud del dataset</div>
+                                      <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
                                         {previewData.quality_profile.health_score}
                                       </div>
-                                      <div className="mt-1 text-sm text-slate-500">
-                                        Score previo al análisis
-                                      </div>
+                                      <div className="mt-1 text-xs text-muted-foreground">Score previo al análisis</div>
                                     </div>
                                     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getHealthTone(previewData.quality_profile.health_status).wrapper}`}>
                                       {getHealthTone(previewData.quality_profile.health_status).icon}
@@ -1771,84 +1873,52 @@ function CargarDatosPageContent() {
                                   </div>
                                 </div>
 
+                                {/* Quality Metrics */}
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                                    <div className="text-xs uppercase tracking-wide text-slate-400">Celdas vacías</div>
-                                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                                      {previewData.quality_profile.null_cell_count.toLocaleString()}
+                                  {[
+                                    { label: 'Celdas vacías', value: previewData.quality_profile.null_cell_count.toLocaleString(), sub: formatPercent(previewData.quality_profile.null_cell_ratio) + ' del dataset' },
+                                    { label: 'Filas duplicadas', value: previewData.quality_profile.duplicate_row_count.toLocaleString(), sub: formatPercent(previewData.quality_profile.duplicate_row_ratio) + ' del total' },
+                                    { label: 'Columnas ambiguas', value: previewData.quality_profile.ambiguous_column_count, sub: 'Cabeceras dudosas' },
+                                    { label: 'Fechas inválidas', value: previewData.quality_profile.invalid_date_column_count, sub: 'Inconsistentes' },
+                                    { label: 'Outliers', value: previewData.quality_profile.outlier_column_count, sub: 'Extremos relevantes' },
+                                  ].map((metric) => (
+                                    <div key={metric.label} className="rounded-xl border border-border/40 bg-card p-4 shadow-[var(--cursor-shadow-xs)]">
+                                      <div className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</div>
+                                      <div className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</div>
+                                      <div className="mt-1 text-xs text-muted-foreground">{metric.sub}</div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      {formatPercent(previewData.quality_profile.null_cell_ratio)} del dataset
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                                    <div className="text-xs uppercase tracking-wide text-slate-400">Filas duplicadas</div>
-                                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                                      {previewData.quality_profile.duplicate_row_count.toLocaleString()}
-                                    </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      {formatPercent(previewData.quality_profile.duplicate_row_ratio)} del total
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                                    <div className="text-xs uppercase tracking-wide text-slate-400">Columnas ambiguas</div>
-                                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                                      {previewData.quality_profile.ambiguous_column_count}
-                                    </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      Cabeceras o contenido dudoso
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                                    <div className="text-xs uppercase tracking-wide text-slate-400">Fechas inválidas</div>
-                                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                                      {previewData.quality_profile.invalid_date_column_count}
-                                    </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      Columnas temporales inconsistentes
-                                    </div>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                                    <div className="text-xs uppercase tracking-wide text-slate-400">Outliers</div>
-                                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                                      {previewData.quality_profile.outlier_column_count}
-                                    </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      Columnas con extremos relevantes
-                                    </div>
-                                  </div>
+                                  ))}
                                 </div>
                               </div>
 
+                              {/* Quality Alerts */}
                               {previewData.quality_profile.alerts.length > 0 && (
-                                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                                <div className="rounded-xl border border-border/40 bg-card p-5 shadow-[var(--cursor-shadow-xs)]">
                                   <div className="mb-3 flex items-center justify-between gap-3">
                                     <div>
-                                      <h4 className="text-sm font-semibold text-slate-900">Alertas de calidad</h4>
-                                      <p className="text-xs text-slate-500">
-                                        Señales que pueden degradar el análisis o la recomendación visual.
-                                      </p>
+                                      <h4 className="text-sm font-medium text-foreground">Alertas de calidad</h4>
+                                      <p className="text-xs text-muted-foreground">Señales que pueden degradar el análisis.</p>
                                     </div>
-                                    <span className="rounded-full border px-2.5 py-1 text-xs text-slate-600">
-                                      {previewData.quality_profile.alert_count} alertas
+                                    <span className="rounded-full border border-border/40 bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                                      {previewData.quality_profile.alert_count} alerta{previewData.quality_profile.alert_count === 1 ? '' : 's'}
                                     </span>
                                   </div>
-                                  <div className="space-y-3">
+                                  <div className="space-y-2">
                                     {previewData.quality_profile.alerts.map((alert) => {
                                       const toneClass = alert.severity === 'critical'
-                                        ? 'border-red-200 bg-red-50'
-                                        : 'border-amber-200 bg-amber-50';
+                                        ? 'border-destructive/30 bg-destructive/10'
+                                        : 'border-amber-500/30 bg-amber-500/10';
                                       const textClass = alert.severity === 'critical'
-                                        ? 'text-red-700'
+                                        ? 'text-destructive'
                                         : 'text-amber-700';
                                       return (
-                                        <div key={alert.code} className={`rounded-xl border px-4 py-3 ${toneClass}`}>
+                                        <div key={alert.code} className={`rounded-lg border px-4 py-3 ${toneClass}`}>
                                           <div className={`text-sm font-medium ${textClass}`}>{alert.title}</div>
-                                          <div className={`mt-1 text-sm ${textClass}`}>{alert.message}</div>
+                                          <div className={`mt-1 text-xs ${textClass}`}>{alert.message}</div>
                                           {alert.affected_columns.length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
                                               {alert.affected_columns.map((columnName) => (
-                                                <span key={`${alert.code}-${columnName}`} className={`rounded-full border bg-white/80 px-2 py-1 text-[11px] ${textClass}`}>
+                                                <span key={`${alert.code}-${columnName}`} className={`rounded-full border border-current/20 bg-background/50 px-2 py-0.5 text-[10px] ${textClass}`}>
                                                   {columnName}
                                                 </span>
                                               ))}
@@ -1861,39 +1931,36 @@ function CargarDatosPageContent() {
                                 </div>
                               )}
 
+                              {/* Column Issues */}
                               {previewData.quality_profile.column_issues.length > 0 && (
-                                <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                                <div className="rounded-xl border border-border/40 bg-card p-5 shadow-[var(--cursor-shadow-xs)]">
                                   <div className="mb-3">
-                                    <h4 className="text-sm font-semibold text-slate-900">Columnas a revisar</h4>
-                                    <p className="text-xs text-slate-500">
-                                      Las más expuestas a nulos, ambigüedad, fechas inválidas u outliers.
-                                    </p>
+                                    <h4 className="text-sm font-medium text-foreground">Columnas a revisar</h4>
+                                    <p className="text-xs text-muted-foreground">Expuestas a nulos, ambigüedad u outliers.</p>
                                   </div>
                                   <div className="grid gap-3 xl:grid-cols-2">
                                     {previewData.quality_profile.column_issues.map((issue) => (
-                                      <div key={issue.name} className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                                      <div key={issue.name} className="rounded-lg border border-border/40 bg-secondary/50 px-4 py-3">
                                         <div className="flex items-start justify-between gap-3">
                                           <div className="min-w-0">
-                                            <div className="truncate text-sm font-medium text-slate-900">{issue.name}</div>
-                                            <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">
-                                              {issue.inferred_type}
-                                            </div>
+                                            <div className="truncate text-sm font-medium text-foreground">{issue.name}</div>
+                                            <div className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{issue.inferred_type}</div>
                                           </div>
-                                          <div className="text-right text-[11px] text-slate-500">
+                                          <div className="text-right text-xs text-muted-foreground shrink-0">
                                             <div>Nulos: {issue.null_count}</div>
                                             <div>Únicos: {issue.distinct_count}</div>
                                           </div>
                                         </div>
-                                        <div className="mt-3 flex flex-wrap gap-2">
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
                                           {issue.issue_flags.map((flag) => (
-                                            <span key={`${issue.name}-${flag}`} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600">
+                                            <span key={`${issue.name}-${flag}`} className="rounded-full border border-border/40 bg-background/50 px-2 py-0.5 text-[10px] text-muted-foreground">
                                               {qualityFlagLabels[flag] || flag}
                                             </span>
                                           ))}
                                         </div>
                                         {(issue.invalid_count > 0 || issue.outlier_count > 0) && (
-                                          <div className="mt-3 text-[11px] text-slate-500">
-                                            {issue.invalid_count > 0 && <span className="mr-3">Valores inválidos: {issue.invalid_count}</span>}
+                                          <div className="mt-2 text-[10px] text-muted-foreground">
+                                            {issue.invalid_count > 0 && <span className="mr-3">Inválidos: {issue.invalid_count}</span>}
                                             {issue.outlier_count > 0 && <span>Outliers: {issue.outlier_count}</span>}
                                           </div>
                                         )}
@@ -1905,17 +1972,18 @@ function CargarDatosPageContent() {
                             </div>
                           )}
 
-                          <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                          {/* Data Table */}
+                          <div className="overflow-x-auto rounded-xl border border-border/40 bg-card shadow-[var(--cursor-shadow-xs)]">
                             <table className="min-w-full border-collapse">
-                              <thead className="sticky top-0 z-10 bg-white">
+                              <thead className="sticky top-0 z-10 bg-card">
                                 <tr>
                                   {previewData.columns.map((column) => (
                                     <th
                                       key={column.name}
-                                      className="border-b border-slate-100 px-4 py-3 text-left align-bottom"
+                                      className="border-b border-border/30 px-4 py-2.5 text-left align-bottom"
                                     >
-                                      <div className="text-sm font-medium text-slate-800">{column.name}</div>
-                                      <div className="mt-1 text-[11px] font-normal uppercase tracking-wide text-slate-400">
+                                      <div className="text-xs font-medium text-foreground">{column.name}</div>
+                                      <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
                                         {column.inferred_type}
                                       </div>
                                     </th>
@@ -1924,11 +1992,11 @@ function CargarDatosPageContent() {
                               </thead>
                               <tbody>
                                 {previewData.rows.map((row, rowIndex) => (
-                                  <tr key={`${previewData.file_id}-row-${rowIndex}`} className="border-b border-slate-100/80 last:border-b-0">
+                                  <tr key={`${previewData.file_id}-row-${rowIndex}`} className="border-b border-border/30 last:border-b-0">
                                     {previewData.columns.map((column) => (
-                                      <td key={`${column.name}-${rowIndex}`} className="px-4 py-3 text-sm text-slate-700">
+                                      <td key={`${column.name}-${rowIndex}`} className="px-4 py-2 text-xs text-foreground">
                                         {row[column.name] === null || row[column.name] === undefined || row[column.name] === ''
-                                          ? <span className="text-slate-300">-</span>
+                                          ? <span className="text-muted-foreground/50">-</span>
                                           : String(row[column.name])}
                                       </td>
                                     ))}
@@ -1956,11 +2024,10 @@ function CargarDatosPageFallback() {
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
+        <header className="border-b border-border/40 px-6 py-4 shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-foreground"></h1>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center text-accent-foreground text-sm font-medium">
                 LB
               </div>
             </div>

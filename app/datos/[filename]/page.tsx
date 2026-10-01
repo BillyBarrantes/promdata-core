@@ -44,11 +44,11 @@ export default function DataDetailsPage() {
       <Sidebar />
       <main className="flex-1 flex flex-col">
         {/* Encabezado superior simplificado */}
-        <header className="border-b border-border px-6 py-4">
+        <header className="border-b border-border/40 px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-foreground">Dashboard de Ventas Q3</h1>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center text-accent-foreground text-sm font-medium">
                 LB
               </div>
             </div>
@@ -56,7 +56,7 @@ export default function DataDetailsPage() {
         </header>
 
         <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-6xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             {/* --- INICIO DE LA SECCIÓN MODIFICADA --- */}
             <Card className="p-6">
               <CardHeader className="p-0 mb-6 flex flex-col gap-4">
@@ -68,7 +68,7 @@ export default function DataDetailsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
+                      className="text-red-600 border-red-600/40 hover:bg-red-50 hover:text-red-700"
                       onClick={handleDeleteFile}
                     >
                       Eliminar
@@ -76,7 +76,7 @@ export default function DataDetailsPage() {
                   </div>
                 </div>
                 {/* Fila inferior del encabezado */}
-                <div className="flex justify-start items-center border-t border-border pt-4">
+                <div className="flex justify-start items-center border-t border-border/40 pt-4">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <img 
                       src={isExcel ? "/Excel.svg" : "/CSV.svg"} 
@@ -94,7 +94,7 @@ export default function DataDetailsPage() {
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border">
+                      <tr className="border-b border-border/20">
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Fecha</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">ID</th>
                         <th className="text-left py-3 px-4 font-medium text-muted-foreground">Nombre</th>

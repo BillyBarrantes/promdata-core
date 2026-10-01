@@ -1,6 +1,7 @@
 "use client"
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { SaveIcon } from '@/components/icons/save-icon';
 import { EChartsOption } from 'echarts';
 import { EChartsChart } from '@/components/echarts-chart'; // Importamos nuestro nuevo componente
-import { AlertTriangle, BarChart3, Check, Filter, PanelsTopLeft, RefreshCcw, Sparkles, Rows3, Table2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, Check, Filter, MoreHorizontal, RefreshCcw, Sparkles, Rows3, Table2, ShieldCheck, Trash2, X } from 'lucide-react';
+import { EvidenceDrawer } from '@/components/dashboard/evidence-drawer';
+import { useCrossFilter } from '@/hooks/useCrossFilter';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { globalFiltersAtom, activeFileIdAtom } from '@/lib/state';
 import {
@@ -27,7 +30,7 @@ const SmartTablePreview = dynamic(
   () => import('@/components/smart-table').then((mod) => mod.SmartTable),
   {
     ssr: false,
-    loading: () => <div className="rounded-xl border border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">Cargando vista tabular...</div>,
+    loading: () => <div className="rounded-xl border border-border/40 bg-muted/20 p-6 text-sm text-muted-foreground">Cargando vista tabular...</div>,
   }
 );
 
@@ -70,6 +73,10 @@ interface ChartsReportProps {
   hideVisualPicker?: boolean;
   /** Cuando true, suprime chrome secundario para modo presentación/exporte. */
   presentationMode?: boolean;
+  /** Callback para eliminar el widget desde el menú de 3 puntos */
+  onDelete?: () => void;
+  /** Contenedor DOM para portalar los controles de acción al header del widget */
+  headerPortalContainer?: HTMLElement | null;
 }
 
 type VisualGovernance = VisualGovernancePayload;
@@ -100,6 +107,21 @@ const normalizeChartOptionForRender = (rawOption: EChartsOption, title?: string)
       });
     }
 
+    // [FASE 5.2] Paleta corporativa SaaS accesible para consistencia visual
+    const ECHARTS_SAAS_PALETTE = [
+      "#2563eb", // Royal Blue
+      "#06b6d4", // Cyan
+      "#10b981", // Emerald
+      "#f59e0b", // Amber
+      "#8b5cf6", // Violet
+      "#ec4899", // Pink
+      "#6366f1", // Indigo
+      "#14b8a6", // Teal
+    ];
+    if (!nextOption.color || !Array.isArray(nextOption.color) || nextOption.color.length === 0) {
+      nextOption.color = ECHARTS_SAAS_PALETTE;
+    }
+
     return nextOption;
   } catch (error) {
     console.error("Error normalizing chart option:", error);
@@ -116,6 +138,25 @@ const hasRenderableSeriesData = (option: EChartsOption | null | undefined): bool
     if (Array.isArray(entry.data) && entry.data.length > 0) return true;
     return false;
   });
+};
+
+/**
+ * ECharts accepts singleton and array forms for component options. Keep that
+ * boundary normalized for diagnostics as well as rendering, so telemetry never
+ * assumes a narrower shape than the public EChartsOption contract.
+ */
+const getChartDiagnosticSnapshot = (option: EChartsOption | null | undefined) => {
+  const titleOption = Array.isArray(option?.title) ? option.title[0] : option?.title;
+  const seriesOptions = option?.series
+    ? (Array.isArray(option.series) ? option.series : [option.series])
+    : [];
+  const primarySeries = seriesOptions[0] as { data?: unknown } | undefined;
+
+  return {
+    title: typeof titleOption?.text === "string" ? titleOption.text : undefined,
+    hasSeries: seriesOptions.length > 0,
+    seriesDataLength: Array.isArray(primarySeries?.data) ? primarySeries.data.length : 0,
+  };
 };
 
 type ChartTablePayload = {
@@ -300,72 +341,73 @@ const VisualGovernanceBanner = ({
 }) => {
   const filterLabel = activeGlobalFilter ?? "";
   const hasGlobalFilter = filterLabel.length > 0;
-  const hasBannerContent = Boolean(
-    hasGlobalFilter ||
-    governance?.applied_label ||
-    governance?.recommended_label ||
-    governance?.blocked_reason ||
-    governance?.advisory_reason ||
-    governance?.recommendation_reason
-  );
+  const hasAdjustment = Boolean(governance?.override_applied && governance.blocked_reason);
+  const hasBannerContent = Boolean(hasGlobalFilter || hasAdjustment);
 
-  if (!hasBannerContent || !governance && !hasGlobalFilter) return null;
+  if (!hasBannerContent) return null;
 
-  const hasDescriptorText = Boolean(
-    governance?.applied_label ||
-    governance?.recommended_label ||
-    governance?.blocked_reason ||
-    governance?.advisory_reason ||
-    governance?.recommendation_reason
-  );
+  const advisoryText = governance?.blocked_reason || governance?.advisory_reason || governance?.recommendation_reason;
 
   return (
-    <div className="mb-4 rounded-xl border border-border/70 bg-muted/30 px-4 py-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-          {governance?.applied_label && (
-          <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 font-medium text-foreground">
-            Aplicado: {governance.applied_label}
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {hasAdjustment && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3" />
+            Ajustado por validez visual
           </span>
         )}
-          {governance?.recommended_label && governance.recommended_label !== governance.applied_label && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-              <Sparkles className="h-3.5 w-3.5" />
-              Recomendado: {governance.recommended_label}
-            </span>
-          )}
-          {governance?.override_applied && governance.blocked_reason && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Ajustado por validez visual
-            </span>
-          )}
-          {hasGlobalFilter && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-              <Filter className="h-3.5 w-3.5" />
-              Filtro global activo: {filterLabel}
-            </span>
-          )}
-        </div>
-
         {hasGlobalFilter && (
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onClearGlobalFilter}>
-              <RefreshCcw className="h-3.5 w-3.5" />
-              Limpiar filtro global
-            </Button>
-          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-foreground">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <span className="max-w-[220px] truncate">Filtro activo: {filterLabel}</span>
+            <button
+              type="button"
+              onClick={onClearGlobalFilter}
+              className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]"
+              title="Limpiar filtro global"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
         )}
       </div>
 
-      {hasDescriptorText && (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          {governance?.blocked_reason || governance?.advisory_reason || governance?.recommendation_reason}
+      {advisoryText && (
+        <p className="w-full text-[11px] leading-4 text-muted-foreground/80">
+          {advisoryText}
         </p>
       )}
     </div>
   );
 };
+
+const CompactMenuItem = ({
+  active = false,
+  icon,
+  label,
+  onSelect,
+}: {
+  active?: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onSelect: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onSelect}
+    className={[
+      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
+      active
+        ? "bg-muted/70 font-medium text-foreground"
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+    ].join(" ")}
+  >
+    <span className="shrink-0">{icon}</span>
+    <span className="flex-1 truncate">{label}</span>
+    {active && <Check className="h-3.5 w-3.5 shrink-0 text-foreground" />}
+  </button>
+);
 
 const normalizeFilterLabel = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -385,18 +427,30 @@ const ChartsReportComponent = ({
   toolbarPrefix = null,
   hideVisualPicker = false,
   presentationMode = false,
+  onDelete,
+  headerPortalContainer,
 }: ChartsReportProps) => {
   const [localOption, setLocalOption] = React.useState<EChartsOption>(() => normalizeChartOptionForRender(option, title));
   const [visualPickerOpen, setVisualPickerOpen] = React.useState(false);
   const [visualOverride, setVisualOverride] = React.useState<VisualId | null>(null);
   const [visualError, setVisualError] = React.useState<string | null>(null);
   const [viewMode, setViewMode] = React.useState<'table' | 'chart' | 'hybrid'>('chart');
+  const [viewMenuOpen, setViewMenuOpen] = React.useState(false);
+
+  // Memoizado: evita re-serializar localOption en cada corrida del effect de sync
+  const localOptionSerialized = React.useMemo(() => {
+    try {
+      return JSON.stringify(localOption);
+    } catch {
+      return null;
+    }
+  }, [localOption]);
 
   // Jotai State Integrations
   const activeFileId = useAtomValue(activeFileIdAtom);
   const globalFilters = useAtomValue(globalFiltersAtom);
   const setGlobalFilters = useSetAtom(globalFiltersAtom);
-  const [, setSelectedCategory] = React.useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const baseGovernance = React.useMemo(() => getVisualGovernance(option), [option]);
   const sourcePayload = React.useMemo(() => getVisualSourcePayload(option), [option]);
   const visualGovernance = React.useMemo(
@@ -412,6 +466,13 @@ const ChartsReportComponent = ({
   const activeGlobalFilter = React.useMemo(() => {
     return normalizeFilterLabel(globalFilters?.global_cross_filter ?? globalFilters?.global_chart_filter ?? null);
   }, [globalFilters]);
+  const hasGovernanceAdjustment = Boolean(visualGovernance?.override_applied && visualGovernance?.blocked_reason);
+
+  React.useEffect(() => {
+    if (!activeGlobalFilter) {
+      setSelectedCategory(null);
+    }
+  }, [activeGlobalFilter]);
 
   const handleClearGlobalFilter = React.useCallback(() => {
     const nextFilters = { ...globalFilters };
@@ -433,6 +494,85 @@ const ChartsReportComponent = ({
   };
 
 
+  const { activeSelection, isSelfChart } = useCrossFilter();
+  const myTableName = (option as any)?.table_name || (option as any)?.original_chart_option?.table_name || (localOption as any)?.table_name;
+  const prevActiveSelectionRef = React.useRef(activeSelection);
+
+  // [FASE 6.3] Reactividad cruzada automática entre gráficos con Anti-Self-Filter
+  React.useEffect(() => {
+    const wasFiltered = prevActiveSelectionRef.current !== null && prevActiveSelectionRef.current !== undefined;
+    prevActiveSelectionRef.current = activeSelection;
+
+    if (!activeSelection) {
+      // Solo restaurar si PREVIAMENTE existía un filtro activo y se acaba de limpiar
+      if (wasFiltered) {
+        const baseOpt = visualOverride && sourcePayload
+          ? buildVisualOptionFromPayload(sourcePayload, visualOverride, option)
+          : option;
+
+        setLocalOption(attachVisualMetadata(
+          normalizeChartOptionForRender(baseOpt || option, title),
+          visualGovernance,
+          sourcePayload
+        ));
+      }
+      return;
+    }
+
+    // Anti-Self-Filter: El gráfico origen resalta pero NO colapsa sus barras
+    if (isSelfChart(myTableName)) {
+      return;
+    }
+
+    const targetDim = activeSelection.dimension.toLowerCase().trim();
+    const targetVal = activeSelection.value.toLowerCase().trim();
+    const rows = sourcePayload?.rows;
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      const filteredRows = rows.filter((row: any) => {
+        if (!row || typeof row !== 'object') return false;
+
+        // 🎯 [FASE B.1] Dimension-Aware Filtering
+        // 1. Identificar columna objetivo en el row correspondiente a targetDim
+        const rowKeys = Object.keys(row);
+        const exactDimKey = rowKeys.find(k => k.toLowerCase() === targetDim);
+        const partialDimKey = exactDimKey || rowKeys.find(k => k.toLowerCase().includes(targetDim));
+
+        if (partialDimKey) {
+          const v = row[partialDimKey];
+          return String(v ?? "").toLowerCase().trim() === targetVal;
+        }
+
+        // 2. Si no coincide el nombre exacto de la dimensión, verificar campos estándar
+        const standardDimKey = rowKeys.find(k => 
+          ['category', 'name', 'label', 'dim', 'x', 'dimension'].includes(k.toLowerCase())
+        );
+        if (standardDimKey) {
+          const v = row[standardDimKey];
+          return String(v ?? "").toLowerCase().trim() === targetVal;
+        }
+
+        // 3. Fallback seguro: solo comparar contra valores de tipo string (evitando colisiones numéricas con métricas)
+        for (const [k, v] of Object.entries(row)) {
+          if (typeof v === 'string' && v.toLowerCase().trim() === targetVal) return true;
+        }
+        return false;
+      });
+
+      if (filteredRows.length > 0) {
+        const filteredPayload = { ...sourcePayload, rows: filteredRows };
+        const nextOpt = buildVisualOptionFromPayload(filteredPayload, activeVisualId || "bar_chart", option);
+        if (nextOpt) {
+          setLocalOption(attachVisualMetadata(
+            normalizeChartOptionForRender(nextOpt, title),
+            visualGovernance,
+            filteredPayload
+          ));
+        }
+      }
+    }
+  }, [activeSelection, isSelfChart, myTableName, option, title, visualGovernance, sourcePayload, activeVisualId, visualOverride]);
+
   // Sync prop changes to state
   React.useEffect(() => {
     if (!option) return;
@@ -443,7 +583,7 @@ const ChartsReportComponent = ({
         sourcePayload,
       );
       const overriddenOption = visualOverride && sourcePayload
-        ? buildVisualOptionFromPayload(sourcePayload, visualOverride)
+        ? buildVisualOptionFromPayload(sourcePayload, visualOverride, option)
         : null;
 
       const nextOption = overriddenOption
@@ -459,11 +599,10 @@ const ChartsReportComponent = ({
       }
 
       const serializedOption = JSON.stringify(nextOption);
-      const currentSerialized = JSON.stringify(localOption);
 
       setVisualError(null);
 
-      if (serializedOption === currentSerialized) return;
+      if (localOptionSerialized !== null && serializedOption === localOptionSerialized) return;
       setLocalOption(nextOption);
     } catch (e) {
       console.error("Error updating chart options:", e);
@@ -475,7 +614,7 @@ const ChartsReportComponent = ({
         )
       );
     }
-  }, [option, title, baseGovernance, sourcePayload]);
+  }, [option, title, baseGovernance, sourcePayload, visualOverride]);
 
   const handleSelectVisual = React.useCallback((visualId: VisualId) => {
     if (!sourcePayload) {
@@ -511,7 +650,7 @@ const ChartsReportComponent = ({
       return;
     }
 
-    const nextOption = buildVisualOptionFromPayload(sourcePayload, visualId);
+    const nextOption = buildVisualOptionFromPayload(sourcePayload, visualId, option);
     if (!nextOption) {
       setVisualError("No se pudo reconstruir ese visual con el payload disponible.");
       return;
@@ -625,7 +764,7 @@ const ChartsReportComponent = ({
 
   if (!localOption) {
     return (
-      <Card className="p-6 mt-6">
+      <Card className="p-6 mt-6 bg-card border border-border/40 shadow-[var(--cursor-shadow-sm)]">
         <VisualStatePanel
           icon={<AlertTriangle className="h-8 w-8" />}
           title="No se pudo renderizar el visual"
@@ -658,28 +797,28 @@ const ChartsReportComponent = ({
       <Button
         variant={viewMode === 'table' ? "default" : "outline"}
         size="sm"
-        className="h-8 shrink-0 gap-1.5 whitespace-nowrap text-xs"
+        className="h-7 shrink-0 gap-1.5 whitespace-nowrap text-[11px] border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('table')}
       >
-        <Table2 className="h-3.5 w-3.5" />
+        <Table2 className="h-3 w-3" />
         Tabla
       </Button>
       <Button
         variant={viewMode === 'hybrid' ? "default" : "outline"}
         size="sm"
-        className="h-8 shrink-0 gap-1.5 whitespace-nowrap text-xs"
+        className="h-7 shrink-0 gap-1.5 whitespace-nowrap text-[11px] border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('hybrid')}
       >
-        <Rows3 className="h-3.5 w-3.5" />
+        <Rows3 className="h-3 w-3" />
         Híbrida
       </Button>
       <Button
         variant={viewMode === 'chart' ? "default" : "outline"}
         size="sm"
-        className="h-8 shrink-0 gap-1.5 whitespace-nowrap text-xs"
+        className="h-7 shrink-0 gap-1.5 whitespace-nowrap text-[11px] border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('chart')}
       >
-        <BarChart3 className="h-3.5 w-3.5" />
+        <BarChart3 className="h-3 w-3" />
         Gráfico
       </Button>
     </>
@@ -689,22 +828,22 @@ const ChartsReportComponent = ({
     <Popover open={visualPickerOpen} onOpenChange={setVisualPickerOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
-          size="sm"
-          className="h-8 shrink-0 whitespace-nowrap"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
           disabled={!canOpenVisualPicker}
-          title={canOpenVisualPicker ? "Reemplazar visual" : "No hay reemplazo visual disponible"}
+          title={canOpenVisualPicker ? "Cambiar tipo de gráfico" : "No hay otros tipos de gráfico disponibles"}
+          aria-label="Cambiar tipo de gráfico"
         >
-          <PanelsTopLeft className="h-4 w-4" />
-          Visual
+          <BarChart3 className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[320px] p-3">
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-semibold text-foreground">Reemplazar visual</div>
+            <div className="text-sm font-semibold text-foreground">Cambiar tipo de gráfico</div>
             <p className="text-xs text-muted-foreground">
-              Cambia la lectura sin recalcular el analisis.
+              Cambia la lectura visual sin recalcular el análisis.
             </p>
           </div>
           <TooltipProvider delayDuration={120}>
@@ -723,10 +862,10 @@ const ChartsReportComponent = ({
                           disabled={!isSelectable}
                           onClick={() => handleSelectVisual(entry.id)}
                           className={[
-                            "w-full rounded-lg border px-3 py-2 text-left transition-colors",
-                            activeVisualId === entry.id
-                              ? "border-foreground/20 bg-foreground/5"
-                              : "border-border bg-background hover:bg-muted/40",
+                            "w-full rounded-lg border px-3 py-2 text-left transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
+                              activeVisualId === entry.id
+                                ? "border-foreground/20 bg-foreground/5 shadow-xs"
+                                : "border-border/40 bg-background hover:bg-muted/40 hover:border-border/60",
                             !isSelectable ? "cursor-not-allowed opacity-55" : "",
                           ].join(" ")}
                         >
@@ -776,11 +915,180 @@ const ChartsReportComponent = ({
       </PopoverContent>
     </Popover>
   );
+  const [isEvidenceOpen, setIsEvidenceOpen] = React.useState(false);
+  const evidenceData = React.useMemo(() => {
+    const opt = (localOption || option) as any;
+    return opt?.evidence_bundle || {
+      plan_hash: opt?.plan_hash || opt?.plan_hash_sha256,
+      computed_facts: opt?.computed_facts || opt?.hard_facts || {},
+      sql_canonical_query: opt?.sql_canonical_query || opt?.sql || opt?.query,
+      row_count: opt?.row_count || opt?.total_rows,
+      execution_timestamp: opt?.execution_timestamp,
+      filters_applied: opt?.filters_applied || opt?.chart_base_filters,
+    };
+  }, [localOption, option]);
+
+  const evidenceButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-8 shrink-0 gap-1.5 whitespace-nowrap text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
+      onClick={() => setIsEvidenceOpen(true)}
+      title="Ver evidencia matemática y auditoría SQL"
+    >
+      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+      <span>Evidencia</span>
+    </Button>
+  );
+
+  // Menú compacto de tres puntos para el modo widget: agrupa cambio de vista y evidencia
+  const viewMenu = !hideModeSwitch && !presentationMode ? (
+    <Popover open={viewMenuOpen} onOpenChange={setViewMenuOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
+          title="Más opciones"
+          aria-label="Más opciones"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-52 p-1.5">
+        <div className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Vista
+        </div>
+        {supportsTabularMode ? (
+          <>
+            <CompactMenuItem
+              active={viewMode === 'chart'}
+              icon={<BarChart3 className="h-3.5 w-3.5" />}
+              label="Gráfico"
+              onSelect={() => { setViewMode('chart'); setViewMenuOpen(false); }}
+            />
+            <CompactMenuItem
+              active={viewMode === 'hybrid'}
+              icon={<Rows3 className="h-3.5 w-3.5" />}
+              label="Híbrida"
+              onSelect={() => { setViewMode('hybrid'); setViewMenuOpen(false); }}
+            />
+            <CompactMenuItem
+              active={viewMode === 'table'}
+              icon={<Table2 className="h-3.5 w-3.5" />}
+              label="Tabla"
+              onSelect={() => { setViewMode('table'); setViewMenuOpen(false); }}
+            />
+          </>
+        ) : (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Solo vista de gráfico</div>
+        )}
+        <div className="my-1 h-px bg-border/60" />
+        <button
+          type="button"
+          onClick={() => { setIsEvidenceOpen(true); setViewMenuOpen(false); }}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          <span className="flex-1 truncate">Ver evidencia</span>
+        </button>
+        {onDelete && (
+          <>
+            <div className="my-1 h-px bg-border/60" />
+            <button
+              type="button"
+              onClick={() => { onDelete(); setViewMenuOpen(false); }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-destructive transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-destructive/10"
+            >
+              <Trash2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 truncate">Eliminar</span>
+            </button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  ) : null;
+
   const showVisualButton = !hideVisualPicker && !presentationMode;
-  const hasToolbarControls = Boolean(modeSwitch || toolbarPrefix || showVisualButton);
+  const headerActions = (
+    <>
+      {showVisualButton ? visualButton : null}
+      {viewMenu}
+    </>
+  );
+  const hasToolbarControls = Boolean(modeSwitch || toolbarPrefix || showVisualButton || !presentationMode);
+
+  const displayOption = React.useMemo(() => {
+    if (!selectedCategory || !localOption) return localOption;
+    try {
+      const next = clonePreservingFunctions(localOption) as any;
+      if (!Array.isArray(next.series)) return localOption;
+
+      const normSelected = selectedCategory.toLowerCase().trim();
+      const categories: string[] = Array.isArray(next.xAxis?.data)
+        ? next.xAxis.data.map((c: any) => String(c ?? '').toLowerCase().trim())
+        : [];
+
+      next.series = next.series.map((serie: any) => {
+        if (!serie || !Array.isArray(serie.data)) return serie;
+        const dimData = serie.data.map((item: any, idx: number) => {
+          let itemName = '';
+          if (typeof item === 'object' && item !== null) {
+            itemName = String(item.name ?? item.raw_name ?? categories[idx] ?? '').toLowerCase().trim();
+          } else {
+            itemName = categories[idx] || '';
+          }
+
+          const isMatch = itemName === normSelected || (itemName.length >= 3 && normSelected.includes(itemName)) || (normSelected.length >= 3 && itemName.includes(normSelected));
+          if (typeof item === 'object' && item !== null) {
+            return {
+              ...item,
+              itemStyle: {
+                ...(item.itemStyle || {}),
+                opacity: isMatch ? 1 : 0.35,
+              },
+            };
+          } else {
+            return {
+              value: item,
+              itemStyle: {
+                opacity: isMatch ? 1 : 0.35,
+              },
+            };
+          }
+        });
+        return { ...serie, data: dimData };
+      });
+      return next;
+    } catch {
+      return localOption;
+    }
+  }, [localOption, selectedCategory]);
+
+  const computedChartHeight = React.useMemo(() => {
+    if (isWidget) return undefined;
+
+    // Detectar barras horizontales (yAxis tipo category o data en yAxis)
+    const yAxisObj = Array.isArray(displayOption?.yAxis) ? displayOption.yAxis[0] : displayOption?.yAxis;
+    const xAxisObj = Array.isArray(displayOption?.xAxis) ? displayOption.xAxis[0] : displayOption?.xAxis;
+
+    const isHorizontalBar = yAxisObj?.type === 'category' || (Array.isArray(yAxisObj?.data) && yAxisObj.data.length > 0);
+    const categoryCount = isHorizontalBar
+      ? (Array.isArray(yAxisObj?.data) ? yAxisObj.data.length : 0)
+      : (Array.isArray(xAxisObj?.data) ? xAxisObj.data.length : 0);
+
+    if (isHorizontalBar && categoryCount > 0) {
+      // 44px por categoría + 100px para márgenes/legend/eje, con un mínimo ejecutivo de 480px
+      return Math.max(480, Math.min(760, categoryCount * 44 + 100));
+    }
+
+    // Para cualquier otro gráfico en el canvas (líneas, barras verticales, pie, treemap):
+    // Altura ejecutiva estándar de proporción dorada (480px)
+    return 480;
+  }, [isWidget, displayOption]);
 
   const renderChartCanvas = () => {
-    const hasData = hasRenderableSeriesData(localOption);
+    const hasData = hasRenderableSeriesData(displayOption);
 
     if (!hasData) {
       return (
@@ -794,12 +1102,18 @@ const ChartsReportComponent = ({
     }
 
     return (
-      <EChartsChart
-        option={localOption}
-        onChartClick={handleInternalChartClick}
-        onEvents={legendEvents}
-        interactionMode={interactionMode}
-      />
+      <div 
+        className={`relative w-full ${isWidget ? 'h-full flex-1 min-h-0' : 'min-h-[440px]'}`}
+        style={isWidget ? undefined : { height: `${computedChartHeight}px` }}
+      >
+        <EChartsChart
+          option={displayOption}
+          onChartClick={handleInternalChartClick}
+          onEvents={legendEvents}
+          interactionMode={interactionMode}
+          style={isWidget ? { width: '100%', height: '100%' } : { width: '100%', height: `${computedChartHeight}px` }}
+        />
+      </div>
     );
   };
 
@@ -822,35 +1136,50 @@ const ChartsReportComponent = ({
 
   // isWidget: renderizar contenido neto sin Card/mt-6 (GridWidget ya es el contenedor visual)
   if (isWidget) {
-    const showWidgetInnerTitle = !presentationMode;
-
     return (
       <div className="w-full h-full min-h-0 min-w-0 flex flex-col">
-        {((showWidgetInnerTitle && title) || hasToolbarControls) && (
-          <div className="mb-2 flex items-start justify-between gap-3 shrink-0">
-            {showWidgetInnerTitle && title ? (
-              <h3 className="min-w-0 flex-1 pr-2 text-lg font-semibold text-foreground">
-                {title}
-              </h3>
-            ) : <div className="flex-1" />}
-            {hasToolbarControls && (
-              <div className="chart-toolbar-row ml-auto inline-flex w-max max-w-full shrink-0 flex-nowrap items-center gap-2 overflow-x-auto pl-2 whitespace-nowrap scrollbar-hide">
-                {modeSwitch}
-                {toolbarPrefix}
-                {showVisualButton ? visualButton : null}
-              </div>
-            )}
+        {headerPortalContainer && typeof window !== 'undefined'
+          ? createPortal(headerActions, headerPortalContainer)
+          : null}
+        {!presentationMode && (activeGlobalFilter || hasGovernanceAdjustment) && (
+          <div className="flex shrink-0 items-center gap-2 pb-0.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+              {activeGlobalFilter && (
+                <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <Filter className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                  <span className="max-w-[180px] truncate">{activeGlobalFilter}</span>
+                  <button
+                    type="button"
+                    onClick={handleClearGlobalFilter}
+                    className="ml-0.5 rounded-full p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground"
+                    title="Limpiar filtro global"
+                    aria-label="Limpiar filtro global"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {hasGovernanceAdjustment && (
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"
+                  title={visualGovernance?.blocked_reason || "Ajustado por validez visual"}
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  Ajustado
+                </span>
+              )}
+            </div>
           </div>
         )}
-        {!presentationMode && (
-          <VisualGovernanceBanner
-            governance={visualGovernance}
-            activeGlobalFilter={activeGlobalFilter}
-            onClearGlobalFilter={handleClearGlobalFilter}
-          />
+        {!presentationMode && !headerPortalContainer && (
+          <div className="flex shrink-0 items-center justify-end gap-0.5 pb-0.5">
+            {toolbarPrefix}
+            {showVisualButton ? visualButton : null}
+            {viewMenu}
+          </div>
         )}
         {visualError && (
-          <div className="mb-3">
+          <div className="mb-2 shrink-0">
             <VisualStatePanel
               icon={<AlertTriangle className="h-7 w-7" />}
               title="Reemplazo visual no disponible"
@@ -860,17 +1189,17 @@ const ChartsReportComponent = ({
           </div>
         )}
         {viewMode === 'table' && supportsTabularMode ? (
-          <div className="flex-1 min-h-0">{renderTablePanel()}</div>
+          <div className="flex-1 min-h-0 overflow-hidden">{renderTablePanel()}</div>
         ) : viewMode === 'hybrid' && supportsTabularMode ? (
-          <div className="flex flex-1 min-h-0 flex-col gap-4">
-            <div className="min-h-[280px] flex-1">{renderChartCanvas()}</div>
-            <div className="min-h-[240px]">{renderTablePanel()}</div>
+          <div className="flex flex-1 min-h-0 flex-col gap-3">
+            <div className="flex min-h-[200px] min-h-0 flex-1 overflow-hidden">{renderChartCanvas()}</div>
+            <div className="min-h-[180px] min-h-0 overflow-hidden">{renderTablePanel()}</div>
           </div>
         ) : (() => {
           const hasData = hasRenderableSeriesData(localOption);
           if (!hasData) {
             return (
-              <div className="flex-1">
+              <div className="flex-1 min-h-0">
                 <VisualStatePanel
                   icon={<BarChart3 className="h-8 w-8" />}
                   title="Sin datos visualizables"
@@ -880,36 +1209,58 @@ const ChartsReportComponent = ({
               </div>
             )
           }
-          return renderChartCanvas();
+          return (
+            <div className="flex-1 min-h-0 w-full overflow-hidden">{renderChartCanvas()}</div>
+          );
         })()}
+
+        <EvidenceDrawer
+          isOpen={isEvidenceOpen}
+          onClose={() => setIsEvidenceOpen(false)}
+          evidence={evidenceData}
+          title={title ? `Evidencia: ${title}` : "Evidencia Analítica"}
+        />
       </div>
     );
   }
 
   return (
-    <div className="mt-6 w-full min-w-0 overflow-hidden h-full"> 
-      <Card className="w-full p-4 relative min-w-0 overflow-hidden h-full flex flex-col">
-        <div className="chart-toolbar-row absolute top-4 right-4 z-10 inline-flex w-max max-w-[calc(100%-2rem)] flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
-          {modeSwitch}
-          {toolbarPrefix}
-          {showVisualButton ? visualButton : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onSave(localOption)}
-            title="Guardar"
-            data-testid="chart-save-button"
-          >
-            <SaveIcon className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="mt-6 w-full min-w-0 overflow-hidden animate-fade-slide-in"> 
+      <Card variant="interactive" className="w-full px-5 py-3 min-w-0 overflow-hidden flex flex-col rounded-xl group shadow-[var(--cursor-shadow-md)] hover:shadow-[var(--cursor-shadow-lg)] transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
+        {/* Header limpio estilo Cursor/Apple: 1 sola línea con título y controles a la derecha */}
+        <div className="flex items-center justify-between gap-4 pb-2 mb-2 border-b border-border/20 shrink-0">
+          {title ? (
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-medium text-foreground leading-snug tracking-tight truncate" title={title}>
+                {title}
+              </h3>
+            </div>
+          ) : <div className="flex-1" />}
 
-        {title && (
-          <h3 className="text-lg font-semibold text-foreground mb-4 pr-20 shrink-0">
-            {title}
-          </h3>
-        )}
+          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 transition-opacity duration-150">
+            {!presentationMode && visualGovernance?.recommended_label && visualGovernance.recommended_label !== visualGovernance.applied_label && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-secondary px-1.5 py-px text-[10px] font-medium text-muted-foreground"
+                title={`Recomendado: ${visualGovernance.recommended_label}`}
+              >
+                <Sparkles className="h-2.5 w-2.5 shrink-0 text-accent" />
+                <span className="max-w-[96px] truncate">{visualGovernance.recommended_label}</span>
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors duration-150"
+              onClick={() => onSave(localOption)}
+              title="Guardar visual"
+              data-testid="chart-save-button"
+            >
+              <SaveIcon className="h-4 w-4" />
+            </Button>
+            {showVisualButton ? visualButton : null}
+            {viewMenu}
+          </div>
+        </div>
 
         {!presentationMode && (
           <VisualGovernanceBanner
@@ -930,20 +1281,31 @@ const ChartsReportComponent = ({
         )}
         {/* Dentro del render, antes de <ReactECharts ... /> */}
         {viewMode === 'table' && supportsTabularMode ? (
-          renderTablePanel()
+          <div className="flex-1 min-h-0 overflow-hidden">{renderTablePanel()}</div>
         ) : viewMode === 'hybrid' && supportsTabularMode ? (
           <div className="flex flex-1 min-h-0 flex-col gap-4">
-            <div className="min-h-[320px] flex-1">
+            <div className="flex min-h-[360px] min-h-0 flex-1 overflow-hidden">
               {renderChartCanvas()}
             </div>
-            <div className="min-h-[260px]">
+            <div className="min-h-[260px] min-h-0 overflow-hidden">
               {renderTablePanel()}
             </div>
           </div>
         ) : (
-          renderChartCanvas()
+          <div 
+            className={`w-full overflow-hidden ${isWidget ? 'flex-1 min-h-0' : 'min-h-[440px]'}`}
+            style={isWidget ? undefined : { height: `${computedChartHeight}px` }}
+          >
+            {renderChartCanvas()}
+          </div>
         )}
 
+        <EvidenceDrawer
+          isOpen={isEvidenceOpen}
+          onClose={() => setIsEvidenceOpen(false)}
+          evidence={evidenceData}
+          title={title ? `Evidencia: ${title}` : "Evidencia Analítica"}
+        />
       </Card>
     </div>
   );

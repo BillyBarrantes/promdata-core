@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { SaveIcon } from '@/components/icons/save-icon'
 import { ChartsReport } from '@/components/charts-report'
 import { EChartsChart } from '@/components/echarts-chart'
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, BarChart3, Table2, Rows3, X, SlidersHorizontal, LoaderCircle } from 'lucide-react'
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, BarChart3, Table2, Rows3, X, SlidersHorizontal, LoaderCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAtomValue } from 'jotai'
 import { activeFileIdAtom } from '@/lib/state'
+import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // TIPOS
@@ -97,6 +98,7 @@ const buildSparklineFromSeries = (seriesList: any[], rowIndex: number, windowSiz
   return segment.length >= 2 ? segment : null
 }
 
+// @deprecated("Usado anteriormente para renderizar sparklines con ECharts; reemplazado por SVG puro de alto rendimiento.")
 const buildSparklineOption = (values: number[]): any => ({
   animation: false,
   tooltip: { show: false },
@@ -124,14 +126,41 @@ const SparklineCell = React.memo(({ values }: { values: number[] }) => {
     return <span className="text-muted-foreground">—</span>
   }
 
+  const minVal = Math.min(...safeValues)
+  const maxVal = Math.max(...safeValues)
+  const range = maxVal - minVal || 1
+
+  const points = safeValues
+    .map((v, i) => {
+      const x = (i / (safeValues.length - 1)) * 84
+      const y = 22 - ((v - minVal) / range) * 20
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+
+  const polygonPoints = `${points} 84,24 0,24`
+
   return (
-    <div className="w-[84px] h-[24px] min-w-[84px]">
-      <EChartsChart
-        option={buildSparklineOption(safeValues)}
-        isThumbnail={true}
-        style={{ width: '84px', height: '24px' }}
-        interactionMode="filter"
-      />
+    <div className="w-[84px] h-[24px] min-w-[84px] flex items-center">
+      <svg
+        width="84"
+        height="24"
+        viewBox="0 0 84 24"
+        className="overflow-hidden"
+      >
+        <polygon
+          points={polygonPoints}
+          className="fill-blue-500/10 dark:fill-blue-400/15"
+        />
+        <polyline
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+      </svg>
     </div>
   )
 })
@@ -513,13 +542,13 @@ const SmartTableComponent = ({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar en la tabla..."
-            className="w-full h-9 pl-9 pr-10 bg-muted/40 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+            className="w-full h-9 pl-9 pr-10 bg-muted/40 border border-border/50 rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
           />
           {search.trim() && (
             <button
               type="button"
               onClick={clearSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]"
               title="Limpiar búsqueda"
             >
               <X className="h-4 w-4" />
@@ -557,7 +586,7 @@ const SmartTableComponent = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-border/50 rounded-lg shadow-sm flex-1 min-h-0">
+      <div className="overflow-x-auto border border-border/40 rounded-lg shadow-sm flex-1 min-h-0">
         <div
           ref={tableViewportRef}
           className={isWidget ? "h-full overflow-y-auto" : "max-h-[500px] overflow-y-auto"}
@@ -565,22 +594,31 @@ const SmartTableComponent = ({
         >
           <table className="w-full text-sm text-left">
             <thead className="bg-card text-muted-foreground sticky top-0 z-10">
-              <tr className="border-b border-border">
-                {normalizedColumns.map(col => (
-                  <th
-                    key={col.key}
-                    className="py-3 px-4 font-medium text-xs uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-muted/70 transition-colors"
-                    onClick={() => handleSort(col.key)}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>{col.label}</span>
-                      {getSortIcon(col.key)}
-                    </div>
-                  </th>
-                ))}
+              <tr className="border-b border-border/30">
+                {normalizedColumns.map(col => {
+                  const isNumeric = col.type === 'number' || col.type === 'percentage';
+                  return (
+                    <th
+                      key={col.key}
+                      className={cn(
+                        "py-2.5 px-3.5 font-medium text-xs uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-muted/70 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
+                        isNumeric ? "text-right" : "text-left"
+                      )}
+                      onClick={() => handleSort(col.key)}
+                    >
+                      <div className={cn(
+                        "flex items-center gap-1.5",
+                        isNumeric ? "justify-end" : "justify-start"
+                      )}>
+                        <span>{col.label}</span>
+                        {getSortIcon(col.key)}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/50">
+            <tbody className="divide-y divide-border/30">
               {topSpacerHeight > 0 && (
                 <tr aria-hidden="true">
                   <td colSpan={normalizedColumns.length} style={{ height: `${topSpacerHeight}px`, padding: 0 }} />
@@ -589,30 +627,35 @@ const SmartTableComponent = ({
               {visibleRows.map((row, rowIdx) => (
                 <tr
                   key={`${page}-${virtualStart + rowIdx}`}
-                  className="hover:bg-muted/30 transition-colors"
+                  className="hover:bg-muted/30 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]"
                 >
                   {normalizedColumns.map(col => {
                     if (col.type === 'sparkline') {
                       return (
                         <td
                           key={col.key}
-                          className="py-2.5 px-4 whitespace-nowrap tabular-nums"
+                          className="py-2 px-3.5 whitespace-nowrap tabular-nums"
                         >
                           <SparklineCell values={Array.isArray(row[col.key]) ? row[col.key] : []} />
                         </td>
                       )
                     }
 
+                    const isNumeric = col.type === 'number' || col.type === 'percentage';
+
                     return (
                       <td
                         key={col.key}
-                        className="py-2.5 px-4 whitespace-nowrap tabular-nums"
+                        className={cn(
+                          "py-2 px-3.5 whitespace-nowrap text-sm text-foreground",
+                          isNumeric ? "text-right font-mono tabular-nums font-medium" : "text-left"
+                        )}
                         style={{
                           ...getDataBarStyle(row[col.key], col),
                           ...getHeatmapStyle(row[col.key], col)
                         }}
                       >
-                        <span className={col.type === 'number' ? 'font-medium' : ''}>
+                        <span>
                           {formatCell(row[col.key], col)}
                         </span>
                       </td>
@@ -649,27 +692,27 @@ const SmartTableComponent = ({
           <span>
             Mostrando {sortedData.length === 0 ? 0 : page * pageSize + 1}–{Math.min((page + 1) * pageSize, sortedData.length)} de {sortedData.length}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               variant="outline"
-              size="sm"
-              className="h-8 text-xs"
+              size="icon"
+              className="h-7 w-7"
               disabled={page === 0}
               onClick={() => setPage(p => Math.max(0, p - 1))}
             >
-              ← Anterior
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <span className="text-xs font-medium px-2">
+            <span className="text-xs font-medium px-2 text-foreground">
               {page + 1} / {totalPages}
             </span>
             <Button
               variant="outline"
-              size="sm"
-              className="h-8 text-xs"
+              size="icon"
+              className="h-7 w-7"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             >
-              Siguiente →
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -690,28 +733,28 @@ const SmartTableComponent = ({
       <Button
         variant={viewMode === 'table' ? "default" : "outline"}
         size="sm"
-        className="h-8 text-xs gap-1.5"
+        className="h-7 text-[11px] gap-1.5 border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('table')}
       >
-        <Table2 className="h-3.5 w-3.5" />
+        <Table2 className="h-3 w-3" />
         Tabla
       </Button>
       <Button
         variant={viewMode === 'hybrid' ? "default" : "outline"}
         size="sm"
-        className="h-8 text-xs gap-1.5"
+        className="h-7 text-[11px] gap-1.5 border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('hybrid')}
       >
-        <Rows3 className="h-3.5 w-3.5" />
+        <Rows3 className="h-3 w-3" />
         Híbrida
       </Button>
       <Button
         variant={viewMode === 'chart' ? "default" : "outline"}
         size="sm"
-        className="h-8 text-xs gap-1.5"
+        className="h-7 text-[11px] gap-1.5 border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
         onClick={() => setViewMode('chart')}
       >
-        <BarChart3 className="h-3.5 w-3.5" />
+        <BarChart3 className="h-3 w-3" />
         Gráfico
       </Button>
     </div>
@@ -740,11 +783,11 @@ const SmartTableComponent = ({
       <>
         {!isWidget && (
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-foreground pr-12 truncate">
+            <h3 className="text-lg font-medium text-foreground pr-12 truncate tracking-tight">
               {title}
             </h3>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onSave} title="Guardar">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[var(--cursor-danger)] hover:bg-secondary/60" onClick={onSave} title="Guardar">
                 <SaveIcon className="h-4 w-4" />
               </Button>
             </div>
@@ -759,7 +802,7 @@ const SmartTableComponent = ({
     }
     return (
       <div className="mt-6 min-w-0 overflow-hidden h-full">
-        <Card className="p-6 relative h-full flex flex-col">
+        <Card variant="interactive" className="p-6 relative h-full flex flex-col rounded-xl shadow-[var(--cursor-shadow-md)] hover:shadow-[var(--cursor-shadow-lg)] transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
           {chartContent}
         </Card>
       </div>
@@ -791,7 +834,7 @@ const SmartTableComponent = ({
 
     return (
       <div className="mt-6 min-w-0 overflow-hidden h-full">
-        <Card className="p-6 relative flex flex-col h-full bg-card/50 backdrop-blur-sm">
+        <Card variant="flat" className="p-6 relative flex flex-col h-full">
           {skeletonInner}
         </Card>
       </div>
@@ -805,9 +848,12 @@ const SmartTableComponent = ({
       {/* Header */}
       <div className={`flex items-center justify-between gap-4 ${isWidget ? "mb-2" : "mb-4"}`}>
         {!isWidget ? (
-          <h3 className="text-lg font-semibold text-foreground truncate">
-            📋 {title || 'Smart Table'}
-          </h3>
+          <div className="flex items-center gap-2 min-w-0">
+            <Table2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <h3 className="text-base font-semibold text-foreground truncate">
+              {title || 'Smart Table'}
+            </h3>
+          </div>
         ) : (
           <div />
         )}
@@ -839,8 +885,8 @@ const SmartTableComponent = ({
   }
 
   return (
-    <div className="mt-6 min-w-0 overflow-hidden h-full">
-      <Card className="p-6 relative flex flex-col h-full bg-card/50 backdrop-blur-sm">
+    <div className="mt-6 min-w-0 overflow-hidden h-full animate-fade-slide-in">
+      <Card variant="interactive" className="p-6 relative flex flex-col h-full rounded-xl shadow-[var(--cursor-shadow-md)] hover:shadow-[var(--cursor-shadow-lg)] transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]">
         {tableInner}
       </Card>
     </div>

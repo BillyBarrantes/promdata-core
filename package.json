@@ -9,7 +9,8 @@
     "start": "next start",
     "test:e2e": "playwright test",
     "test:e2e:crossfilter": "playwright test e2e/crossfilter.spec.ts",
-    "test:e2e:happy-path": "playwright test e2e/happy-path-analysis.spec.ts"
+    "test:e2e:happy-path": "playwright test e2e/happy-path-analysis.spec.ts",
+    "verify:ui": "node scripts/verify_ui_safety.mjs"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.33.1-dev20.0",

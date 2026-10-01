@@ -155,29 +155,29 @@ export default function GlosarioPage() {
         <div className="flex h-screen bg-background">
             <Sidebar />
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-8">
-                    <div className="max-w-5xl mx-auto w-full space-y-8">
-
-                        {/* Header */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
-                            <div>
-                                <h1 className="text-4xl font-normal tracking-tight flex items-center gap-3 text-foreground">
-                                    <BookOpen className="w-8 h-8 text-primary/80" strokeWidth={1.5} />
-                                    Glosario de Negocio
-                                </h1>
-                                <p className="text-muted-foreground mt-2 text-lg font-light">
-                                    "Enséñale" a la IA los términos clave de tu empresa para análisis más precisos.
-                                </p>
-                            </div>
-                            <Button onClick={openNew} className="shrink-0 gap-2">
-                                <Plus className="w-4 h-4" />
-                                Agregar Término
-                            </Button>
+                <header className="border-b border-border/20 px-6 py-5 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+                    <div className="flex items-center justify-between max-w-7xl mx-auto">
+                        <div>
+                            <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground leading-tight flex items-center gap-3">
+                                <BookOpen className="h-7 w-7 text-primary/80" strokeWidth={1.5} />
+                                Glosario de Negocio
+                            </h1>
+                            <p className="mt-1.5 text-base font-light text-muted-foreground">
+                                "Enséñale" a la IA los términos clave de tu empresa para análisis más precisos.
+                            </p>
                         </div>
+                        <Button onClick={openNew} className="shrink-0 gap-2 rounded-lg">
+                            <Plus className="w-4 h-4" />
+                            Agregar Término
+                        </Button>
+                    </div>
+                </header>
+                <div className="flex-1 overflow-y-auto">
+                    <div className="max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
 
                         {/* Search & List */}
                         <Card>
-                            <CardHeader className="pb-3 border-b">
+                            <CardHeader className="pb-3 border-b border-border/30">
                                 <div className="relative">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                     <Input
@@ -205,9 +205,9 @@ export default function GlosarioPage() {
 
                                         <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mb-8">
                                             {/* Ejemplo Básico */}
-                                            <div className="border border-border/60 rounded-[1.5rem] p-6 bg-card hover:shadow-lg transition-all duration-300">
+                                            <div className="border border-border/60 rounded-2xl p-6 bg-card shadow-[var(--cursor-shadow-xs)] hover:shadow-[var(--cursor-shadow-md)] transition-all duration-200">
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded border border-blue-200">Básico</span>
+                                                    <span className="bg-secondary text-muted-foreground text-xs font-bold px-2 py-0.5 rounded border border-border/40">Básico</span>
                                                     <span className="font-semibold text-sm">Identificadores</span>
                                                 </div>
                                                 <div className="space-y-2 text-sm">
@@ -217,7 +217,7 @@ export default function GlosarioPage() {
                                             </div>
 
                                             {/* Ejemplo Profesional */}
-                                            <div className="border border-border/60 rounded-[1.5rem] p-6 bg-card hover:shadow-lg transition-all duration-300">
+                                            <div className="border border-border/60 rounded-2xl p-6 bg-card shadow-[var(--cursor-shadow-xs)] hover:shadow-[var(--cursor-shadow-md)] transition-all duration-200">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded border border-emerald-200">Profesional</span>
                                                     <span className="font-semibold text-sm">Métrica Financiera</span>

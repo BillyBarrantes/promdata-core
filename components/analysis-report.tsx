@@ -1,8 +1,16 @@
 import React from "react"
+import { useAtomValue } from "jotai"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { SaveIcon } from '@/components/icons/save-icon';
 import { EChartsChart } from "@/components/echarts-chart"
+import { BarChart3, Table2, Download, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useKpiReactivity } from "@/components/use-kpi-reactivity"
+import {
+  CURRENCY_LOCALES,
+  userPreferencesAtom,
+} from "@/components/user-preferences"
 
 
 // Interfaz flexible para los datos
@@ -11,20 +19,63 @@ type AnalysisData = any;
 interface AnalysisReportProps {
   data: AnalysisData;
   onSave: () => void;
+  isWidget?: boolean;
 }
 
-const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
+function KpiCard({ metric, isSingleKpi, isWidget }: { metric: { label: string; value: string }; isSingleKpi: boolean; isWidget?: boolean }) {
+  const { filteredValue, isFiltered, originalValue } = useKpiReactivity({
+    label: metric.label,
+    originalValue: metric.value,
+    isWidget,
+  })
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col justify-between transition-all duration-150",
+        isWidget
+          ? "items-center text-center justify-center border-0 bg-transparent shadow-none p-0 w-full"
+          : "rounded-lg border border-border/50 bg-muted/20 p-3.5 shadow-xs hover:border-border hover:bg-muted/40",
+        !isWidget && isSingleKpi ? "max-w-xs w-fit min-w-[200px]" : (!isWidget ? "w-full" : ""),
+        isFiltered && !isWidget && "border-primary/50"
+      )}
+    >
+      <span className={cn(
+        "text-[11px] font-medium uppercase tracking-wider text-muted-foreground line-clamp-2",
+        isWidget && "text-center"
+      )} title={metric.label}>
+        {metric.label.replace(/_/g, ' ')}
+      </span>
+      <span className={cn(
+        "mt-1.5 font-semibold tracking-tight font-mono tabular-nums text-2xl",
+        isWidget && "text-center",
+        isFiltered ? "text-primary" : "text-foreground"
+      )}>
+        {filteredValue || metric.value}
+      </span>
+      {isFiltered && (
+        <span className={cn(
+          "mt-1 text-[10px] text-muted-foreground",
+          isWidget && "text-center"
+        )}>
+          Total: {originalValue}
+        </span>
+      )}
+    </div>
+  )
+}
+
+const AnalysisReportComponent = ({ data, onSave, isWidget = false }: AnalysisReportProps) => {
 
   const [chartFilter, setChartFilter] = React.useState<string | null>(null);
+  const userPreferences = useAtomValue(userPreferencesAtom);
+  const numberLocale = CURRENCY_LOCALES[userPreferences.currency] ?? "es-PE";
 
   // --- HELPER: Motor de Localización Monetaria (Smart Formatting) ---
   const formatCurrency = (value: number) => {
-    // Intentamos detectar si 'data' tiene metadata de moneda (si viene del backend)
-    // Pero como 'data' es flexible, asumimos PEN por defecto o buscamos 'currency_code' si existiera en un futuro standar
-    const currency = 'PEN'; // Por defecto Perú
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(numberLocale, {
       style: 'currency',
-      currency: currency,
+      currency: userPreferences.currency,
       minimumFractionDigits: 2
     }).format(value);
   };
@@ -49,7 +100,7 @@ const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
           // Si falla la conversión, caer al formato numérico normal
         }
       }
-      return value.toLocaleString('es-PE', { maximumFractionDigits: 2 });
+      return value.toLocaleString(numberLocale, { maximumFractionDigits: 2 });
     }
     if (typeof value === 'object') {
       return value.value || value.amount || value.total || JSON.stringify(value);
@@ -87,13 +138,23 @@ const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
   const chartComponents = Array.isArray(data) ? data.filter((item: any) => item.type === 'chart' || item.chart_options) : [];
 
   return (
-    <div className="mt-6 space-y-6 min-w-0 overflow-hidden">
+    <div className={cn(
+      "min-w-0 overflow-hidden",
+      isWidget ? "h-full w-full flex items-center justify-center p-1.5" : "mt-6 space-y-6"
+    )}>
 
       {/* Botón de Reset Filtro (Flotante o en Cabecera) */}
       {chartFilter && (
-        <div className="flex justify-end p-2 bg-muted/20 rounded-lg border border-dashed border-primary/30">
-          <Button variant="secondary" size="sm" onClick={() => setChartFilter(null)} className="animate-in fade-in zoom-in">
-            🚫 Quitar Filtro: <span className="font-bold ml-1 text-primary">{chartFilter}</span>
+        <div className="flex justify-end p-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setChartFilter(null)}
+            className="h-7 gap-1.5 rounded-full border border-border/60 bg-muted/60 px-3 text-xs font-medium text-foreground hover:bg-muted transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
+          >
+            <X className="h-3 w-3 text-muted-foreground" />
+            <span>Filtro activo:</span>
+            <span className="font-semibold text-primary font-mono">{chartFilter}</span>
           </Button>
         </div>
       )}
@@ -149,7 +210,6 @@ const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
         }
         // C. CASO ESPECIAL: Si 'data' es directamente un objeto de métricas (flat)
         else if (data && !data.tableData && !data.analysis && !data.chart_options) {
-          // Asumimos que es un objeto de métricas K:V si no tiene structura conocida
           Object.entries(data).forEach(([k, v]) => {
             if (typeof v !== 'object' && k !== 'title') {
               metricsArray.push({ label: k, value: formatValue(v) });
@@ -159,28 +219,50 @@ const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
 
         if (metricsArray.length === 0) return null;
 
+        const isSingleKpi = metricsArray.length === 1;
+
+        const metricsGrid = (
+          <div className={isSingleKpi
+            ? isWidget
+              ? "flex justify-center items-center w-full py-1"
+              : "flex justify-start"
+            : isWidget
+              ? "grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2 w-full content-center"
+              : "grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3"
+          }>
+            {metricsArray.map((metric, idx) => (
+              <KpiCard key={idx} metric={metric} isSingleKpi={isSingleKpi} isWidget={isWidget} />
+            ))}
+          </div>
+        );
+
+        if (isWidget) {
+          return metricsGrid;
+        }
+
         return (
-          <Card className="p-6 relative !mt-4">
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onSave} title="Guardar">
-                <SaveIcon className="h-4 w-4" />
+          <Card className={cn(
+            "p-5 rounded-xl mt-4",
+            isSingleKpi ? "w-fit min-w-[240px] max-w-sm" : "w-full"
+          )}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Indicadores Clave
+                </h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                onClick={onSave}
+                title="Guardar"
+              >
+                <SaveIcon className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2 pr-20">
-              📊 Métricas Clave
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              {metricsArray.map((metric, idx) => (
-                <div key={idx} className="flex flex-col space-y-1 p-4 bg-muted/40 rounded-lg border hover:bg-muted/60 transition-colors">
-                  <span className="text-muted-foreground capitalize text-xs font-medium truncate" title={metric.label}>
-                    {metric.label.replace(/_/g, ' ')}
-                  </span>
-                  <strong className="text-foreground text-xl font-bold tracking-tight text-primary break-words whitespace-normal leading-tight" title={metric.value}>
-                    {metric.value}
-                  </strong>
-                </div>
-              ))}
-            </div>
+            {metricsGrid}
           </Card>
         );
       })()}
@@ -223,42 +305,89 @@ const AnalysisReportComponent = ({ data, onSave }: AnalysisReportProps) => {
           })
           : foundTable;
 
+        const handleExportCSV = () => {
+          if (!displayTable || displayTable.length === 0) return;
+          const headers = Object.keys(firstRow);
+          const csvRows: string[] = [];
+
+          const escapeCSV = (val: any) => {
+            if (val === null || val === undefined) return '""';
+            return `"${String(val).replace(/"/g, '""')}"`;
+          };
+
+          csvRows.push(headers.map(h => escapeCSV(h.replace(/_/g, ' '))).join(","));
+
+          for (const row of displayTable) {
+            csvRows.push(headers.map(h => escapeCSV(row[h])).join(","));
+          }
+
+          const csvString = csvRows.join("\r\n");
+          const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          const sanitizedTitle = (tableTitle || "reporte_analisis")
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9_-]/g, "_")
+            .replace(/_+/g, "_");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `${sanitizedTitle || "reporte"}_${Date.now()}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
         return (
-          <Card className="p-6">
+          <Card className="p-5 rounded-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                {tableTitle ? `📋 ${tableTitle}` : '📋 Tabla de Datos'}
-                {chartFilter && <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded ml-2">Filtrado por: {chartFilter}</span>}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Table2 className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {tableTitle || 'Detalle Analítico'}
+                </h3>
+                {chartFilter && (
+                  <span className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-mono font-medium">
+                    Filtrado por: {chartFilter}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="bg-transparent h-8 text-xs">
-                  Exportar
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]" onClick={handleExportCSV}>
+                  <Download className="h-3.5 w-3.5" />
+                  Exportar CSV
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onSave} title="Guardar">
-                  <SaveIcon className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]" onClick={onSave} title="Guardar">
+                  <SaveIcon className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
 
-            <div className="overflow-x-auto border rounded-lg shadow-sm max-h-[400px] overflow-y-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-muted-foreground">
-                  <tr className="border-b border-border">
-                    {Object.keys(firstRow).map((key) => (
-                      <th key={key} className="py-3 px-4 font-medium capitalize whitespace-nowrap">
-                        {key.replace(/_/g, ' ')}
-                      </th>
-                    ))}
+            <div className="overflow-x-auto border border-border/40 rounded-lg shadow-xs max-h-[400px] overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/40 text-muted-foreground sticky top-0 z-10 backdrop-blur-xs">
+                  <tr className="border-b border-border/30">
+                    {Object.keys(firstRow).map((key) => {
+                      const isColNumeric = displayTable.some((r: any) => typeof r[key] === 'number');
+                      return (
+                        <th key={key} className={`py-2.5 px-3.5 font-medium uppercase tracking-wider text-[11px] whitespace-nowrap ${isColNumeric ? 'text-right' : 'text-left'}`}>
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/30">
                   {displayTable.map((row: any, index: number) => (
-                    <tr key={index} className="hover:bg-muted/50 transition-colors">
-                      {Object.entries(row).map(([key, value], cellIndex) => (
-                        <td key={cellIndex} className="py-3 px-4 whitespace-nowrap">
-                          {formatValue(value, key)}
-                        </td>
-                      ))}
+                    <tr key={index} className="hover:bg-muted/30 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)]">
+                      {Object.entries(row).map(([key, value], cellIndex) => {
+                        const isNumeric = typeof value === 'number';
+                        return (
+                          <td key={cellIndex} className={`py-2 px-3.5 whitespace-nowrap text-foreground ${isNumeric ? 'text-right font-mono tabular-nums font-medium' : 'text-left'}`}>
+                            {formatValue(value, key)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                   {displayTable.length === 0 && (

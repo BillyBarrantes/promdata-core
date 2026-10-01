@@ -3,7 +3,11 @@
 
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase-client';
-import type { SupabaseClient } from '@supabase/supabase-js';
+
+// [P0-5 FIX] '@supabase/supabase-js' no es dependencia directa (pnpm no
+// hoista transitivas). El tipo se deriva del factory real, que sí está
+// tipado vía '@supabase/ssr'.
+type SupabaseClient = ReturnType<typeof createClient>;
 
 type SupabaseContext = {
   supabase: SupabaseClient;

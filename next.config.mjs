@@ -3,12 +3,12 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // [P0-5 FIX 2026-07-25] Gates de build eliminados:
+  // - 'typescript.ignoreBuildErrors: true' permitía merges con errores de tipo.
+  //   Ahora el build FALLA si tsc falla (9 errores corregidos en Sprint 1).
+  // - 'eslint.ignoreDuringBuilds' era clave muerta: Next.js 16 ya no soporta
+  //   la clave 'eslint' en config (warning en cada dev server start). El gate
+  //   de lint debe vivir como paso CI propio (Fase 6), no como flag de build.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   images: {
     unoptimized: true,
@@ -42,11 +42,21 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: *.vercel-insights.com *.sentry.io",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: *.vercel-insights.com *.vercel-scripts.com *.sentry.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src * blob: data:",
               "media-src 'none'",
-              `connect-src 'self' https://*.supabase.co https://*.sentry.io https://o*.ingest.sentry.io wss://*.sentry.io ${wssAllowed}`,
+              // [QW-4 FIX 2026-07-25] https://cdn.jsdelivr.net es requerido por
+              // DuckDB-WASM: lib/duckdb-engine.ts fetchea el worker script
+              // (línea ~225) y el módulo .wasm desde ese CDN. Sin este origen
+              // en connect-src, el cross-filter falla SOLO en producción
+              // (donde estos headers sí se aplican). El worker se construye
+              // desde blob: (worker-src blob: ya permitido), pero el fetch()
+              // inicial quedaba bloqueado por CSP.
+              // Se elimina además 'https://o*.ingest.sentry.io': fuente CSP
+              // inválida (wildcard parcial de label) que los browsers ignoran;
+              // 'https://*.sentry.io' ya cubre los endpoints de ingest.
+              `connect-src 'self' https://cdn.jsdelivr.net https://*.supabase.co https://*.sentry.io wss://*.sentry.io ${wssAllowed}`,
               "font-src 'self'",
               "object-src 'none'",
               "frame-src 'self'",

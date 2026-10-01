@@ -545,7 +545,7 @@ export const isVisualTransformSupported = (
   payload?: VisualSourcePayload | null,
 ): boolean => getTransformSupportReason(visualId, payload) === null;
 
-export const buildVisualOptionFromPayload = (
+const buildRawVisualOptionFromPayload = (
   payload: VisualSourcePayload | null | undefined,
   visualId: VisualId,
 ): EChartsOption | null => {
@@ -592,8 +592,25 @@ export const buildVisualOptionFromPayload = (
   }
 
   if (visualId === "pie_chart") {
-    const data = extractNamedValues(rows);
+    let data = extractNamedValues(rows);
     if (data.length === 0) return null;
+
+    // Ordenar descendente para priorizar categorias principales
+    data = [...data].sort((a, b) => b.value - a.value);
+
+    // Donut Inteligente: Si hay mas de 6 categorias, agrupar en Top 5 + OTROS (mismo comportamiento que ChartFactory del backend)
+    if (data.length > 6) {
+      const top5 = data.slice(0, 5);
+      const othersVal = data.slice(5).reduce((acc, curr) => acc + curr.value, 0);
+      data = [
+        ...top5,
+        {
+          name: "OTROS",
+          value: othersVal,
+        },
+      ];
+    }
+
     option.tooltip = { trigger: "item" };
     option.color = COLORS;
     option.series = [
@@ -605,7 +622,9 @@ export const buildVisualOptionFromPayload = (
         data: data.map((item, index) => ({
           name: item.name,
           value: item.value,
-          itemStyle: { color: COLORS[index % COLORS.length] },
+          itemStyle: item.name === "OTROS"
+            ? { color: "#94a3b8" }
+            : { color: COLORS[index % COLORS.length] },
         })),
         itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 6 },
         labelLine: {
@@ -910,4 +929,26 @@ export const buildVisualOptionFromPayload = (
   }
 
   return null;
+};
+
+export const buildVisualOptionFromPayload = (
+  payload: VisualSourcePayload | null | undefined,
+  visualId: VisualId,
+  sourceOption?: EChartsOption | null,
+): EChartsOption | null => {
+  const result = buildRawVisualOptionFromPayload(payload, visualId);
+  if (!result) return null;
+
+  const src = (sourceOption as Record<string, unknown>) || {};
+  const built = result as Record<string, unknown>;
+
+  // Preservar contratos, buffer Arrow y metadatos del gráfico original
+  if (src.table_name) built.table_name = src.table_name;
+  if (src.granular_arrow) built.granular_arrow = src.granular_arrow;
+  if (src.query_contract) built.query_contract = src.query_contract;
+  if (src.chart_base_filters) built.chart_base_filters = src.chart_base_filters;
+  if (src.extra_info) built.extra_info = src.extra_info;
+  if (src._cross_filter_meta) built._cross_filter_meta = src._cross_filter_meta;
+
+  return built as EChartsOption;
 };

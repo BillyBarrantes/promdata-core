@@ -2,13 +2,82 @@
 "use client"
 
 import React, { useRef, useEffect } from 'react';
-import * as echarts from 'echarts';
-import { EChartsOption } from 'echarts';
+import * as echarts from 'echarts/core';
+import {
+  BarChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  TreemapChart,
+  FunnelChart,
+  GaugeChart,
+  BoxplotChart,
+  CustomChart,
+  MapChart,
+} from 'echarts/charts';
+import {
+  TitleComponent,
+  TooltipComponent,
+  AxisPointerComponent,
+  GridComponent,
+  LegendComponent,
+  LegendScrollComponent,
+  DataZoomComponent,
+  ToolboxComponent,
+  VisualMapComponent,
+  MarkLineComponent,
+  MarkPointComponent,
+  MarkAreaComponent,
+  GeoComponent,
+  AriaComponent,
+  GraphicComponent,
+  DatasetComponent,
+  TransformComponent,
+} from 'echarts/components';
+import { SVGRenderer } from 'echarts/renderers';
+import { LabelLayout, UniversalTransition } from 'echarts/features';
+import type { EChartsOption } from 'echarts';
+
+echarts.use([
+  BarChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  TreemapChart,
+  FunnelChart,
+  GaugeChart,
+  BoxplotChart,
+  CustomChart,
+  MapChart,
+  TitleComponent,
+  TooltipComponent,
+  AxisPointerComponent,
+  GridComponent,
+  LegendComponent,
+  LegendScrollComponent,
+  DataZoomComponent,
+  ToolboxComponent,
+  VisualMapComponent,
+  MarkLineComponent,
+  MarkPointComponent,
+  MarkAreaComponent,
+  GeoComponent,
+  AriaComponent,
+  GraphicComponent,
+  DatasetComponent,
+  TransformComponent,
+  SVGRenderer,
+  LabelLayout,
+  UniversalTransition,
+]);
 import { useAtomValue } from 'jotai';
 import { drillDownVisibleAtom } from '@/lib/state';
 
 import { useTheme } from 'next-themes';
 import { Info, MousePointerClick } from 'lucide-react';
+import { CURRENCY_LOCALES, CURRENCY_SYMBOLS, getActiveCurrency } from '@/components/user-preferences';
 
 interface EChartsChartProps {
   option: EChartsOption;
@@ -206,7 +275,10 @@ const formatBusinessValue = (value: unknown, label?: string): string => {
   }
 
   if (isCurrencyLike(label)) {
-    return `S/ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const currency = getActiveCurrency();
+    const locale = CURRENCY_LOCALES[currency] ?? undefined;
+    const symbol = CURRENCY_SYMBOLS[currency] ?? "S/";
+    return `${symbol} ${value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   if (Math.abs(value) >= 1000) {
@@ -316,12 +388,13 @@ const applyBusinessTooltip = (currentOption: any): any => {
   const xName = xAxis?.name || vsp?.x_label || "Dimensión";
   const yName = yAxis?.name || vsp?.y_label || "Valor";
 
+  const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   currentOption.tooltip = {
     confine: true,
-    backgroundColor: "rgba(15, 23, 42, 0.94)",
+    backgroundColor: isDarkMode ? "rgba(28, 27, 24, 0.95)" : "rgba(15, 23, 42, 0.94)",
     borderWidth: 0,
-    textStyle: { color: "#f8fafc" },
-    extraCssText: "border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(15,23,42,.25);",
+    textStyle: { color: isDarkMode ? "#f0efeb" : "#f8fafc" },
+    extraCssText: "border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.25);",
     ...(currentOption.tooltip || {}),
   };
 
@@ -645,6 +718,8 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
   const fullOptionRef = useRef<any>(null);
   const lastFilterPreviewRef = useRef<{ seriesIndex?: number; dataIndex?: number } | null>(null);
   const filterCallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 🎨 Cache de colores del tema: evita getComputedStyle (reflow) en cada cambio de option
+  const themeColorsRef = useRef<{ theme: string; textColor: string; mutedColor: string; gridColor: string } | null>(null);
 
   const cancelPendingFilterCallback = React.useCallback(() => {
     if (filterCallbackTimeoutRef.current) {
@@ -703,6 +778,10 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
   useEffect(() => {
     if (chartRef.current && !chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'svg' });
+      // Force resize after init in case container had 0 dimensions at mount time
+      requestAnimationFrame(() => {
+        chartInstance.current?.resize();
+      });
     }
 
     const handleChartClick = (params: any) => {
@@ -847,9 +926,26 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
 
       // --- THEME OVERRIDES FOR DARK MODE ---
       const isDark = resolvedTheme === 'dark';
-      const textColor = isDark ? '#e5e7eb' : '#374151';
-      const mutedColor = isDark ? '#9ca3af' : '#6b7280';
-      const gridColor = isDark ? '#374151' : '#e5e7eb';
+      let themeColors = themeColorsRef.current;
+      if (!themeColors || themeColors.theme !== (resolvedTheme ?? 'light')) {
+        const rootStyle = getComputedStyle(document.documentElement);
+        themeColors = {
+          theme: resolvedTheme ?? 'light',
+          textColor: isDark
+            ? (rootStyle.getPropertyValue('--text-primary').trim() || '#f0efeb')
+            : (rootStyle.getPropertyValue('--foreground').trim() || '#374151'),
+          mutedColor: isDark
+            ? (rootStyle.getPropertyValue('--text-muted').trim() || '#a09e96')
+            : (rootStyle.getPropertyValue('--muted-foreground').trim() || '#6b7280'),
+          gridColor: isDark
+            ? (rootStyle.getPropertyValue('--border-subtle').trim() || '#4a4843')
+            : (rootStyle.getPropertyValue('--border').trim() || '#e5e7eb'),
+        };
+        themeColorsRef.current = themeColors;
+      }
+      const textColor = themeColors.textColor;
+      const mutedColor = themeColors.mutedColor;
+      const gridColor = themeColors.gridColor;
 
       if (currentOption.title) {
         if (Array.isArray(currentOption.title)) {
@@ -986,6 +1082,60 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
       };
       currentOption = sanitizeOption(currentOption);
       // --- END SANITIZATION ---
+
+      // --- GRID NORMALIZATION (Evitar cortes de ejes X/Y y scrollbars) ---
+      const hasLegend = Boolean(
+        currentOption.legend && 
+        (Array.isArray(currentOption.legend) 
+          ? currentOption.legend.some((l: any) => l.show !== false) 
+          : currentOption.legend.show !== false)
+      );
+
+      const defaultGridConfig = {
+        top: '10%',
+        bottom: hasLegend ? 48 : 28,
+        left: '4%',
+        right: '4%',
+        containLabel: true,
+      };
+
+      if (currentOption.xAxis || currentOption.yAxis) {
+        if (!currentOption.grid) {
+          currentOption.grid = defaultGridConfig;
+        } else if (!Array.isArray(currentOption.grid)) {
+          currentOption.grid = {
+            ...defaultGridConfig,
+            ...currentOption.grid,
+            bottom: hasLegend ? Math.max(48, typeof currentOption.grid.bottom === 'number' ? currentOption.grid.bottom : 48) : (currentOption.grid.bottom || 28),
+            containLabel: true,
+          };
+        }
+      }
+      // --- END GRID NORMALIZATION ---
+
+      // --- BAR PROPORTION & REFINEMENT ---
+      if (Array.isArray(currentOption.series)) {
+        const isHorizontal = Boolean(
+          (Array.isArray(currentOption.yAxis) && currentOption.yAxis.some((y: any) => y?.type === 'category')) ||
+          currentOption.yAxis?.type === 'category'
+        );
+
+        currentOption.series = currentOption.series.map((s: any) => {
+          if (s && s.type === 'bar') {
+            return {
+              ...s,
+              barMaxWidth: s.barMaxWidth || 28,
+              itemStyle: {
+                borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
+                ...(s.itemStyle || {}),
+              },
+            };
+          }
+          return s;
+        });
+      }
+      // --- END BAR PROPORTION ---
+
       currentOption = applyBusinessTooltip(currentOption);
       currentOption = applyBusinessPieLabels(currentOption);
 
@@ -1163,37 +1313,34 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
     if (chartRef.current && typeof window !== 'undefined' && 'ResizeObserver' in window) {
       let previousWidth = 0;
       let previousHeight = 0;
-      const observedElements = [chartRef.current, chartRef.current.parentElement].filter(Boolean) as Element[];
+      const chartElement = chartRef.current;
 
       resizeObserver = new ResizeObserver((entries) => {
-        const sizeChanged = entries.some((entry) => {
-          const nextWidth = entry.contentRect.width;
-          const nextHeight = entry.contentRect.height;
-          const changed = nextWidth > 0 && nextHeight > 0 && (nextWidth !== previousWidth || nextHeight !== previousHeight);
-          if (changed) {
-            previousWidth = nextWidth;
-            previousHeight = nextHeight;
-          }
-          return changed;
-        });
+        const entry = entries[0];
+        if (!entry) return;
+
+        const nextWidth = entry.contentRect.width;
+        const nextHeight = entry.contentRect.height;
+        // Umbral de histéresis: ignorar variaciones menores a 2px para evitar bucles oscilantes
+        const widthDiff = Math.abs(nextWidth - previousWidth);
+        const heightDiff = Math.abs(nextHeight - previousHeight);
+        const sizeChanged = nextWidth > 0 && nextHeight > 0 && (widthDiff >= 2 || heightDiff >= 2);
 
         if (sizeChanged) {
+          previousWidth = nextWidth;
+          previousHeight = nextHeight;
           requestAnimationFrame(() => {
             chartInstance.current?.resize();
           });
         }
       });
 
-      observedElements.forEach((element) => resizeObserver?.observe(element));
+      resizeObserver.observe(chartElement);
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (resizeObserver && chartRef.current) {
-        resizeObserver.unobserve(chartRef.current);
-        if (chartRef.current.parentElement) {
-          resizeObserver.unobserve(chartRef.current.parentElement);
-        }
+      if (resizeObserver) {
         resizeObserver.disconnect();
       }
     };
@@ -1231,8 +1378,8 @@ const EChartsChartInner: React.FC<EChartsChartProps> = ({ option, style, isThumb
   };
 
   return (
-    <div className="relative group w-full min-w-0 overflow-hidden">
-      <div ref={chartRef} className="w-full min-w-0" style={style || { width: '100%', height: '400px' }} />
+    <div className="relative group w-full h-full min-h-0 overflow-hidden rounded-md">
+      <div ref={chartRef} className="w-full h-full min-h-0" style={style || { width: '100%', height: '400px' }} />
 
       {selectionCount > 0 && !isThumbnail && (
         <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-lg border bg-card/92 px-3 py-2 text-xs shadow-lg backdrop-blur-sm">

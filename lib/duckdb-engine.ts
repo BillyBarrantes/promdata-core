@@ -43,6 +43,48 @@ type SyntheticBucketFilter = {
   excluded: string[];
 };
 
+type StructuredFilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'greater_than'
+  | 'less_than'
+  | 'greater_equal'
+  | 'less_equal'
+  | 'like'
+  | 'not_like'
+  | 'contains'
+  | 'not_contains'
+  | 'starts_with'
+  | 'ends_with'
+  | 'in'
+  | 'not_in';
+
+type StructuredFilter = {
+  operator: StructuredFilterOperator;
+  value: string;
+};
+
+const FILTER_OPERATOR_BY_TOKEN: Record<string, StructuredFilterOperator> = {
+  equals: 'equals',
+  not_equals: 'not_equals',
+  greater_than: 'greater_than',
+  less_than: 'less_than',
+  greater_equal: 'greater_equal',
+  less_equal: 'less_equal',
+  // Ibis normalizes LIKE/ILIKE as case-insensitive containment.
+  like: 'contains',
+  ilike: 'contains',
+  not_like: 'not_contains',
+  contains: 'contains',
+  not_contains: 'not_contains',
+  starts_with: 'starts_with',
+  ends_with: 'ends_with',
+  in: 'in',
+  in_list: 'in',
+  not_in: 'not_in',
+  not_in_list: 'not_in',
+};
+
 // ---------------------------------------------------------------------------
 // SINGLETON STATE
 // ---------------------------------------------------------------------------
@@ -484,11 +526,28 @@ function isTemporalType(dataType: string): boolean {
   return t.includes('DATE') || t.includes('TIMESTAMP') || t.startsWith('TIME') || t.includes(' TIME');
 }
 
+function isNumericType(dataType: string): boolean {
+  const t = dataType.toUpperCase();
+  return /\b(U?INT(?:8|16|32|64|128)?|TINYINT|SMALLINT|INTEGER|BIGINT|HUGEINT|UTINYINT|USMALLINT|UINTEGER|UBIGINT|DECIMAL|NUMERIC|DOUBLE|FLOAT|REAL)\b/.test(t);
+}
+
+/**
+ * Avoids DuckDB's implicit string-to-number coercion for UI selections.
+ * Chart labels are always text at the interaction boundary, even when the
+ * snapshot's physical Arrow column is numeric.
+ */
+function buildSafeExactPredicate(columnName: string, dataType: string, escapedValue: string): string {
+  const quotedColumn = `"${columnName}"`;
+  return isTextType(dataType)
+    ? `${quotedColumn} = '${escapedValue}'`
+    : `CAST(${quotedColumn} AS VARCHAR) = '${escapedValue}'`;
+}
+
 type TemporalValueCandidate = {
-  year: number;
+  year?: number;
   month?: number;
   day?: number;
-  kind: 'iso_date' | 'year_month' | 'month_year_label' | 'year_only';
+  kind: 'iso_date' | 'year_month' | 'month_year_label' | 'year_only' | 'month_only';
 };
 
 const MONTH_TOKEN_TO_NUMBER: Record<string, number> = {
@@ -556,10 +615,10 @@ function buildTemporalValueCandidates(rawValue: string): TemporalValueCandidate[
   const pushCandidate = (candidate: TemporalValueCandidate | null): void => {
     if (!candidate) return;
     const { year, month, day } = candidate;
-    if (year < 1900 || year > 2100) return;
+    if (year !== undefined && (year < 1900 || year > 2100)) return;
     if (month !== undefined && (month < 1 || month > 12)) return;
     if (day !== undefined && (day < 1 || day > 31)) return;
-    const key = `${year}-${month ?? 0}-${day ?? 0}`;
+    const key = `${year ?? 0}-${month ?? 0}-${day ?? 0}`;
     if (seen.has(key)) return;
     seen.add(key);
     candidates.push(candidate);
@@ -628,38 +687,135 @@ function buildTemporalValueCandidates(rawValue: string): TemporalValueCandidate[
     });
   }
 
+  match = normalized.match(/^([a-záéíóúñü]{3,12})$/i);
+  if (match) {
+    const monthToken = normalizeMonthToken(match[1]);
+    const monthNumber = MONTH_TOKEN_TO_NUMBER[monthToken];
+    if (monthNumber) {
+      pushCandidate({
+        month: monthNumber,
+        kind: 'month_only',
+      });
+    }
+  }
+
   return candidates;
 }
 
-function temporalPredicateForColumn(columnName: string, candidate: TemporalValueCandidate): string {
-  if (candidate.day !== undefined && candidate.month !== undefined) {
+function temporalPredicateForExpression(expression: string, candidate: TemporalValueCandidate): string {
+  if (candidate.day !== undefined && candidate.month !== undefined && candidate.year !== undefined) {
     const month = String(candidate.month).padStart(2, '0');
     const day = String(candidate.day).padStart(2, '0');
-    return `CAST(CAST("${columnName}" AS TIMESTAMP) AS DATE) = DATE '${candidate.year}-${month}-${day}'`;
+    return `CAST(${expression} AS DATE) = DATE '${candidate.year}-${month}-${day}'`;
   }
-  if (candidate.month !== undefined) {
-    return `EXTRACT(YEAR FROM CAST("${columnName}" AS TIMESTAMP)) = ${candidate.year} AND EXTRACT(MONTH FROM CAST("${columnName}" AS TIMESTAMP)) = ${candidate.month}`;
+  if (candidate.month !== undefined && candidate.year !== undefined) {
+    return `EXTRACT(YEAR FROM ${expression}) = ${candidate.year} AND EXTRACT(MONTH FROM ${expression}) = ${candidate.month}`;
   }
-  return `EXTRACT(YEAR FROM CAST("${columnName}" AS TIMESTAMP)) = ${candidate.year}`;
+  if (candidate.month !== undefined && candidate.year === undefined) {
+    return `EXTRACT(MONTH FROM ${expression}) = ${candidate.month}`;
+  }
+  if (candidate.year !== undefined) {
+    return `EXTRACT(YEAR FROM ${expression}) = ${candidate.year}`;
+  }
+  return '1=1';
+}
+
+type TemporalStoragePredicate = {
+  representation: 'native' | 'string_timestamp' | 'compact_calendar' | 'excel_serial' | 'unix_day' | 'unix_epoch';
+  predicate: string;
+};
+
+/**
+ * Construye predicados temporales desde la representación física, no desde
+ * nombres de columnas. Los snapshots Arrow pueden preservar la fecha como
+ * DATE/TIMESTAMP, texto, YYYYMM(DD), serial Excel o epoch numérico.
+ * Cada alternativa se valida con COUNT(*) antes de entrar al WHERE final.
+ */
+function buildTemporalStoragePredicates(
+  columnName: string,
+  dataType: string,
+  candidate: TemporalValueCandidate
+): TemporalStoragePredicate[] {
+  const quotedColumn = `"${columnName}"`;
+  const predicates: TemporalStoragePredicate[] = [
+    {
+      representation: 'native',
+      predicate: temporalPredicateForExpression(`CAST(${quotedColumn} AS TIMESTAMP)`, candidate),
+    },
+    {
+      representation: 'string_timestamp',
+      predicate: temporalPredicateForExpression(
+        `TRY_CAST(CAST(${quotedColumn} AS VARCHAR) AS TIMESTAMP)`,
+        candidate
+      ),
+    },
+  ];
+
+  if (!isNumericType(dataType)) return predicates;
+
+  const numericText = `CAST(${quotedColumn} AS VARCHAR)`;
+  const numericValue = `TRY_CAST(${numericText} AS BIGINT)`;
+  const compactDateExpression = candidate.day !== undefined
+    ? `TRY_CAST(CASE WHEN LENGTH(${numericText}) = 8 THEN CONCAT(SUBSTR(${numericText}, 1, 4), '-', SUBSTR(${numericText}, 5, 2), '-', SUBSTR(${numericText}, 7, 2)) END AS DATE)`
+    : candidate.month !== undefined
+      ? `TRY_CAST(CASE WHEN LENGTH(${numericText}) IN (6, 8) THEN CONCAT(SUBSTR(${numericText}, 1, 4), '-', SUBSTR(${numericText}, 5, 2), '-01') END AS DATE)`
+      : `TRY_CAST(CASE WHEN LENGTH(${numericText}) IN (4, 6, 8) THEN CONCAT(SUBSTR(${numericText}, 1, 4), '-01-01') END AS DATE)`;
+  predicates.push({
+    representation: 'compact_calendar',
+    predicate: temporalPredicateForExpression(compactDateExpression, candidate),
+  });
+
+  // Excel serial values are deliberately bounded so regular identifiers are
+  // never interpreted as dates. The interval covers 1900-2173.
+  const excelDateExpression = `CASE WHEN ${numericValue} BETWEEN 1 AND 100000 THEN DATE '1899-12-30' + ${numericValue} END`;
+  predicates.push({
+    representation: 'excel_serial',
+    predicate: temporalPredicateForExpression(excelDateExpression, candidate),
+  });
+
+  // DATE32 values can arrive through Arrow as their physical day offset.
+  // Keep it separate from Excel serials: both are numeric but have different
+  // epochs, and the COUNT gate selects only a representation present in data.
+  const unixDayExpression = `CASE WHEN ${numericValue} BETWEEN -100000 AND 100000 THEN DATE '1970-01-01' + ${numericValue} END`;
+  predicates.push({
+    representation: 'unix_day',
+    predicate: temporalPredicateForExpression(unixDayExpression, candidate),
+  });
+
+  // Epoch units are inferred only by magnitude. This makes the conversion
+  // deterministic for seconds, milliseconds, microseconds and nanoseconds.
+  const epochTimestampExpression = `to_timestamp(CASE WHEN ABS(${numericValue}) >= 100000000000000000 THEN ${numericValue} / 1000000000.0 WHEN ABS(${numericValue}) >= 100000000000000 THEN ${numericValue} / 1000000.0 WHEN ABS(${numericValue}) >= 100000000000 THEN ${numericValue} / 1000.0 WHEN ABS(${numericValue}) >= 100000000 THEN ${numericValue} END)`;
+  predicates.push({
+    representation: 'unix_epoch',
+    predicate: temporalPredicateForExpression(epochTimestampExpression, candidate),
+  });
+
+  return predicates;
 }
 
 async function tryResolveTemporalCondition(
   tableName: string,
   columnName: string,
-  candidates: TemporalValueCandidate[]
+  candidates: TemporalValueCandidate[],
+  dataType = ''
 ): Promise<string | null> {
   for (const candidate of candidates) {
-    const predicate = temporalPredicateForColumn(columnName, candidate);
-    try {
-      const match = await query(
-        `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE ${predicate}`,
-        true
-      );
-      if (match.length > 0 && Number(match[0].cnt) > 0) {
-        return predicate;
+    const kindLabel = candidate.kind || (candidate.day !== undefined ? 'exact_date' : candidate.month !== undefined ? 'year_month' : 'year_only');
+    for (const { representation, predicate } of buildTemporalStoragePredicates(columnName, dataType, candidate)) {
+      try {
+        const match = await query(
+          `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE ${predicate}`,
+          true
+        );
+        if (match.length > 0 && Number(match[0].cnt) > 0) {
+          console.log(`🦆 [TEMPORAL] Resuelto: "${columnName}" | kind=${kindLabel} | storage=${representation} | ${predicate} | rows=${match[0].cnt}`);
+          return predicate;
+        }
+      } catch {
+        // A representation that does not apply to this Arrow column is not
+        // an error; continue with the next deterministic representation.
+        continue;
       }
-    } catch {
-      continue;
     }
   }
   return null;
@@ -718,6 +874,121 @@ function buildCanonicalSqlExpr(colName: string): string {
     '',
     'g'
   )`;
+}
+
+function parseStructuredFilter(value: string): StructuredFilter | null {
+  const normalized = value.replace(/\0/g, '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  const enumMatch = normalized.match(/^FilterOperator\.([A-Z_]+)\s+(.+)$/i);
+  if (enumMatch) {
+    const operator = FILTER_OPERATOR_BY_TOKEN[enumMatch[1].toLowerCase()];
+    const operand = enumMatch[2]?.trim();
+    return operator && operand ? { operator, value: operand } : null;
+  }
+
+  const symbolMatch = normalized.match(/^(==|=|!=|>=|<=|>|<|~)\s+(.+)$/);
+  if (!symbolMatch) return null;
+
+  const operatorBySymbol: Record<string, StructuredFilterOperator> = {
+    '==': 'equals',
+    '=': 'equals',
+    '!=': 'not_equals',
+    '>': 'greater_than',
+    '<': 'less_than',
+    '>=': 'greater_equal',
+    '<=': 'less_equal',
+    '~': 'contains',
+  };
+  const operator = operatorBySymbol[symbolMatch[1]];
+  const operand = symbolMatch[2]?.trim();
+  return operator && operand ? { operator, value: operand } : null;
+}
+
+function formatTemporalFilterDate(candidate: TemporalValueCandidate): string | null {
+  if (candidate.month === undefined || candidate.day === undefined) return null;
+  return `${candidate.year}-${String(candidate.month).padStart(2, '0')}-${String(candidate.day).padStart(2, '0')}`;
+}
+
+function parseStructuredFilterList(value: string): string[] {
+  try {
+    const decoded = JSON.parse(value);
+    if (Array.isArray(decoded)) {
+      return decoded
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim());
+    }
+  } catch {
+    // Legacy payloads may encode IN values as a comma-separated string.
+  }
+
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function buildStructuredFilterCondition(
+  columnName: string,
+  filter: StructuredFilter
+): string | null {
+  const quotedColumn = `"${columnName}"`;
+  const escapedValue = filter.value.replace(/'/g, "''");
+  const canonicalValue = canonicalizeFilterToken(filter.value).replace(/'/g, "''");
+  const canonicalColumn = buildCanonicalSqlExpr(columnName);
+
+  switch (filter.operator) {
+    case 'equals':
+      return `${quotedColumn} = '${escapedValue}'`;
+    case 'not_equals':
+      return `${quotedColumn} <> '${escapedValue}'`;
+    case 'contains':
+      return canonicalValue ? `${canonicalColumn} LIKE '%${canonicalValue}%'` : null;
+    case 'not_contains':
+      return canonicalValue ? `${canonicalColumn} NOT LIKE '%${canonicalValue}%'` : null;
+    case 'starts_with':
+      return canonicalValue ? `${canonicalColumn} LIKE '${canonicalValue}%'` : null;
+    case 'ends_with':
+      return canonicalValue ? `${canonicalColumn} LIKE '%${canonicalValue}'` : null;
+    case 'like':
+      return `${quotedColumn} LIKE '${escapedValue}'`;
+    case 'not_like':
+      return `${quotedColumn} NOT LIKE '${escapedValue}'`;
+    case 'in':
+    case 'not_in': {
+      const values = parseStructuredFilterList(filter.value)
+        .map((item) => `'${item.replace(/'/g, "''")}'`);
+      return values.length > 0
+        ? `${quotedColumn} ${filter.operator === 'in' ? 'IN' : 'NOT IN'} (${values.join(', ')})`
+        : null;
+    }
+    case 'greater_than':
+    case 'less_than':
+    case 'greater_equal':
+    case 'less_equal': {
+      const operatorByKind: Record<StructuredFilterOperator, string | null> = {
+        equals: null,
+        not_equals: null,
+        greater_than: '>',
+        less_than: '<',
+        greater_equal: '>=',
+        less_equal: '<=',
+        like: null,
+        not_like: null,
+        contains: null,
+        not_contains: null,
+        starts_with: null,
+        ends_with: null,
+        in: null,
+        not_in: null,
+      };
+      const operator = operatorByKind[filter.operator];
+      const temporalDate = buildTemporalValueCandidates(filter.value)
+        .map(formatTemporalFilterDate)
+        .find((candidate): candidate is string => Boolean(candidate));
+      if (operator && temporalDate) {
+        return `TRY_CAST(CAST(${quotedColumn} AS VARCHAR) AS DATE) ${operator} DATE '${temporalDate}'`;
+      }
+      return operator ? `${quotedColumn} ${operator} '${escapedValue}'` : null;
+    }
+    default:
+      return null;
+  }
 }
 
 function isOthersBucketLabel(value: string | null | undefined): boolean {
@@ -890,6 +1161,14 @@ function scoreColumnForGlobalFilter(columnName: string, filterValue: string): nu
     return -100;
   }
 
+  // --- Bonus por patrones genéricos de columnas temporales cuando el filtro es temporal ---
+  const isTemporalFilter = buildTemporalValueCandidates(filterValue).length > 0;
+  if (isTemporalFilter) {
+    if (/(fecha|date|time|tiempo|periodo|period|mes|month|ano|anio|year)/i.test(normalizedColumn)) {
+      score += 50;
+    }
+  }
+
   // --- Bonus por patrones genéricos de columnas categóricas ---
   // Tier 1: Columnas de tipo/categoría (alta probabilidad de ser filtro)
   if (/(tipo|type|category|categoria|clase|class|grupo|group|segmento|segment)/i.test(normalizedColumn)) score += 40;
@@ -1035,11 +1314,24 @@ export async function crossFilter(
 
   const whereClause = conditions.join(' AND ');
   const sqlQuery = `SELECT * FROM "${tableName}" WHERE ${whereClause}`;
-  console.log(`2. SQL Generado: ${sqlQuery}`);
+
+  const temporalConditions = conditions.filter(c => /\bEXTRACT\b|CAST\(.*TIMESTAMP|\bdate\b|\bBETWEEN\b/i.test(c));
+  console.log(`2. SQL Generado: ${sqlQuery}`, {
+    table: tableName,
+    conditionCount: conditions.length,
+    temporalCount: temporalConditions.length,
+    temporalPredicates: temporalConditions.length > 0 ? temporalConditions : undefined,
+    filterKeys: Object.keys(filters),
+  });
   
   const results = await query(sqlQuery);
   rememberFilterResult(cacheKey, results);
-  console.log(`3. Filas retornadas: ${results.length}`);
+  console.log(`3. Filas retornadas: ${results.length}`, {
+    table: tableName,
+    rows: results.length,
+    columns: results.length > 0 ? Object.keys(results[0] as object) : [],
+    temporalPredicatesFound: temporalConditions,
+  });
   finishPerf({
     cacheHit: false,
     rows: results.length,
@@ -1063,10 +1355,15 @@ async function resolveFilterCondition(
   }
 
   const columnNames = new Set(columns.map(c => String(c.column_name)));
-  const canonicalValue = canonicalizeFilterToken(value);
+  const structuredFilter = parseStructuredFilter(value);
+  const filterValue = structuredFilter?.value ?? value;
+  const canonicalValue = canonicalizeFilterToken(filterValue);
   const escapedCanonicalValue = canonicalValue.replace(/'/g, "''");
-  const temporalCandidates = buildTemporalValueCandidates(value);
-  const isDateLikeValue = temporalCandidates.some((candidate) => candidate.day !== undefined);
+  const temporalCandidates = buildTemporalValueCandidates(filterValue);
+  // Month/year labels such as "Sep-2023" are valid temporal selections too.
+  // Restricting this to exact days bypasses the temporal resolver for charts
+  // whose Arrow snapshot stores dates as VARCHAR.
+  const isDateLikeValue = temporalCandidates.length > 0;
   const isSyntheticGlobalFilter = dimension === 'global_cross_filter' || dimension === 'global_chart_filter';
 
 
@@ -1084,6 +1381,11 @@ async function resolveFilterCondition(
       return rightScore - leftScore;
     });
 
+    const topColScores = prioritizedColumns.slice(0, 8).map((entry) => ({
+      column: String(entry.column_name),
+      type: String(entry.data_type),
+      score: scoreColumnForGlobalFilter(String(entry.column_name), valueCandidates[0]?.value || value),
+    }));
     console.log(`🕵️ [CROSS-FILTER] synthetic_candidates`, {
       tableName,
       dimension,
@@ -1093,10 +1395,7 @@ async function resolveFilterCondition(
         kind: candidate.kind,
         allowCastFallback: candidate.allowCastFallback,
       })),
-      topColumns: prioritizedColumns.slice(0, 8).map((entry) => ({
-        column: String(entry.column_name),
-        type: String(entry.data_type),
-      })),
+      topColumns: topColScores,
     });
 
     for (const candidate of valueCandidates) {
@@ -1110,10 +1409,20 @@ async function resolveFilterCondition(
         const textCol = isTextType(String(col.data_type));
         const temporalCol = isTemporalType(String(col.data_type));
 
-        if (temporalCol && temporalCandidates.length > 0) {
-          const temporalCondition = await tryResolveTemporalCondition(tableName, colName, temporalCandidates);
+        if ((temporalCol || temporalCandidates.length > 0) && temporalCandidates.length > 0) {
+          const temporalCondition = await tryResolveTemporalCondition(
+            tableName,
+            colName,
+            temporalCandidates,
+            String(col.data_type)
+          );
           if (temporalCondition) {
-            console.log(`🦆 [CROSS-FILTER] FAST global temporal: "${colName}" = "${candidateValue}" ✅`);
+            console.log(`🦆 [CROSS-FILTER] FAST global temporal: "${colName}" = "${candidateValue}" ✅`, {
+              table: tableName,
+              column: colName,
+              value: candidateValue,
+              predicate: temporalCondition,
+            });
             rememberResolvedCondition(conditionCacheKey, temporalCondition);
             return temporalCondition;
           }
@@ -1187,59 +1496,45 @@ async function resolveFilterCondition(
 
   // ─── L1: COLUMNA DIRECTA ─────────────────────────────────────────────
   if (columnNames.has(dimension)) {
-    const result = await query(
-      `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE "${dimension}" = '${escapedValue}'`, true
-    );
-    if (result.length > 0 && Number(result[0].cnt) > 0) {
-      console.log(`🦆 [CROSS-FILTER] L1 Columna directa: "${dimension}" ✅`);
-      const resolvedCondition = `"${dimension}" = '${escapedValue}'`;
-      rememberResolvedCondition(conditionCacheKey, resolvedCondition);
-      return resolvedCondition;
-    }
-    // ── [FIX 2026-06-26] TEMPORAL RESCUE (DUAL-GATE) ──────────────────
-    // Cuando la columna existe pero el match directo (string = string)
-    // devolvió 0 filas, puede ser un type mismatch o un format mismatch:
-    //
-    // Gate 1: La columna es de tipo temporal (TIMESTAMP, DATE, TIME)
-    //         → El valor string '2021-07-31' no matchea contra TIMESTAMP.
-    //         → Ejemplo: PyArrow preservó datetime64 → DuckDB lo ve como TIMESTAMP.
-    // Gate 2: La columna es VARCHAR pero el VALOR tiene forma de fecha
-    //         (detectado por buildTemporalValueCandidates, que parsea
-    //          ISO dates, DD/MM/YYYY, YYYY-MM, "Month YYYY", etc.)
-    //         → El formato del string difiere del almacenado (ej. el
-    //           backend envía '2021-07-31' pero el archivo tenía '31/07/2021').
-    //
-    // Sin este dual-gate, el guard de L1 preserva un filtro string literal
-    // que no matchea, y el resolver temporal de L3 NUNCA se ejecuta porque
-    // L1 ya retornó con el guard.
-    //
-    // ¿Por qué es seguro el Gate 2?
-    // buildTemporalValueCandidates() valida estructura estricta (regex):
-    //   - "2021-07-31" → {year:2021, month:7, day:31, kind:'iso_date'}
-    //   - "PAMPAS" → [] (no es fecha → NO se activa)
-    //   - "12345" → podría ser year_only, pero tryResolveTemporalCondition
-    //     verifica con COUNT(*) real → si no hay filas, falla seguro.
     const colSchema = columns.find(c => String(c.column_name) === dimension);
     const colDataType = colSchema ? String(colSchema.data_type) : '';
-    const isColTemporal = isTemporalType(colDataType);
-    const isValueDateLike = temporalCandidates.length > 0;
 
-    if (isColTemporal || isValueDateLike) {
-      if (temporalCandidates.length > 0) {
-        const temporalCondition = await tryResolveTemporalCondition(
-          tableName, dimension, temporalCandidates
-        );
-        if (temporalCondition) {
-          console.log(
-            `🦆 [CROSS-FILTER] L1 temporal rescue (${isColTemporal ? 'col=temporal' : 'val=date-like'}): ` +
-            `"${dimension}" ← "${value}" ✅`
-          );
-          rememberResolvedCondition(conditionCacheKey, temporalCondition);
-          return temporalCondition;
-        }
+    if (structuredFilter) {
+      const structuredCondition = buildStructuredFilterCondition(dimension, structuredFilter);
+      if (structuredCondition) {
+        console.log(`🦆 [CROSS-FILTER] L1 filtro estructurado: "${dimension}" ${structuredFilter.operator} ✅`);
+        rememberResolvedCondition(conditionCacheKey, structuredCondition);
+        return structuredCondition;
       }
     }
 
+    // Resolve the chart selection as a date before any literal comparison.
+    // This is essential for Arrow snapshots that encode calendar values as
+    // integers (YYYYMM, serial dates or epoch) while charts display labels.
+    if (temporalCandidates.length > 0) {
+      const temporalCondition = await tryResolveTemporalCondition(
+        tableName,
+        dimension,
+        temporalCandidates,
+        colDataType
+      );
+      if (temporalCondition) {
+        console.log(`🦆 [CROSS-FILTER] L1 temporal semantic match: "${dimension}" ← "${value}" ✅`);
+        rememberResolvedCondition(conditionCacheKey, temporalCondition);
+        return temporalCondition;
+      }
+    }
+
+    const directPredicate = buildSafeExactPredicate(dimension, colDataType, escapedValue);
+    const result = await query(
+      `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE ${directPredicate}`,
+      true
+    );
+    if (result.length > 0 && Number(result[0].cnt) > 0) {
+      console.log(`🦆 [CROSS-FILTER] L1 Columna directa: "${dimension}" ✅`);
+      rememberResolvedCondition(conditionCacheKey, directPredicate);
+      return directPredicate;
+    }
     // [GUARD] Columna existe pero count=0: preservar filtro exacto para
     // evitar que L2 enlace el valor contra otra columna incorrecta.
     // Sin esto, un filtro "tipo_movimiento='Ingreso'" que no matchee
@@ -1249,9 +1544,8 @@ async function resolveFilterCondition(
       `[DuckDB-Engine] L1 columna '${dimension}' existe pero 0 filas para '${value}'. ` +
       `Preservando filtro exacto para evitar caída L2 → columna incorrecta.`
     );
-    const resolvedCondition = `"${dimension}" = '${escapedValue}'`;
-    rememberResolvedCondition(conditionCacheKey, resolvedCondition);
-    return resolvedCondition;
+    rememberResolvedCondition(conditionCacheKey, directPredicate);
+    return directPredicate;
   }
 
   // ─── FASE A: NORMALIZACIÓN DE NOMBRE (Display → Físico) ──────────────
@@ -1278,23 +1572,36 @@ async function resolveFilterCondition(
       console.warn(
         `[DuckDB-Engine] Normalizando filtro dinámico: '${dimension}' → '${resolvedCol}'`
       );
+      const resolvedColSchema = columns.find(c => String(c.column_name) === resolvedCol);
+      const resolvedColType = resolvedColSchema ? String(resolvedColSchema.data_type) : '';
+      if (temporalCandidates.length > 0) {
+        const temporalCondition = await tryResolveTemporalCondition(
+          tableName,
+          resolvedCol,
+          temporalCandidates,
+          resolvedColType
+        );
+        if (temporalCondition) {
+          rememberResolvedCondition(conditionCacheKey, temporalCondition);
+          return temporalCondition;
+        }
+      }
+      const resolvedExactPredicate = buildSafeExactPredicate(resolvedCol, resolvedColType, escapedValue);
       const result = await query(
-        `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE "${resolvedCol}" = '${escapedValue}'`, true
+        `SELECT COUNT(*) as cnt FROM "${tableName}" WHERE ${resolvedExactPredicate}`, true
       );
       if (result.length > 0 && Number(result[0].cnt) > 0) {
         console.log(`🦆 [CROSS-FILTER] Fase A columna normalizada: "${resolvedCol}" ✅`);
-        const resolvedCondition = `"${resolvedCol}" = '${escapedValue}'`;
-        rememberResolvedCondition(conditionCacheKey, resolvedCondition);
-        return resolvedCondition;
+        rememberResolvedCondition(conditionCacheKey, resolvedExactPredicate);
+        return resolvedExactPredicate;
       }
       // Columna normalizada encontrada pero count=0 — preservar filtro
       console.warn(
         `[DuckDB-Engine] Fase A: columna '${resolvedCol}' (desde '${dimension}') ` +
         `tiene 0 filas para '${value}'. Preservando filtro exacto.`
       );
-      const resolvedCondition = `"${resolvedCol}" = '${escapedValue}'`;
-      rememberResolvedCondition(conditionCacheKey, resolvedCondition);
-      return resolvedCondition;
+      rememberResolvedCondition(conditionCacheKey, resolvedExactPredicate);
+      return resolvedExactPredicate;
     }
     console.log(`🦆 [CROSS-FILTER] Fase A sin columna normalizada para: "${dimension}"`);
   }

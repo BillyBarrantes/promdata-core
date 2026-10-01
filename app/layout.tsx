@@ -6,11 +6,12 @@ import './globals.css'
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import SupabaseProvider from '@/lib/supabase-provider';
+import { PageTransition } from "@/components/page-transition";
+import { UserPreferencesHydrator } from "@/components/user-preferences-hydrator";
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'PromData',
+  description: 'Plataforma de analítica e inteligencia de datos',
 }
 
 export default function RootLayout({
@@ -19,9 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased`}>
-        {/* 2. Envuelve ThemeProvider con SupabaseProvider */}
+    <html lang="es" suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <SupabaseProvider>
           <ThemeProvider
             attribute="class"
@@ -29,7 +29,8 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <UserPreferencesHydrator />
+            <PageTransition>{children}</PageTransition>
             <Analytics />
             <Toaster />
           </ThemeProvider>

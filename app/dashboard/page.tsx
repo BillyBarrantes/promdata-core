@@ -8,14 +8,16 @@ import { Input } from '@/components/ui/input';
 import { useSupabase } from '@/lib/supabase-provider';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
-import { Copy, FileText, Library, Loader2, Pencil, Plus, RefreshCw, Presentation, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FileText, Library, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, Presentation, Trash2, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { GridWidget } from '@/components/dashboard/grid-widget';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import './dashboard-grid.css';
-import { useAtom } from 'jotai';
-import { duckdbReadyAtom, SavedReport, activePresentationIdAtom, presentationsListAtom, Presentation as PresentationModel, globalFiltersAtom } from '@/lib/state';
+import { useAtom, useSetAtom } from 'jotai';
+import { duckdbReadyAtom, SavedReport, activePresentationIdAtom, presentationsListAtom, Presentation as PresentationModel, globalFiltersAtom, activeCrossFilterAtom } from '@/lib/state';
 import * as duckdbEngine from '@/lib/duckdb-engine';
+import { WidgetQueryContract } from '@/lib/dashboard-crossfilter';
 import {
   buildExecutiveWidgetSnapshot,
   ExecutiveNarrativeWidgetSnapshot,
@@ -24,6 +26,8 @@ import {
 import { exportDashboardAsImage, exportDashboardAsPdf } from '@/lib/dashboard-export';
 import { getScopedLocalPerfAverage } from '@/lib/local-performance';
 import { API_BASE_URL } from '@/lib/api-config';
+import { fetchPresentationsShared } from '@/components/presentations-fetch';
+import { getAccessToken } from '@/components/auth-helpers';
 
 const ResponsiveGridLayout = dynamic(
   () => import('react-grid-layout/legacy').then(mod => (mod as any).WidthProvider((mod as any).Responsive)),
@@ -92,6 +96,103 @@ const extractRawChartCategory = (params: any): string | null => {
   }
 
   return null;
+};
+
+interface ExtractedChartDimensions {
+  category: string | null;
+  series: string | null;
+  categoryDimension?: string | null;
+  seriesDimension?: string | null;
+}
+
+const extractChartClickDimensions = (
+  params: any,
+  widgetMeta?: {
+    reportId?: string;
+    chartOption?: any;
+    contract?: WidgetQueryContract | null;
+  }
+): ExtractedChartDimensions => {
+  const category = extractRawChartCategory(params);
+
+  const rawSecondary = typeof params?.rawSecondaryCategory === 'string' && params.rawSecondaryCategory.trim()
+    ? params.rawSecondaryCategory.replace(/\0/g, '').normalize('NFC').replace(/\s+/g, ' ').trim()
+    : null;
+
+  const rawSeriesCandidate = typeof params?.seriesName === 'string' && params.seriesName.trim()
+    ? params.seriesName.replace(/\0/g, '').normalize('NFC').replace(/\s+/g, ' ').trim()
+    : (typeof params?.series === 'string' && params.series.trim()
+      ? params.series.replace(/\0/g, '').normalize('NFC').replace(/\s+/g, ' ').trim()
+      : null);
+
+  const candidateSeries = rawSecondary || rawSeriesCandidate;
+  let validSeries: string | null = null;
+
+  if (
+    candidateSeries &&
+    candidateSeries !== 'undefined' &&
+    candidateSeries !== 'valor' &&
+    candidateSeries !== 'Series' &&
+    candidateSeries !== 'Total' &&
+    candidateSeries !== category
+  ) {
+    const chartOption = widgetMeta?.chartOption;
+    const contract = widgetMeta?.contract || chartOption?.query_contract;
+    const chartTitle = chartOption?.title?.text || chartOption?.visual_source_payload?.title || '';
+
+    const isDecorativeSeries = candidateSeries === chartTitle;
+
+    const crossFilterMeta = chartOption?._cross_filter_meta as {
+      series_kind?: string;
+      series_name?: string;
+      metrics?: string[];
+      dimensions?: string[];
+    } | undefined;
+
+    let isMetricName = false;
+    if (crossFilterMeta) {
+      if (crossFilterMeta.series_kind === 'decorative') {
+        // decorativa
+      } else if (crossFilterMeta.series_kind === 'metric' || (crossFilterMeta.metrics || []).includes(candidateSeries)) {
+        isMetricName = true;
+      }
+    } else if (contract) {
+      const colAliases = contract?.column_aliases || {};
+      const knownMetrics: string[] = [
+        contract.metric,
+        contract.plot_metric,
+        contract.value_column,
+        ...(contract.metrics || []),
+        ...(Object.keys(colAliases)),
+        ...(Object.values(colAliases)),
+      ].filter(Boolean).map((m: string) => String(m).toLowerCase());
+
+      isMetricName = knownMetrics.includes(candidateSeries.toLowerCase());
+    }
+
+    if (!isDecorativeSeries && !isMetricName) {
+      validSeries = candidateSeries;
+    }
+  }
+
+  const contractDimension = typeof widgetMeta?.contract?.dimension === 'string'
+    ? widgetMeta.contract.dimension.trim()
+    : (typeof widgetMeta?.chartOption?.query_contract?.dimension === 'string'
+      ? widgetMeta.chartOption.query_contract.dimension.trim()
+      : null);
+
+  const contractGroupBy = Array.isArray(widgetMeta?.contract?.group_by) && widgetMeta.contract.group_by.length > 0
+    ? String(widgetMeta.contract.group_by[0]).trim()
+    : (Array.isArray(widgetMeta?.chartOption?.query_contract?.group_by) && widgetMeta.chartOption.query_contract.group_by.length > 0
+      ? String(widgetMeta.chartOption.query_contract.group_by[0]).trim()
+      : null);
+
+  return {
+    category,
+    series: validSeries,
+    categoryDimension: contractDimension || undefined,
+    seriesDimension: contractGroupBy || undefined,
+  };
 };
 
 const normalizeGlobalFilterValue = (value: string) =>
@@ -183,6 +284,7 @@ function DashboardPageClient() {
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isRenamePresentationOpen, setIsRenamePresentationOpen] = useState(false);
   const [isDuplicatePresentationOpen, setIsDuplicatePresentationOpen] = useState(false);
+  const [isPresentationMenuOpen, setIsPresentationMenuOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isExecutiveSummaryOpen, setIsExecutiveSummaryOpen] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
@@ -205,6 +307,7 @@ function DashboardPageClient() {
   const [activePresentationId, setActivePresentationId] = useAtom(activePresentationIdAtom);
   const [presentations, setPresentations] = useAtom(presentationsListAtom);
   const [globalFilters, setGlobalFilters] = useAtom(globalFiltersAtom);
+  const setActiveCrossFilter = useSetAtom(activeCrossFilterAtom);
   const layoutSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLayoutRef = useRef<Record<string, { x: number; y: number; w: number; h: number }>>({});
   const layoutPersistRequestVersionRef = useRef(0);
@@ -223,24 +326,16 @@ function DashboardPageClient() {
     const rawValue = searchParams.get('presentationId');
     return rawValue && rawValue.trim() ? rawValue.trim() : null;
   }, [searchParams]);
-  const getDashboardAccessToken = useCallback(async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) return session.access_token;
-
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('__qa_dashboard') === '1') {
-        return params.get('__qa_dashboard_token') || 'qa-dashboard-token';
-      }
-    }
-
-    return null;
-  }, [supabase]);
+  const getDashboardAccessToken = useCallback(
+    () => getAccessToken(supabase, "dashboard"),
+    [supabase]
+  );
 
   const normalizeReportsWithLayout = (rawReports: any[]): SavedReport[] => {
     return (Array.isArray(rawReports) ? rawReports : []).map((report: any) => {
       const content = report?.content && typeof report.content === 'object' ? report.content : {};
-      const layoutFromContent = content?.layout && typeof content.layout === 'object' ? content.layout : {};
+      const layoutFromContent = (content?.layout && typeof content.layout === 'object' ? content.layout : null)
+        || (content?.content?.layout && typeof content.content.layout === 'object' ? content.content.layout : {});
 
       const normalizedLayout = {
         x: report?.layout_x ?? layoutFromContent?.x ?? null,
@@ -367,17 +462,8 @@ function DashboardPageClient() {
     try {
       const accessToken = await getDashboardAccessToken();
       if (!accessToken) return [];
-      const res = await fetch(`${API_BASE_URL}/api/v1/presentations?_t=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        },
-        cache: 'no-store'
-      });
-      if (!res.ok) return [];
-
-      const data = await res.json();
-      const nextPresentations = Array.isArray(data) ? data : [];
+      const data = await fetchPresentationsShared(accessToken);
+      const nextPresentations = data as unknown as PresentationModel[];
       setPresentations(nextPresentations);
 
       if (preferredPresentationId && nextPresentations.some((presentation: PresentationModel) => presentation.id === preferredPresentationId)) {
@@ -1024,48 +1110,135 @@ function DashboardPageClient() {
     }
   }, [getDashboardAccessToken]);
 
-  const handleCrossFilter = useCallback(async (filters: Record<string, string>, sourceFileId?: string | null) => {
-    const rawSelectedValue = (
-      filters.category && filters.category !== 'undefined'
-        ? filters.category
-        : filters.series
-    )?.trim();
+  const handleCrossFilter = useCallback(async (filters: Record<string, any>, sourceFileId?: string | null) => {
+    const rawCategory = typeof filters.category === 'string' && filters.category !== 'undefined'
+      ? filters.category.trim()
+      : '';
+    const rawSeries = typeof filters.series === 'string' && filters.series !== 'undefined'
+      ? filters.series.trim()
+      : '';
 
-    const selectedValue = rawSelectedValue ? normalizeGlobalFilterValue(rawSelectedValue) : '';
-    const currentFilter = typeof globalFilters.global_cross_filter === 'string'
+    const selectedCategory = rawCategory ? normalizeGlobalFilterValue(rawCategory) : '';
+    const selectedSeries = rawSeries ? normalizeGlobalFilterValue(rawSeries) : '';
+
+    // Si no vino category ni series explícitas, buscar generic key (ej. global_cross_filter)
+    const fallbackValue = !selectedCategory && !selectedSeries
+      ? (typeof filters.global_cross_filter === 'string' ? normalizeGlobalFilterValue(filters.global_cross_filter) : '')
+      : '';
+
+    const targetCategory = selectedCategory;
+    const targetSeries = selectedSeries;
+    const targetSingle = fallbackValue || targetCategory || targetSeries;
+
+    if (!targetCategory && !targetSeries && !targetSingle) {
+      return;
+    }
+
+    const currentChartFilter = typeof globalFilters.global_chart_filter === 'string'
+      ? normalizeGlobalFilterValue(globalFilters.global_chart_filter)
+      : '';
+    const currentCrossFilter = typeof globalFilters.global_cross_filter === 'string'
       ? normalizeGlobalFilterValue(globalFilters.global_cross_filter)
       : '';
     const currentScopedFileId = typeof globalFilters.__scope_file_id === 'string'
       ? globalFilters.__scope_file_id.trim()
       : '';
     const nextScopedFileId = typeof sourceFileId === 'string' ? sourceFileId.trim() : '';
+    const sourceReportId = typeof filters.sourceReportId === 'string' ? filters.sourceReportId.trim() : '';
 
-    if (!selectedValue) {
-      return;
+    // Toggle Check (deselección al repetir clic):
+    let shouldClearFilter = false;
+    if (currentScopedFileId === nextScopedFileId) {
+      if (targetCategory && targetSeries) {
+        shouldClearFilter = areEquivalentFilterValues(currentChartFilter, targetCategory)
+          && areEquivalentFilterValues(currentCrossFilter, targetSeries);
+      } else if (targetCategory && !targetSeries) {
+        shouldClearFilter = areEquivalentFilterValues(currentCrossFilter, targetCategory)
+          && !currentChartFilter;
+      } else if (!targetCategory && targetSeries) {
+        shouldClearFilter = areEquivalentFilterValues(currentCrossFilter, targetSeries)
+          && !currentChartFilter;
+      } else if (targetSingle) {
+        shouldClearFilter = areEquivalentFilterValues(currentCrossFilter, targetSingle);
+      }
     }
 
-    const shouldClearFilter = areEquivalentFilterValues(currentFilter, selectedValue)
-      && currentScopedFileId === nextScopedFileId;
+    // ── Resolver las dimensiones reales del contrato (L1 direct) ──────
+    // Si el contrato proporciona categoryDimension/seriesDimension, usarlas
+    // como filter keys para habilitar resolución L1 directa en DuckDB-WASM
+    // en vez del scan sintético global (~77ms → ~1ms).
+    const catDimKey = typeof filters.categoryDimension === 'string' && filters.categoryDimension.trim()
+      ? filters.categoryDimension.trim()
+      : null;
+    const serDimKey = typeof filters.seriesDimension === 'string' && filters.seriesDimension.trim()
+      ? filters.seriesDimension.trim()
+      : null;
 
-    const nextFilters: Record<string, string> = shouldClearFilter
-      ? {}
-      : {
-          global_cross_filter: selectedValue,
+    let nextFilters: Record<string, string> = {};
+    if (!shouldClearFilter) {
+      if (targetCategory && targetSeries) {
+        // Ambos ejes tienen valor → usar dimensiones del contrato si están disponibles
+        const chartKey = catDimKey || 'global_chart_filter';
+        const crossKey = serDimKey || 'global_cross_filter';
+        nextFilters = {
+          [chartKey]: targetCategory,
+          [crossKey]: targetSeries,
           ...(nextScopedFileId ? { __scope_file_id: nextScopedFileId } : {}),
+          ...(sourceReportId ? { __source_report_id: sourceReportId } : {}),
         };
+      } else {
+        // Solo un eje → usar la dimensión del contrato (categoryDimension) si está
+        const val = targetSingle || targetCategory || targetSeries;
+        const filterKey = catDimKey || 'global_cross_filter';
+        nextFilters = {
+          [filterKey]: val,
+          ...(nextScopedFileId ? { __scope_file_id: nextScopedFileId } : {}),
+          ...(sourceReportId ? { __source_report_id: sourceReportId } : {}),
+        };
+      }
+    }
 
     setGlobalFilters(nextFilters);
-    toast.success(
-      nextFilters.global_cross_filter
-        ? `Filtro global aplicado: ${selectedValue}`
-        : "Filtro global limpiado"
-    );
-  }, [areEquivalentFilterValues, globalFilters.__scope_file_id, globalFilters.global_cross_filter, setGlobalFilters]);
+    if (Object.keys(nextFilters).length > 0) {
+      const displayLabel = targetCategory && targetSeries
+        ? `${targetCategory} (${targetSeries})`
+        : (targetSingle || targetCategory || targetSeries);
 
-  const handleChartDrillDown = useCallback((params: any, tableName?: string, sourceFileId?: string) => {
-    const rawCategory = extractRawChartCategory(params);
-    if (rawCategory) {
-      void handleCrossFilter({ category: rawCategory }, sourceFileId);
+      // Propagar la dimensión real del contrato al activeCrossFilter
+      // para que charts-report.tsx y grid-widget.tsx resuelvan vía L1
+      const resolvedDimension = catDimKey || serDimKey || 'global_cross_filter';
+      setActiveCrossFilter({
+        dimension: resolvedDimension,
+        value: displayLabel,
+        sourceTable: nextScopedFileId || undefined,
+        sourceSeries: targetSeries || undefined,
+      });
+      toast.success(`Filtro global aplicado: ${displayLabel}`);
+    } else {
+      setActiveCrossFilter(null);
+      toast.success("Filtro global limpiado");
+    }
+  }, [areEquivalentFilterValues, globalFilters.__scope_file_id, globalFilters.global_chart_filter, globalFilters.global_cross_filter, setGlobalFilters, setActiveCrossFilter]);
+
+  const handleChartDrillDown = useCallback((
+    params: any,
+    tableName?: string,
+    sourceFileId?: string,
+    widgetMeta?: {
+      reportId?: string;
+      chartOption?: any;
+      contract?: WidgetQueryContract | null;
+    }
+  ) => {
+    const { category, series, categoryDimension, seriesDimension } = extractChartClickDimensions(params, widgetMeta);
+    if (category || series) {
+      void handleCrossFilter({
+        category: category || undefined,
+        series: series || undefined,
+        categoryDimension,
+        seriesDimension,
+        sourceReportId: widgetMeta?.reportId,
+      }, sourceFileId);
     }
   }, [handleCrossFilter]);
 
@@ -1264,16 +1437,21 @@ function DashboardPageClient() {
 
   // Pre-calcular config inicial del grid con tamaños inteligentes por tipo de contenido
   const initialLayout = useMemo(() => reports.map((r, i) => {
-    const layout = layoutOverrides[r.id] || r.content.layout || {};
+    const rawLayout = layoutOverrides[r.id] || r.content.layout || {};
     const contentType = r.content.type || r.type || 'metrics';
 
     // Defaults dimensionales por tipo de widget
     const sizeDefaults: Record<string, { w: number; h: number; minW: number; minH: number }> = {
-      chart:   { w: 6,  h: 4, minW: 4, minH: 3 },
+      chart:   { w: 6,  h: 5, minW: 4, minH: 3 },
       table:   { w: 12, h: 3, minW: 6, minH: 2 },
-      metrics: { w: 4,  h: 3, minW: 3, minH: 2 },
+      metrics: { w: 2,  h: 1, minW: 2, minH: 1 },
     };
     const defaults = sizeDefaults[contentType] || sizeDefaults.metrics;
+
+    // Normalizar métricas: siempre forzar h: 1 y ancho compacto w: 2 proporcional a los datos
+    const layout = contentType === 'metrics'
+      ? { ...rawLayout, h: defaults.h, w: rawLayout.w ? Math.min(rawLayout.w, defaults.w) : defaults.w }
+      : rawLayout;
 
     return {
       i: r.id,
@@ -1287,7 +1465,7 @@ function DashboardPageClient() {
   }), [layoutOverrides, reports]);
 
   const gridLayoutKey = useMemo(
-    () => `${activePresentationId || 'global'}:${reports.map((report) => report.id).join('|')}`,
+    () => `${activePresentationId || 'global'}:${reports.map((report) => `${report.id}:${report.content?.layout?.h ?? 1}`).join('|')}`,
     [activePresentationId, reports],
   );
 
@@ -1383,128 +1561,247 @@ function DashboardPageClient() {
       </div>
       <main className={[
         "flex-1 flex flex-col overflow-hidden transition-[padding] duration-150",
-        presentationMode ? "p-0" : "p-6",
+        presentationMode ? "p-0" : "px-8 pt-8 pb-6",
       ].join(" ")}>
         {!presentationMode ? (
-          <header className="mb-6 border-b pb-4 flex justify-between items-center sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div>
-              <h1 className="font-normal tracking-tight text-4xl text-foreground">
-                Tablero de Control
-              </h1>
-              <p className="mt-2 text-sm font-light text-muted-foreground">
-                Visión integral de tus indicadores clave.
-              </p>
-            </div>
-            <div className="flex gap-4 items-center">
-              <div className="relative inline-flex items-center">
-                <Presentation className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <select 
-                  className="appearance-none bg-background border border-input text-sm rounded-md pl-9 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground h-9"
-                  value={activePresentationId || ''}
-                  onChange={(e) => setActivePresentationId(e.target.value || null)}
-                  disabled={isPresentationActionLoading}
+          <header className="mb-6 border-b border-border/20 pb-5 sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+              {/* Lado Izquierdo: Título y Subtítulo con margen generoso y estilo ligero (font-normal y font-light) */}
+              <div className="min-w-0">
+                <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground leading-tight">
+                  Tablero de Control
+                </h1>
+                <p className="mt-1.5 text-base font-light text-muted-foreground">
+                  Visión integral de tus indicadores clave.
+                </p>
+              </div>
+
+              {/* Lado Centro-Derecho: Selector de Lienzo dinámico y botones de interacción */}
+              <div className="flex items-center gap-2.5 flex-wrap lg:justify-end shrink-0 pt-1 lg:pt-0">
+                {/* Grupo Presentación / Lienzo dinámico */}
+                {(() => {
+                  const currentLienzoName = activePresentation?.name || (activePresentationId ? 'Presentación' : 'Todas (Lienzo Global)');
+                  return (
+                    <div className="inline-flex items-center rounded-lg border border-border/40 bg-card hover:bg-secondary/30 transition-colors shadow-xs h-9 p-0.5">
+                      {/* Selector interactivo con texto visible en span y select nativo transparente */}
+                      <div className="relative inline-flex items-center h-full px-2.5 group cursor-pointer">
+                        <Presentation className="h-3.5 w-3.5 text-muted-foreground shrink-0 mr-2 pointer-events-none group-hover:text-foreground transition-colors" />
+                        <span
+                          className="text-xs sm:text-[13px] font-normal text-foreground whitespace-nowrap overflow-hidden text-ellipsis select-none pointer-events-none transition-[max-width] duration-300 ease-in-out"
+                          style={{
+                            maxWidth: `${Math.min(46, Math.max(16, currentLienzoName.length + 2))}ch`,
+                          }}
+                          title={currentLienzoName}
+                        >
+                          {currentLienzoName}
+                        </span>
+                        <ChevronDown className="h-3 w-3 text-muted-foreground/60 shrink-0 ml-1.5 pointer-events-none group-hover:text-foreground transition-colors" />
+                        <select
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                          value={activePresentationId || ''}
+                          onChange={(e) => setActivePresentationId(e.target.value || null)}
+                          disabled={isPresentationActionLoading}
+                          aria-label="Seleccionar Lienzo"
+                        >
+                          {!activePresentationId && <option value="">Selecciona Presentación</option>}
+                          <option value="">Todas (Lienzo Global)</option>
+                          {safePresentations.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="h-4 w-px bg-border/40 shrink-0 my-auto mx-0.5" />
+
+                      <Button
+                        onClick={handleOpenCreatePresentation}
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md text-muted-foreground hover:text-[var(--cursor-danger)] hover:bg-secondary/60 shrink-0"
+                        disabled={isPresentationActionLoading}
+                        title="Crear presentación"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+
+                      <Popover open={isPresentationMenuOpen} onOpenChange={setIsPresentationMenuOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-md text-muted-foreground hover:text-[var(--cursor-danger)] hover:bg-secondary/60 shrink-0"
+                            title="Opciones de presentación"
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-48 p-1 space-y-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsPresentationMenuOpen(false);
+                              handleOpenRenamePresentation();
+                            }}
+                            disabled={!activePresentation || isPresentationActionLoading}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-colors disabled:opacity-50 disabled:pointer-events-none text-left"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            Renombrar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsPresentationMenuOpen(false);
+                              handleOpenDuplicatePresentation();
+                            }}
+                            disabled={!activePresentation || isPresentationActionLoading}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-colors disabled:opacity-50 disabled:pointer-events-none text-left"
+                          >
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                            Duplicar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsPresentationMenuOpen(false);
+                              void refreshReports();
+                            }}
+                            disabled={isPresentationActionLoading}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-secondary/60 hover:text-[var(--cursor-danger)] transition-colors disabled:opacity-50 disabled:pointer-events-none text-left"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                            Actualizar datos
+                          </button>
+                          <div className="my-1 border-t border-border/30" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsPresentationMenuOpen(false);
+                              setIsDeletePresentationOpen(true);
+                            }}
+                            disabled={!activePresentation || isPresentationActionLoading}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-[var(--cursor-danger)] transition-colors disabled:opacity-50 disabled:pointer-events-none text-left"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Eliminar presentación
+                          </button>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  );
+                })()}
+
+                {/* Separador vertical */}
+                <div className="h-5 w-px bg-border/30 hidden sm:block" />
+
+                {/* CTA Presentar */}
+                <Button
+                  onClick={() => void enterPresentationMode()}
+                  size="sm"
+                  className="h-8.5 text-xs font-medium gap-1.5 bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] shadow-xs px-3.5 rounded-lg transition-all tracking-tight"
+                  disabled={reports.length === 0}
+                  title="Activar modo presentación"
                 >
-                  {!activePresentationId && <option value="">Selecciona Presentación</option>}
-                  <option value="">Todas (Lienzo Global Legacy)</option>
-                  {safePresentations.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <Presentation className="h-3.5 w-3.5" />
+                  Presentar
+                </Button>
+
+                {/* Acciones secundarias */}
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    onClick={handleOpenLibrary}
+                    variant="outline"
+                    size="sm"
+                    className="h-8.5 text-xs font-medium gap-1.5 border-border/80 bg-background/50 hover:bg-secondary hover:text-foreground px-3 rounded-lg transition-all shadow-2xs hidden lg:inline-flex tracking-tight"
+                    disabled={isPresentationActionLoading}
+                    title="Abrir biblioteca global"
+                  >
+                    <Library className="h-3.5 w-3.5" />
+                    Biblioteca
+                  </Button>
+
+                  <Button
+                    onClick={() => void handleOpenExecutiveSummary()}
+                    variant="outline"
+                    size="sm"
+                    className="h-8.5 text-xs font-medium gap-1.5 border-border/80 bg-background/50 hover:bg-secondary hover:text-foreground px-3 rounded-lg transition-all shadow-2xs hidden lg:inline-flex tracking-tight"
+                    disabled={reports.length === 0 || isExecutiveSummaryLoading}
+                    title="Generar resumen ejecutivo"
+                  >
+                    {isExecutiveSummaryLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
+                    Resumen Ejecutivo
+                  </Button>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8.5 w-8.5 border-border/80 hover:bg-secondary hover:text-foreground rounded-lg lg:hidden inline-flex shadow-2xs"
+                        disabled={isPresentationActionLoading}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-48 p-1">
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          onClick={handleOpenLibrary}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-xs gap-2"
+                          disabled={isPresentationActionLoading}
+                        >
+                          <Library className="h-3.5 w-3.5" />
+                          Biblioteca
+                        </Button>
+                        <Button
+                          onClick={() => void handleOpenExecutiveSummary()}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-xs gap-2"
+                          disabled={reports.length === 0 || isExecutiveSummaryLoading}
+                        >
+                          {isExecutiveSummaryLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <FileText className="h-3.5 w-3.5" />
+                          )}
+                          Resumen Ejecutivo
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {Object.keys(globalFilters || {}).length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setGlobalFilters({});
+                        setActiveCrossFilter(null);
+                      }}
+                      variant="secondary"
+                      size="sm"
+                      className="h-9 text-xs gap-1 text-muted-foreground hover:text-[var(--cursor-danger)] hover:bg-secondary/60 px-2.5"
+                      data-testid="dashboard-clear-filters"
+                      title="Limpiar todos los filtros"
+                    >
+                      <X className="h-3 w-3" />
+                      Limpiar Filtros
+                    </Button>
+                  )}
                 </div>
               </div>
-              <Button
-                onClick={handleOpenCreatePresentation}
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={isPresentationActionLoading}
-                title="Crear presentación"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleOpenRenamePresentation}
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={!activePresentation || isPresentationActionLoading}
-                title="Renombrar presentación"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleOpenDuplicatePresentation}
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={!activePresentation || isPresentationActionLoading}
-                title="Duplicar presentación"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button onClick={() => setIsDeletePresentationOpen(true)} variant="outline" size="icon" className="h-9 w-9" disabled={!activePresentation || isPresentationActionLoading} title="Eliminar presentación">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleOpenLibrary}
-                variant="outline"
-                size="sm"
-                className="h-9"
-                disabled={isPresentationActionLoading}
-                title="Abrir biblioteca global"
-              >
-                <Library className="h-4 w-4 mr-2" />
-                Biblioteca
-              </Button>
-              <Button
-                onClick={() => void handleOpenExecutiveSummary()}
-                variant="outline"
-                size="sm"
-                className="h-9"
-                disabled={reports.length === 0 || isExecutiveSummaryLoading}
-                title="Generar resumen ejecutivo"
-              >
-                {isExecutiveSummaryLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4 mr-2" />
-                )}
-                Resumen Ejecutivo
-              </Button>
-              <Button
-                onClick={() => void enterPresentationMode()}
-                variant="outline"
-                size="sm"
-                className="h-9"
-                disabled={reports.length === 0}
-                title="Activar modo presentación"
-              >
-                Presentar
-              </Button>
-
-              <Button onClick={() => void refreshReports()} variant="outline" size="icon" title="Actualizar datos">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              {Object.keys(globalFilters || {}).length > 0 && (
-                <Button
-                  onClick={() => setGlobalFilters({})}
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  data-testid="dashboard-clear-filters"
-                >
-                  Limpiar Filtros
-                </Button>
-              )}
             </div>
           </header>
         ) : (
           <div className="dashboard-presentation-toolbar">
-            <div className="text-sm font-medium text-foreground">
+            <div className="text-sm font-medium text-foreground tracking-tight">
               {activePresentation?.name || 'Tablero Ejecutivo'}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1512,13 +1809,13 @@ function DashboardPageClient() {
                 onClick={() => void handleTogglePresentationSummary()}
                 variant="outline"
                 size="sm"
-                className="h-9"
+                className="h-8 text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)]"
                 disabled={reports.length === 0 || isExecutiveSummaryLoading}
               >
                 {isExecutiveSummaryLoading ? 'Generando resumen...' : presentationSummaryVisible ? 'Ocultar resumen' : 'Mostrar resumen'}
               </Button>
               {focusedReport ? (
-                <Button onClick={clearWidgetFocus} variant="outline" size="sm" className="h-9">
+                <Button onClick={clearWidgetFocus} variant="outline" size="sm" className="h-8 text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)]">
                   Salir foco
                 </Button>
               ) : null}
@@ -1526,7 +1823,7 @@ function DashboardPageClient() {
                 onClick={() => void handleExportPresentation('png')}
                 variant="outline"
                 size="sm"
-                className="h-9"
+                className="h-8 text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)]"
                 disabled={isPresentationExporting !== null}
               >
                 {isPresentationExporting === 'png' ? 'Exportando...' : 'PNG'}
@@ -1535,7 +1832,7 @@ function DashboardPageClient() {
                 onClick={() => void handleExportPresentation('jpg')}
                 variant="outline"
                 size="sm"
-                className="h-9"
+                className="h-8 text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)]"
                 disabled={isPresentationExporting !== null}
               >
                 {isPresentationExporting === 'jpg' ? 'Exportando...' : 'JPG'}
@@ -1544,12 +1841,12 @@ function DashboardPageClient() {
                 onClick={() => void handleExportPresentation('pdf')}
                 variant="outline"
                 size="sm"
-                className="h-9"
+                className="h-8 text-xs border-border/40 hover:bg-secondary/60 hover:text-[var(--cursor-danger)]"
                 disabled={isPresentationExporting !== null}
               >
                 {isPresentationExporting === 'pdf' ? 'Preparando PDF...' : 'PDF'}
               </Button>
-              <Button onClick={() => void exitPresentationMode()} size="sm" className="h-9">
+              <Button onClick={() => void exitPresentationMode()} size="sm" className="h-8 text-xs">
                 Salir
               </Button>
             </div>
@@ -1571,9 +1868,9 @@ function DashboardPageClient() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : reports.length === 0 ? (
-              <div className="text-center py-20 bg-muted/20 rounded-xl border border-dashed">
-                <h3 className="text-xl font-medium text-foreground">No tienes reportes guardados</h3>
-                <p className="text-muted-foreground mt-2">
+              <div className="text-center py-20 bg-secondary/30 rounded-lg border border-dashed border-border/40">
+                <h3 className="text-xl font-medium text-foreground tracking-tight">No tienes reportes guardados</h3>
+                <p className="text-muted-foreground/70 mt-2 text-sm">
                   Guarda métricas o gráficos desde el chat para armar tu tablero.
                 </p>
               </div>
@@ -1581,17 +1878,23 @@ function DashboardPageClient() {
               <ResponsiveGridLayout
                 key={gridLayoutKey}
                 className="layout"
-                layouts={{ lg: initialLayout }}
+                layouts={{
+                  lg: initialLayout,
+                  md: initialLayout.map(item => ({ ...item, w: Math.min(item.w, 10) })),
+                  sm: initialLayout.map(item => ({ ...item, w: Math.min(item.w, 6) })),
+                  xs: initialLayout.map(item => ({ ...item, w: Math.min(item.w, 4) })),
+                  xxs: initialLayout.map(item => ({ ...item, w: Math.min(item.w, 2) })),
+                }}
                 breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
                 cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-                rowHeight={presentationMode ? 82 : 100}
+                rowHeight={presentationMode ? 100 : 120}
                 onDragStop={onLayoutCommit}
                 onResizeStop={onLayoutCommit}
                 draggableHandle=".widget-drag-handle"
                 isDraggable={!presentationMode}
                 isResizable={!presentationMode}
                 resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
-                margin={presentationMode ? [20, 20] : [24, 24]}
+                margin={presentationMode ? [16, 16] : [20, 20]}
               >
                 {reports.map((report: SavedReport, index: number) => (
                   <div key={report.id}>

@@ -119,7 +119,7 @@ const knowledgeDateFormatter = new Intl.DateTimeFormat("es-PE", {
 });
 
 const KNOWLEDGE_ACTION_BUTTON_CLASSNAME =
-  "border-slate-200 bg-white text-slate-900 shadow-xs hover:bg-slate-50 hover:text-slate-900 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100";
+  "rounded-lg border-border/40 bg-card text-foreground shadow-xs hover:bg-muted/30 hover:text-foreground disabled:border-border/40 disabled:bg-muted/30 disabled:text-muted-foreground disabled:opacity-100";
 
 function getFileExtension(fileName: string): string {
   const extension = fileName.split(".").pop();
@@ -154,7 +154,7 @@ function getDocumentTypeIcon(document: KnowledgeDocument) {
   if (extension === ".md") {
     return <FileCode2 className="h-4 w-4 text-sky-600" aria-hidden="true" />;
   }
-  return <FileText className="h-4 w-4 text-slate-500" aria-hidden="true" />;
+  return <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />;
 }
 
 function isPendingKnowledgeStatus(status: string): boolean {
@@ -363,7 +363,9 @@ export default function ConocimientoPage() {
     }
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  // [P0-5 FIX] El handler se adjunta a un <button> (línea ~969): el tipo
+  // debe ser HTMLElement para ser asignable a DragEventHandler<HTMLButtonElement>.
+  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setIsDraggingOver(false);
@@ -535,29 +537,27 @@ export default function ConocimientoPage() {
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
+        <header className="border-b border-border/20 px-6 py-5 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-foreground"></h1>
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-medium text-white">
-                LB
-              </div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl tracking-tight text-foreground leading-tight">Base de Conocimiento</h1>
+              <p className="mt-1.5 text-base font-light text-muted-foreground">Gestiona el conocimiento institucional para análisis RAG</p>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50/60">
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
-            <section className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-8 shadow-sm shadow-slate-200/60">
+        <div className="flex-1 overflow-y-auto bg-muted/20">
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-10">
+            <section className="flex flex-col gap-4 rounded-[28px] border border-border/40  bg-card/90 p-8 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-border/40  bg-muted/30 px-3 py-1 text-xs font-medium text-muted-foreground">
                     <BookOpen className="h-3.5 w-3.5" />
                     Contexto documental para análisis RAG
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Base de Conocimiento</h2>
-                    <p className="max-w-2xl text-sm leading-6 text-slate-500">
+                    <h2 className="text-2xl tracking-tight text-foreground">Base de Conocimiento</h2>
+                    <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                       Sube normativas, planes corporativos y documentación institucional para que la capa analítica
                       pueda cruzar datos operativos con contexto de negocio.
                     </p>
@@ -594,9 +594,9 @@ export default function ConocimientoPage() {
               </div>
             </section>
 
-            <Card className="gap-0 overflow-hidden border-slate-200/80 bg-white shadow-sm shadow-slate-200/50">
-              <CardHeader className="border-b border-slate-100 bg-white">
-                <CardTitle className="text-lg text-slate-900">Consulta semántica directa</CardTitle>
+            <Card className="gap-0 overflow-hidden border-border/40 bg-card shadow-sm">
+              <CardHeader className="border-b border-border/20 bg-card">
+                <CardTitle className="text-lg text-foreground">Consulta semántica directa</CardTitle>
                 <CardDescription>
                   Busca políticas, definiciones y lineamientos institucionales ya indexados en la base vectorial.
                 </CardDescription>
@@ -605,12 +605,12 @@ export default function ConocimientoPage() {
                 <form onSubmit={handleKnowledgeQuery} className="space-y-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <div className="relative flex-1">
-                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={knowledgeQuery}
                         onChange={(event) => setKnowledgeQuery(event.target.value)}
                         placeholder="Pregúntale a la base de conocimiento..."
-                        className="h-12 rounded-2xl border-slate-200 pl-11 pr-4 text-sm shadow-sm"
+                        className="h-12 rounded-2xl border-border/40 pl-11 pr-4 text-sm shadow-sm"
                         disabled={isQueryingKnowledge}
                       />
                     </div>
@@ -634,10 +634,10 @@ export default function ConocimientoPage() {
                     </Button>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{indexedDocumentsCount} documentos indexados disponibles para consulta</span>
                     {submittedKnowledgeQuery ? (
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
+                      <span className="rounded-full border border-border/40 bg-muted px-2.5 py-1 text-muted-foreground">
                         Ultima consulta: {submittedKnowledgeQuery}
                       </span>
                     ) : null}
@@ -651,7 +651,7 @@ export default function ConocimientoPage() {
                 ) : null}
 
                 {isQueryingKnowledge ? (
-                  <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-slate-200 bg-slate-50/70 px-6 py-10 text-sm text-slate-500">
+                  <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-border/40 bg-muted/70 px-6 py-10 text-sm text-muted-foreground">
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                     Consultando y sintetizando respuesta con respaldo documental...
                   </div>
@@ -661,7 +661,7 @@ export default function ConocimientoPage() {
                       "rounded-[24px] border p-5 shadow-sm",
                       knowledgeInsufficientEvidence
                         ? "border-amber-200 bg-amber-50/80 shadow-amber-100/50"
-                        : "border-slate-200 bg-white shadow-slate-200/40"
+                        : "border-border bg-card shadow-[var(--cursor-shadow-xs)]"
                     )}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="space-y-2">
@@ -673,23 +673,23 @@ export default function ConocimientoPage() {
                             )}
                             <p className={cn(
                               "text-sm font-semibold",
-                              knowledgeInsufficientEvidence ? "text-amber-800" : "text-slate-900"
+                              knowledgeInsufficientEvidence ? "text-amber-800" : "text-foreground"
                             )}>
                               {knowledgeInsufficientEvidence ? "Respuesta sin respaldo suficiente" : "Respuesta generada con respaldo documental"}
                             </p>
                           </div>
                           <p className={cn(
                             "text-base leading-7",
-                            knowledgeInsufficientEvidence ? "text-amber-900" : "text-slate-800"
+                            knowledgeInsufficientEvidence ? "text-amber-900" : "text-foreground"
                           )}>
                             {knowledgeAnswer}
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
+                          <span className="rounded-full border border-border/40 bg-muted px-2.5 py-1 text-muted-foreground">
                             Recuperados {knowledgeRetrievedCount}
                           </span>
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
+                          <span className="rounded-full border border-border/40 bg-muted px-2.5 py-1 text-muted-foreground">
                             Citados {knowledgeSnippetsUsed}
                           </span>
                           <span className={cn(
@@ -706,14 +706,14 @@ export default function ConocimientoPage() {
                     {knowledgeCitations.length > 0 ? (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-slate-900">Fuentes utilizadas</p>
-                          <p className="text-xs text-slate-400">Citas estructuradas del motor RAG</p>
+                          <p className="text-sm font-medium text-foreground">Fuentes utilizadas</p>
+                          <p className="text-xs text-muted-foreground/60">Citas estructuradas del motor RAG</p>
                         </div>
                         <div className="grid gap-4">
                           {knowledgeCitations.map((citation) => (
                             <article
                               key={`${citation.document_id}-${citation.chunk_index}-${citation.source_id}`}
-                              className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/40"
+                              className="rounded-[24px] border border-border/40 bg-card p-5 shadow-[var(--cursor-shadow-xs)]"
                             >
                               {(() => {
                                 const citationKey = `${citation.document_id}-${citation.chunk_index}-${citation.source_id}`;
@@ -722,31 +722,31 @@ export default function ConocimientoPage() {
                                   <>
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex min-w-0 items-start gap-3">
-                                  <div className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                                  <div className="mt-0.5 rounded-xl border border-border/40 bg-muted p-2">
                                     {getDocumentTypeIcon({
                                       file_name: citation.document_file_name,
                                       source_kind: citation.source_kind,
                                     } as KnowledgeDocument)}
                                   </div>
                                   <div className="min-w-0 space-y-1">
-                                    <p className="truncate text-sm font-semibold text-slate-900">
+                                    <p className="truncate text-sm font-semibold text-foreground">
                                       {citation.document_title || citation.document_file_name}
                                     </p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-muted-foreground">
                                       {citation.source_id} · {citation.document_file_name} · Fragmento {citation.chunk_index + 1}
                                     </p>
                                   </div>
                                 </div>
                                 {typeof citation.similarity === "number" ? (
-                                  <span className="inline-flex shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                                  <span className="inline-flex shrink-0 rounded-full border border-border/40 bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                                     Similitud {(citation.similarity * 100).toFixed(1)}%
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 transition-all duration-200">
+                              <div className="mt-4 rounded-2xl border border-border/50 bg-muted/80 p-4 transition-all duration-200">
                                 <p
                                   className={cn(
-                                    "whitespace-pre-wrap text-sm leading-6 text-slate-700 transition-all duration-200",
+                                    "whitespace-pre-wrap text-sm leading-6 text-foreground/80 transition-all duration-200",
                                     isExpanded ? "line-clamp-none" : "line-clamp-3"
                                   )}
                                 >
@@ -755,7 +755,7 @@ export default function ConocimientoPage() {
                                 <button
                                   type="button"
                                   onClick={() => toggleCitationExpansion(citationKey)}
-                                  className="mt-3 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700"
+                                  className="mt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground/80"
                                 >
                                   {isExpanded ? "Ver menos" : "Ver más"}
                                 </button>
@@ -770,25 +770,25 @@ export default function ConocimientoPage() {
                     ) : null}
                   </div>
                 ) : submittedKnowledgeQuery && !knowledgeQueryError ? (
-                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <Search className="h-5 w-5 text-slate-500" />
+                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-[24px] border border-border/30 bg-muted/30 px-6 py-10 text-center">
+                    <div className="rounded-2xl border border-border/30 bg-card p-4 shadow-sm">
+                      <Search className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-slate-900">No hubo respuesta disponible.</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm font-medium text-foreground">No hubo respuesta disponible.</p>
+                      <p className="text-sm text-muted-foreground">
                         Intenta reformular la pregunta o ampliar la base documental indexada.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <DatabaseZap className="h-5 w-5 text-slate-500" />
+                  <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-[24px] border border-border/30 bg-muted/30 px-6 py-10 text-center">
+                    <div className="rounded-2xl border border-border/30 bg-card p-4 shadow-sm">
+                      <DatabaseZap className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-slate-900">La consulta semántica está lista.</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm font-medium text-foreground">La consulta semántica está lista.</p>
+                      <p className="text-sm text-muted-foreground">
                         Escribe una pregunta para obtener una respuesta natural respaldada por documentos.
                       </p>
                     </div>
@@ -797,27 +797,27 @@ export default function ConocimientoPage() {
               </CardContent>
             </Card>
 
-            <Card className="gap-0 overflow-hidden border-slate-200/80 bg-white shadow-sm shadow-slate-200/50">
-              <CardHeader className="border-b border-slate-100 bg-white">
-                <CardTitle className="text-lg text-slate-900">Documentos indexables</CardTitle>
+            <Card className="gap-0 overflow-hidden border-border/40 bg-card shadow-sm">
+              <CardHeader className="border-b border-border/20 bg-card">
+                <CardTitle className="text-lg text-foreground">Documentos indexables</CardTitle>
                 <CardDescription>
                   Seguimiento del pipeline documental: carga, indexación vectorial y disponibilidad para consultas semánticas.
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-0">
                 {isLoading ? (
-                  <div className="flex items-center justify-center px-6 py-20 text-sm text-slate-500">
+                  <div className="flex items-center justify-center px-6 py-20 text-sm text-muted-foreground">
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                     Cargando base de conocimiento...
                   </div>
                 ) : documents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <BookOpen className="h-6 w-6 text-slate-500" />
+                    <div className="rounded-2xl border border-border/40 bg-muted p-4">
+                      <BookOpen className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-slate-900">Aún no hay documentos cargados.</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm font-medium text-foreground">Aún no hay documentos cargados.</p>
+                      <p className="text-sm text-muted-foreground">
                         Sube tu primer PDF, TXT o MD para comenzar a construir contexto institucional.
                       </p>
                     </div>
@@ -825,26 +825,26 @@ export default function ConocimientoPage() {
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-slate-100 hover:bg-white">
-                        <TableHead className="px-6 py-4 text-xs uppercase tracking-[0.18em] text-slate-400">Nombre del archivo</TableHead>
-                        <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-slate-400">Tipo</TableHead>
-                        <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-slate-400">Estado</TableHead>
-                        <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-slate-400">Fecha de carga</TableHead>
-                        <TableHead className="px-4 py-4 text-right text-xs uppercase tracking-[0.18em] text-slate-400">Acciones</TableHead>
+                        <TableRow className="border-border/20 hover:bg-muted/30">
+                          <TableHead className="px-6 py-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Nombre del archivo</TableHead>
+                          <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Tipo</TableHead>
+                          <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Estado</TableHead>
+                          <TableHead className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Fecha de carga</TableHead>
+                          <TableHead className="px-4 py-4 text-right text-xs uppercase tracking-[0.18em] text-muted-foreground">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {documents.map((document) => (
-                        <TableRow key={document.id} className="border-slate-100 hover:bg-slate-50/70">
+                        <TableRow key={document.id} className="border-border/20 hover:bg-muted/30">
                           <TableCell className="px-6 py-4 align-top">
                             <div className="flex items-start gap-3">
-                              <div className="mt-0.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                              <div className="mt-0.5 rounded-xl border border-border/40 bg-muted p-2">
                                 {getDocumentTypeIcon(document)}
                               </div>
                               <div className="min-w-0 space-y-1">
-                                <p className="truncate text-sm font-medium text-slate-900">{document.file_name}</p>
-                                <p className="truncate text-xs text-slate-500">{document.title}</p>
-                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                                <p className="truncate text-sm font-medium text-foreground">{document.file_name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{document.title}</p>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                   <span>{formatFileSize(document.file_size_bytes)}</span>
                                   <span>{document.chunk_count} chunks</span>
                                   <span>{document.word_count} palabras</span>
@@ -856,14 +856,14 @@ export default function ConocimientoPage() {
                             </div>
                           </TableCell>
                           <TableCell className="px-4 py-4 align-top">
-                            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                            <span className="inline-flex rounded-full border border-border/40 bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                               {getDocumentTypeLabel(document)}
                             </span>
                           </TableCell>
                           <TableCell className="px-4 py-4 align-top">
                             <KnowledgeStatusBadge status={document.status} />
                           </TableCell>
-                          <TableCell className="px-4 py-4 align-top text-sm text-slate-500">
+                            <TableCell className="px-4 py-4 align-top text-sm text-muted-foreground">
                             {formatKnowledgeDate(document.created_at)}
                           </TableCell>
                           <TableCell className="px-4 py-4 align-top">
@@ -875,7 +875,7 @@ export default function ConocimientoPage() {
                                   size="sm"
                                   disabled={retryingDocumentId === document.id}
                                   onClick={() => void handleRetryDocument(document)}
-                                  className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                                  className="border-border text-foreground/80 hover:bg-muted"
                                 >
                                   {retryingDocumentId === document.id ? (
                                     <>
@@ -890,7 +890,7 @@ export default function ConocimientoPage() {
                                   )}
                                 </Button>
                               ) : (
-                                <span className="text-xs text-slate-300">-</span>
+                                <span className="text-xs text-border">-</span>
                               )}
                             </div>
                           </TableCell>
@@ -911,12 +911,12 @@ export default function ConocimientoPage() {
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all duration-200"
             onClick={handleCloseUploadSheet}
           />
-          <aside className="fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-border bg-background shadow-2xl sm:max-w-[640px]">
+          <aside className="fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-border/60 bg-background shadow-2xl sm:max-w-[640px]">
             <div className="shrink-0 border-b border-border/50 bg-background/95 p-5 backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1">
-                  <h3 className="text-xl font-semibold text-slate-900">Subir Documento</h3>
-                  <p className="text-sm text-slate-500">
+                  <h3 className="text-xl font-semibold text-foreground">Subir Documento</h3>
+                  <p className="text-sm text-muted-foreground">
                     Carga archivos PDF, TXT o MD para indexarlos en la base vectorial institucional.
                   </p>
                 </div>
@@ -926,7 +926,7 @@ export default function ConocimientoPage() {
                   size="icon"
                   onClick={handleCloseUploadSheet}
                   disabled={isUploading}
-                  className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                  className="text-muted-foreground hover:bg-secondary hover:text-foreground/80"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -935,7 +935,7 @@ export default function ConocimientoPage() {
 
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5">
               <div className="space-y-2">
-                <label htmlFor="knowledge-document-title" className="text-sm font-medium text-slate-700">
+                <label htmlFor="knowledge-document-title" className="text-sm font-medium text-foreground/80">
                   Título documental
                 </label>
                 <Input
@@ -944,7 +944,7 @@ export default function ConocimientoPage() {
                   onChange={(event) => setUploadTitle(event.target.value)}
                   placeholder="Ej. Plan de contingencia Q4"
                   disabled={isUploading}
-                  className="border-slate-200"
+                  className="border-border"
                 />
               </div>
 
@@ -971,23 +971,23 @@ export default function ConocimientoPage() {
                 className={cn(
                   "flex min-h-[280px] w-full flex-col items-center justify-center rounded-[28px] border border-dashed px-8 py-10 text-center transition-colors",
                   isDraggingOver
-                    ? "border-slate-900 bg-slate-100"
-                    : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100/70",
+                    ? "border-foreground bg-secondary"
+                    : "border-border bg-muted hover:border-border hover:bg-secondary/70",
                   isUploading && "cursor-not-allowed opacity-70"
                 )}
               >
-                <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <Upload className="h-6 w-6 text-slate-700" />
+                <div className="mb-4 rounded-2xl border border-border/40 bg-card p-4 shadow-sm">
+                  <Upload className="h-6 w-6 text-foreground/80" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-base font-medium text-slate-900">
+                  <p className="text-base font-medium text-foreground">
                     Arrastra tu documento aquí o selecciona un archivo
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Formatos soportados: PDF, TXT y MD.
                   </p>
                 </div>
-                <span className="mt-5 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+                <span className="mt-5 inline-flex rounded-full border border-border/40 bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
                   Abrir selector
                 </span>
               </button>
@@ -1000,17 +1000,17 @@ export default function ConocimientoPage() {
                 onChange={(event) => handleSelectFile(event.target.files?.[0] || null)}
               />
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="rounded-2xl border border-border/40 bg-card p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-slate-900">Documento seleccionado</p>
+                    <p className="text-sm font-medium text-foreground">Documento seleccionado</p>
                     {selectedFile ? (
                       <>
-                        <p className="text-sm text-slate-600">{selectedFile.name}</p>
-                        <p className="text-xs text-slate-400">{formatFileSize(selectedFile.size)}</p>
+                        <p className="text-sm text-muted-foreground">{selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground/60">{formatFileSize(selectedFile.size)}</p>
                       </>
                     ) : (
-                      <p className="text-sm text-slate-500">Ningún archivo seleccionado todavía.</p>
+                      <p className="text-sm text-muted-foreground">Ningún archivo seleccionado todavía.</p>
                     )}
                   </div>
                   {selectedFile ? (
@@ -1026,7 +1026,7 @@ export default function ConocimientoPage() {
                         }
                       }}
                       disabled={isUploading}
-                      className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                      className="text-muted-foreground hover:bg-secondary hover:text-foreground/80"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -1034,7 +1034,7 @@ export default function ConocimientoPage() {
                 </div>
               </div>
 
-              <p className="text-xs italic text-slate-400">
+              <p className="text-xs italic text-muted-foreground/60">
                 El documento se registrará como <span className="font-medium">queued</span> y su indexación vectorial continuará en segundo plano.
               </p>
 

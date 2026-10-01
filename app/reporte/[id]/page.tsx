@@ -137,11 +137,11 @@ export default function ReportePage() {
       <main className="flex-1 flex">
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
-          <header className="border-b border-border px-6 py-4">
+          <header className="border-b border-border/40 px-6 py-4">
             <div className="flex items-center justify-between">
               <h1 className="text-lg font-semibold text-foreground">Dashboard de Ventas Q3</h1>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center text-accent-foreground text-sm font-medium">
                   LB
                 </div>
               </div>
@@ -149,7 +149,7 @@ export default function ReportePage() {
           </header>
 
           <div className="flex-1 p-6 overflow-auto">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-5xl mx-auto">
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-1">
                   <h2 className="text-xl font-semibold text-foreground">{report.title}</h2>
@@ -190,8 +190,8 @@ export default function ReportePage() {
                   <div className="space-y-3">
                     {report.data.recommendations.map((rec: any, index: number) => (
                       <div key={index} className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-blue-600 text-xs font-medium">{index + 1}</span>
+                        <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-muted-foreground text-xs font-medium">{index + 1}</span>
                         </div>
                         <div>
                           <h4 className="font-medium text-foreground">{rec.title}</h4>
@@ -207,8 +207,8 @@ export default function ReportePage() {
         </div>
 
         {/* Chat Sidebar */}
-        <div className="w-80 border-l border-border flex flex-col bg-muted/20">
-          <div className="p-4 border-b border-border">
+          <div className="w-80 border-l border-border/40 flex flex-col bg-muted/20">
+            <div className="p-4 border-b border-border/20">
             <h3 className="font-semibold text-foreground">Chat de Análisis</h3>
             <p className="text-xs text-muted-foreground">Continúa configurando tu dashboard</p>
           </div>
@@ -227,7 +227,7 @@ export default function ReportePage() {
               </div>
             )}
           </div>
-          <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border/20">
             <div className="space-y-3">
               <Textarea
                 placeholder="Pregunta sobre este análisis..."

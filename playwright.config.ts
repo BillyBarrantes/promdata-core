@@ -10,14 +10,14 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3005',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'pnpm dev --port 3005',
-    url: 'http://127.0.0.1:3005',
+    command: 'pnpm dev --port 3000',
+    url: 'http://127.0.0.1:3000',
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,
   },

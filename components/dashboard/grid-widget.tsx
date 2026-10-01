@@ -3,9 +3,10 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { GripHorizontal, Maximize2, MessageSquare, Trash2 } from 'lucide-react';
+import { Maximize2, MessageSquare, MoreHorizontal, Sparkles, Trash2 } from 'lucide-react';
 import { SavedReport, globalFiltersAtom } from '@/lib/state';
 import { AnalysisReport } from '@/components/analysis-report';
 import { SmartTable } from '@/components/smart-table';
@@ -25,7 +26,16 @@ interface GridWidgetProps {
   report: SavedReport;
   onDelete: (id: string) => void;
   onAnalyze: (report: SavedReport) => void;
-  onChartClick?: (params: any, tableName?: string, sourceFileId?: string) => void;
+  onChartClick?: (
+    params: any,
+    tableName?: string,
+    sourceFileId?: string,
+    widgetMeta?: {
+      reportId?: string;
+      chartOption?: any;
+      contract?: WidgetQueryContract | null;
+    }
+  ) => void;
   onNarrativeSnapshotChange?: (reportId: string, snapshot: ExecutiveNarrativeWidgetSnapshot) => void;
   presentationMode?: boolean;
   onRequestFocus?: (report: SavedReport) => void;
@@ -40,6 +50,143 @@ const MEDIUM_WIDGET_THRESHOLD_MS = 90;
 const HEAVY_WIDGET_EXTRA_DELAY_MS = 72;
 const MEDIUM_WIDGET_EXTRA_DELAY_MS = 30;
 
+const MONTH_NAMES_FALLBACK: Record<string, number> = {
+  ene: 1, enero: 1, jan: 1, january: 1,
+  feb: 2, febrero: 2, february: 2,
+  mar: 3, marzo: 3, march: 3,
+  abr: 4, abril: 4, apr: 4, april: 4,
+  may: 5, mayo: 5,
+  jun: 6, junio: 6, june: 6,
+  jul: 7, julio: 7, july: 7,
+  ago: 8, agosto: 8, aug: 8, august: 8,
+  sep: 9, sept: 9, set: 9, septiembre: 9, setiembre: 9, september: 9,
+  oct: 10, octubre: 10, october: 10,
+  nov: 11, noviembre: 11, november: 11,
+  dic: 12, diciembre: 12, dec: 12, december: 12,
+};
+
+function normalizeFilterToken(val: string): string {
+  return val
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function rowMatchesFilterValue(val: unknown, targetStr: string): boolean {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'object' && !(val instanceof Date)) return false;
+
+  const targetNormalized = normalizeFilterToken(targetStr);
+  if (!targetNormalized) return true;
+
+  const targetMonthNumber = MONTH_NAMES_FALLBACK[targetNormalized];
+
+  // 1. Direct equality (raw or string)
+  const cellStr = String(val).trim();
+  const cellNormalized = normalizeFilterToken(cellStr);
+  if (cellNormalized === targetNormalized) return true;
+
+  // 2. Contains match if string length >= 3
+  if (targetNormalized.length >= 3 && cellNormalized.includes(targetNormalized)) {
+    return true;
+  }
+
+  // 2b. Singular/Plural matching (e.g. "ingresos" vs "ingreso")
+  if (
+    (targetNormalized.endsWith('s') && targetNormalized.slice(0, -1) === cellNormalized) ||
+    (cellNormalized.endsWith('s') && cellNormalized.slice(0, -1) === targetNormalized)
+  ) {
+    return true;
+  }
+
+  // 3. Temporal matching if target is a month
+  if (targetMonthNumber !== undefined) {
+    if (val instanceof Date) {
+      const mUtc = val.getUTCMonth() + 1;
+      const mLoc = val.getMonth() + 1;
+      return mUtc === targetMonthNumber || mLoc === targetMonthNumber;
+    }
+    // Check if cell is a month token itself
+    if (MONTH_NAMES_FALLBACK[cellNormalized] === targetMonthNumber) {
+      return true;
+    }
+    // Check if cell is a month-year token like "Abr-2026", "2026-Abr"
+    const cellMonthYearMatch = cellNormalized.match(/^([a-z]+)[-_](\d{4})$/) || cellNormalized.match(/^(\d{4})[-_]([a-z]+)$/);
+    if (cellMonthYearMatch) {
+      const token = cellMonthYearMatch[1]?.match(/^[a-z]+$/) ? cellMonthYearMatch[1] : cellMonthYearMatch[2];
+      if (token && MONTH_NAMES_FALLBACK[token] === targetMonthNumber) {
+        return true;
+      }
+      return false;
+    }
+    // Check if cell is date-like "2025-01-15", "01/2025", etc.
+    const isoMonthMatch = cellStr.match(/^\d{4}[-/](\d{1,2})([-/]\d{1,2})?$/);
+    if (isoMonthMatch && Number(isoMonthMatch[1]) === targetMonthNumber) {
+      return true;
+    }
+    const ddmmyyyyMatch = cellStr.match(/^(\d{1,2})[-/](\d{1,2})[-/]\d{4}$/);
+    if (ddmmyyyyMatch && Number(ddmmyyyyMatch[2]) === targetMonthNumber) {
+      return true;
+    }
+    const parsed = Date.parse(cellStr);
+    if (!Number.isNaN(parsed)) {
+      const d = new Date(parsed);
+      if (d.getUTCMonth() + 1 === targetMonthNumber || d.getMonth() + 1 === targetMonthNumber) {
+        return true;
+      }
+    }
+  }
+
+  // 3b. Temporal matching if target is YYYY-MM or YYYY
+  const ymMatch = targetStr.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (ymMatch) {
+    const tYear = Number(ymMatch[1]);
+    const tMonth = Number(ymMatch[2]);
+    if (val instanceof Date) {
+      const vYearUtc = val.getUTCFullYear();
+      const vMonthUtc = val.getUTCMonth() + 1;
+      const vYearLoc = val.getFullYear();
+      const vMonthLoc = val.getMonth() + 1;
+      if ((vYearUtc === tYear && vMonthUtc === tMonth) || (vYearLoc === tYear && vMonthLoc === tMonth)) {
+        return true;
+      }
+    }
+    const cellYm = cellStr.match(/^(\d{4})[-/](\d{1,2})/);
+    if (cellYm && Number(cellYm[1]) === tYear && Number(cellYm[2]) === tMonth) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function filterRowsInMemory(
+  rows: Record<string, unknown>[],
+  scopedFilters: Record<string, string>
+): Record<string, unknown>[] {
+  const filterEntries = Object.entries(scopedFilters).filter(
+    ([k, v]) => !k.startsWith('__') && v !== null && v !== undefined && String(v).trim() !== ''
+  );
+  if (filterEntries.length === 0 || rows.length === 0) return rows;
+
+  return rows.filter((row) => {
+    return filterEntries.every(([key, filterVal]) => {
+      const targetStr = String(filterVal).trim();
+      if (!targetStr) return true;
+
+      if (key === 'global_cross_filter' || key === 'global_chart_filter') {
+        // Search across any column in the row
+        return Object.values(row).some((cellVal) => rowMatchesFilterValue(cellVal, targetStr));
+      }
+
+      // Column-specific filter
+      const cellVal = row[key];
+      return rowMatchesFilterValue(cellVal, targetStr);
+    });
+  });
+}
+
 export const GridWidget = React.memo(function GridWidget({
   report,
   onDelete,
@@ -53,6 +200,15 @@ export const GridWidget = React.memo(function GridWidget({
   const { content } = report;
   const type = content.type;
   const innerContent = content.content;
+  const visualGovernance = type === 'chart'
+    ? (innerContent as any)?.visual_governance
+    : (innerContent as any)?.original_chart_option?.visual_governance || (innerContent as any)?.visual_governance;
+  const recommendedLabel = (() => {
+    const recommended = visualGovernance?.recommended_label;
+    const applied = visualGovernance?.applied_label;
+    if (!recommended || recommended === applied) return null;
+    return String(recommended);
+  })();
   const globalFilters = useAtomValue(globalFiltersAtom);
   const widgetPerfScopeKey = React.useMemo(() => `report:${report.id}`, [report.id]);
   const explicitContract = React.useMemo<WidgetQueryContract | null>(() => {
@@ -72,7 +228,9 @@ export const GridWidget = React.memo(function GridWidget({
   }, [type, innerContent]);
   const [resolvedChartOption, setResolvedChartOption] = React.useState<any>(type === 'chart' ? innerContent : innerContent?.original_chart_option);
   const [resolvedTableData, setResolvedTableData] = React.useState<any[]>(type === 'table' ? innerContent?.data || [] : []);
+  const [resolvedMetrics, setResolvedMetrics] = React.useState<Record<string, number> | null>(null);
   const [resolvedContract, setResolvedContract] = React.useState<WidgetQueryContract | null>(explicitContract);
+  const [headerActionsEl, setHeaderActionsEl] = React.useState<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     setResolvedContract(explicitContract);
@@ -155,6 +313,7 @@ export const GridWidget = React.memo(function GridWidget({
 
       if (!hasGlobalFilters) {
         setResolvedChartOption(baseChartOption);
+        setResolvedMetrics(null);
         if (type === 'table') {
           setResolvedTableData(innerContent?.data || []);
         }
@@ -168,6 +327,7 @@ export const GridWidget = React.memo(function GridWidget({
 
       if (outOfScopeByFile) {
         setResolvedChartOption(baseChartOption);
+        setResolvedMetrics(null);
         if (type === 'table') {
           setResolvedTableData(innerContent?.data || []);
         }
@@ -180,30 +340,49 @@ export const GridWidget = React.memo(function GridWidget({
         return;
       }
 
-      const granularArrow = type === 'chart'
-        ? innerContent?.granular_arrow
-        : innerContent?.granular_arrow || innerContent?.original_chart_option?.granular_arrow;
+      const sourceReportId = typeof globalFilters?.__source_report_id === 'string'
+        ? globalFilters.__source_report_id.trim()
+        : '';
+      const isSourceWidget = Boolean(sourceReportId) && sourceReportId === report.id;
 
-      if (!granularArrow) {
-        console.warn("⚠️ [DASHBOARD] Widget sin granular_arrow; se omite recomputación reactiva", {
-          reportId: report.id,
-          type,
-        });
+      if (isSourceWidget) {
+        // [Anti-Self-Filter Guard]: El widget emisor mantiene su baseChartOption
+        // para que ECharts mantenga la visibilidad de todas las barras y resalte la seleccionada.
+        setResolvedChartOption(baseChartOption);
+        setResolvedMetrics(null);
+        if (type === 'table') {
+          setResolvedTableData(innerContent?.data || []);
+        }
         finishPerf({
           hasGlobalFilters: true,
-          skipped: true,
-          reason: 'missing_granular_arrow',
+          isSourceWidget: true,
+          resolvedRows: type === 'table' ? (innerContent?.data || []).length : 0,
+          resetToBase: true,
         });
         return;
       }
 
-      const tableName = `dashboard_widget_${report.id.replace(/-/g, '_')}`;
+      const granularArrow = type === 'chart'
+        ? innerContent?.granular_arrow
+        : innerContent?.granular_arrow || innerContent?.original_chart_option?.granular_arrow;
 
-      try {
-        await duckdbEngine.loadArrowData(granularArrow, tableName);
+      const rawRows: Record<string, unknown>[] = Array.isArray(innerContent?.visual_source_payload?.rows)
+        ? innerContent.visual_source_payload.rows
+        : Array.isArray(innerContent?.data)
+          ? innerContent.data
+          : Array.isArray(innerContent?.original_chart_option?.visual_source_payload?.rows)
+            ? innerContent.original_chart_option.visual_source_payload.rows
+            : Array.isArray(innerContent?.original_chart_option?.data)
+              ? innerContent.original_chart_option.data
+              : [];
 
-        let filteredRows: Record<string, unknown>[] = [];
+      let filteredRows: Record<string, unknown>[] = [];
+      let executionMode: 'duckdb' | 'memory_fallback' = 'duckdb';
+
+      if (granularArrow) {
+        const tableName = `dashboard_widget_${report.id.replace(/-/g, '_')}`;
         try {
+          await duckdbEngine.loadArrowData(granularArrow, tableName);
           filteredRows = await duckdbEngine.crossFilter(scopedFilters, tableName);
           console.log("🕵️ [DASHBOARD FILTER RESULT]", {
             reportId: report.id,
@@ -214,18 +393,52 @@ export const GridWidget = React.memo(function GridWidget({
             filteredRows: filteredRows.length,
           });
         } catch (crossFilterError) {
-          console.error("Error aplicando duckdbEngine.crossFilter:", {
+          console.warn("⚠️ [DASHBOARD] Error aplicando duckdbEngine.crossFilter, activando fallback en memoria", {
             error: crossFilterError,
             tableName,
             globalFilters: scopedFilters,
             reportId: report.id,
             widgetType: type,
           });
-          throw crossFilterError;
+          executionMode = 'memory_fallback';
         }
+      } else {
+        executionMode = 'memory_fallback';
+      }
 
-        if (cancelled) return;
+      // Capa 2: Fallback en memoria si no hay granular_arrow, si DuckDB falló o si DuckDB devolvió 0 filas pero hay datos en memoria
+      if (executionMode === 'memory_fallback' || (filteredRows.length === 0 && rawRows.length > 0)) {
+        if (rawRows.length > 0) {
+          const memoryFiltered = filterRowsInMemory(rawRows, scopedFilters as Record<string, string>);
+          if (memoryFiltered.length > 0 || filteredRows.length === 0) {
+            filteredRows = memoryFiltered;
+            executionMode = 'memory_fallback';
+            console.log("🧠 [DASHBOARD MEMORY FALLBACK RESULT]", {
+              reportId: report.id,
+              reportTitle: report.title,
+              widgetType: type,
+              globalFilters: scopedFilters,
+              totalRawRows: rawRows.length,
+              filteredRows: filteredRows.length,
+            });
+          }
+        } else if (!granularArrow) {
+          console.warn("⚠️ [DASHBOARD] Widget sin granular_arrow ni filas en memoria; se omite recomputación reactiva", {
+            reportId: report.id,
+            type,
+          });
+          finishPerf({
+            hasGlobalFilters: true,
+            skipped: true,
+            reason: 'missing_granular_arrow_and_raw_rows',
+          });
+          return;
+        }
+      }
 
+      if (cancelled) return;
+
+      try {
         if (type === 'chart') {
           const contract = resolveContractForRows(innerContent, filteredRows);
           if (contract) {
@@ -235,6 +448,7 @@ export const GridWidget = React.memo(function GridWidget({
               hasGlobalFilters: true,
               filteredRows: filteredRows.length,
               chartReactive: true,
+              executionMode,
             });
           } else {
             console.warn("⚠️ [DASHBOARD] No se pudo resolver query_contract para widget chart", {
@@ -266,6 +480,7 @@ export const GridWidget = React.memo(function GridWidget({
               hasGlobalFilters: true,
               filteredRows: filteredRows.length,
               tableReactive: true,
+              executionMode,
             });
           } else if (originalChartOption) {
             console.warn("⚠️ [DASHBOARD] No se pudo resolver query_contract para SmartTable híbrida", {
@@ -284,8 +499,46 @@ export const GridWidget = React.memo(function GridWidget({
               filteredRows: filteredRows.length,
               tableReactive: false,
               reason: 'no_original_chart_option',
+              executionMode,
             });
           }
+        }
+
+        if (type === 'metrics') {
+          if (filteredRows.length > 0 && innerContent && typeof innerContent === 'object') {
+            const filtered: Record<string, number> = {};
+            const originalMetrics: Record<string, number> = {};
+            for (const [key, val] of Object.entries(innerContent)) {
+              if (typeof val === 'number') originalMetrics[key] = val;
+            }
+
+            // Buscar columnas en filteredRows que coincidan con las keys de métricas
+            const sampleRow = filteredRows[0];
+            const columns = Object.keys(sampleRow || {});
+            for (const metricKey of Object.keys(originalMetrics)) {
+              const normalizedKey = metricKey.toLowerCase().replace(/[_\s]+/g, '');
+              const matchingCol = columns.find(
+                (col) => col.toLowerCase().replace(/[_\s]+/g, '') === normalizedKey
+              );
+              if (matchingCol) {
+                filtered[metricKey] = filteredRows.reduce(
+                  (sum, row) => sum + (typeof row[matchingCol] === 'number' ? row[matchingCol] : 0), 0
+                );
+              } else {
+                filtered[metricKey] = originalMetrics[metricKey];
+              }
+            }
+            setResolvedMetrics(filtered);
+          } else {
+            setResolvedMetrics(null);
+          }
+          finishPerf({
+            hasGlobalFilters: true,
+            filteredRows: filteredRows.length,
+            metricsReactive: true,
+            executionMode,
+          });
+          return;
         }
       } catch (error) {
         finishPerf({
@@ -375,7 +628,7 @@ export const GridWidget = React.memo(function GridWidget({
   const renderContent = () => {
     switch (type) {
       case 'metrics':
-        return <AnalysisReport data={{ metrics: innerContent, tableData: [] }} onSave={() => {}} />;
+        return <AnalysisReport data={{ metrics: resolvedMetrics || innerContent, tableData: [] }} onSave={() => {}} isWidget={true} />;
       case 'table':
         return (
           <div className="h-full overflow-hidden flex flex-col pt-1">
@@ -387,7 +640,11 @@ export const GridWidget = React.memo(function GridWidget({
                originalChartOption={resolvedChartOption}
                defaultViewMode={innerContent?.default_view_mode}
                fileId={report.file_id}
-               onChartClick={(params) => onChartClick && onChartClick(params, innerContent.table_name, report.file_id)}
+               onChartClick={(params) => onChartClick && onChartClick(params, innerContent.table_name, report.file_id, {
+                 reportId: report.id,
+                 chartOption: resolvedChartOption || innerContent,
+                 contract: resolvedContract || explicitContract,
+               })}
                isWidget={true}
                presentationMode={presentationMode}
                // FUTURE PHASE: usar granular_arrow/query_contract para abrir modal "Ver datos crudos".
@@ -399,12 +656,18 @@ export const GridWidget = React.memo(function GridWidget({
           <ChartsReport 
             option={resolvedChartOption || innerContent} 
             onSave={() => {}} 
-            onChartClick={(params) => onChartClick && onChartClick(params, innerContent.table_name, report.file_id)} 
+            onChartClick={(params) => onChartClick && onChartClick(params, innerContent.table_name, report.file_id, {
+              reportId: report.id,
+              chartOption: resolvedChartOption || innerContent,
+              contract: resolvedContract || explicitContract,
+            })} 
             isWidget={true}
             interactionMode="filter"
             hideModeSwitch={presentationMode}
             hideVisualPicker={presentationMode}
             presentationMode={presentationMode}
+            onDelete={() => onDelete(report.id)}
+            headerPortalContainer={headerActionsEl}
           />
         );
       default:
@@ -418,7 +681,7 @@ export const GridWidget = React.memo(function GridWidget({
 
   return (
     <Card
-      className="flex flex-col w-full h-full bg-card border shadow-sm rounded-xl overflow-hidden group"
+      className="flex flex-col w-full h-full bg-card border border-border/40 rounded-xl overflow-hidden group shadow-[var(--cursor-shadow-md)] hover:shadow-[var(--cursor-shadow-lg)] transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] gap-0 py-0"
       data-testid={`dashboard-widget-${report.id}`}
       data-widget-type={type}
       data-report-title={report.title}
@@ -426,27 +689,29 @@ export const GridWidget = React.memo(function GridWidget({
     >
       {/* Header Interactivo (Drag Handle) */}
       <CardHeader className={[
-        "flex flex-row items-center justify-between border-b border-border/30 bg-background/50",
-        presentationMode ? "p-2.5" : "p-3",
+        "flex flex-row items-center justify-between border-b border-border/15",
+        presentationMode ? "p-2" : "px-3 py-1.5",
         presentationMode ? "" : "cursor-grab active:cursor-grabbing widget-drag-handle",
       ].join(" ")}>
-        <div className="flex flex-col min-w-0">
-          <CardTitle className="text-sm font-medium leading-tight truncate text-foreground/90">
+        <div className="flex flex-col min-w-0 pr-2">
+          <CardTitle className="text-[13px] font-medium leading-tight truncate text-foreground tracking-tight">
             {report.title}
           </CardTitle>
-          <p className="text-[10px] text-muted-foreground/80 font-medium">
-            {format(new Date(report.created_at), "d 'de' MMM, yy", { locale: es })}
-          </p>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70">
+              {format(new Date(report.created_at), "d 'de' MMM, yy", { locale: es })}
+            </span>
+          </div>
         </div>
         
         {/* Controles Ocultos por defecto, visibles en Hover */}
         {presentationMode ? (
           onRequestFocus ? (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:bg-secondary/80"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors duration-150"
                 onClick={() => onRequestFocus(report)}
                 title="Enfocar visual"
               >
@@ -455,16 +720,56 @@ export const GridWidget = React.memo(function GridWidget({
             </div>
           ) : null
         ) : (
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-secondary/80" onClick={() => onAnalyze(report)} title="Continuar en Chat">
+          <div 
+            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 transition-opacity duration-150 shrink-0 cursor-default"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {!presentationMode && recommendedLabel && (
+              <span
+                className="inline-flex min-w-0 items-center gap-1 rounded-full bg-secondary px-1.5 py-px text-[10px] font-medium text-muted-foreground"
+                title={`Recomendado: ${recommendedLabel}`}
+              >
+                <Sparkles className="h-2.5 w-2.5 shrink-0 text-accent" />
+                <span className="max-w-[96px] truncate">{recommendedLabel}</span>
+              </span>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors duration-150" 
+              onClick={() => onAnalyze(report)} 
+              title="Continuar en Chat"
+            >
               <MessageSquare className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(report.id)} title="Eliminar">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-            <div className="flex items-center text-muted-foreground/50 ml-1">
-              <GripHorizontal className="h-4 w-4" />
-            </div>
+            
+            <div ref={setHeaderActionsEl} className="flex items-center gap-1" />
+
+            {type !== 'chart' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors duration-150"
+                    title="Más opciones"
+                    aria-label="Más opciones"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-44 p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(report.id)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1 truncate">Eliminar</span>
+                  </button>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         )}
       </CardHeader>
@@ -472,7 +777,7 @@ export const GridWidget = React.memo(function GridWidget({
       {/* Contenido (Canvas Completo) */}
       <CardContent className={[
         "flex-1 min-h-0 relative overflow-hidden flex flex-col",
-        presentationMode ? "p-1.5" : "p-2",
+        presentationMode ? "p-1" : "p-1 sm:p-1.5",
       ].join(" ")}>
         {renderContent()}
       </CardContent>

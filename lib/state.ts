@@ -48,6 +48,7 @@ export interface DrillDownState {
     series: string;
     tableName?: string;
     secondaryCategory?: string;
+    option?: any;
   };
 }
 export const drillDownAtom = atom<DrillDownState>({
@@ -80,7 +81,18 @@ export interface AnalysisComponent {
   original_chart_option?: any; // ECharts option original para toggle tabla↔gráfico
   default_view_mode?: "table" | "chart" | "hybrid";
   table_name?: string;         // [FASE 4 Fix] Nombre de la tabla aislada en DuckDB
+  task_id?: string;            // [FASE 6.1] ID de la tarea para re-hidratación on-demand
+  file_id?: string;            // [FASE 6.1] ID del archivo asociado
 }
+
+// 🦆 [FASE 6.3] Cross-Filter Selection State con Anti-Self-Filter y Toggle
+export interface CrossFilterSelection {
+  dimension: string;
+  value: string;
+  sourceTable?: string;
+  sourceSeries?: string;
+}
+export const activeCrossFilterAtom = atom<CrossFilterSelection | null>(null);
 
 export interface WorkspaceRenderState {
   status: "idle" | "analyzing" | "staging";

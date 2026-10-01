@@ -3,6 +3,22 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Rutas que exigen sesión activa. El resto son públicas (marketing, login,
+// callback OAuth, vistas de reporte compartidas y fixtures de QA).
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/cargar-datos',
+  '/conocimiento',
+  '/glosario',
+  '/settings',
+]
+
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 export async function middleware(request: NextRequest) {
   // Debug opcional y liviano para desarrollo local.
   if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG_MIDDLEWARE === '1') {
@@ -49,7 +65,21 @@ export async function middleware(request: NextRequest) {
 
   // 3. Esta línea es crucial: refresca la sesión del usuario si ha expirado
   // y asegura que la cookie de sesión esté siempre actualizada.
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // 3.1. Auth Guard: si la ruta es privada y no hay sesión, redirigimos a
+  // /login conservando el destino original en `?next=` para retornar allí
+  // tras completar el OAuth.
+  if (!user && isProtectedPath(request.nextUrl.pathname)) {
+    const originalPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/login'
+    redirectUrl.search = ''
+    redirectUrl.searchParams.set('next', originalPath)
+    return NextResponse.redirect(redirectUrl)
+  }
 
   // 4. Devolvemos la respuesta final, que ahora contiene la sesión correcta.
   return response

@@ -2,9 +2,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
-import { Sparkles, ArrowRight, TrendingUp, Search, Scale, RefreshCw, Target, PieChart, BarChart2, Zap } from "lucide-react";
+import { ArrowRight, TrendingUp, Search, Scale, RefreshCw, Target, PieChart, BarChart2, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { TemporalProvenanceBadge } from "@/components/temporal-provenance-badge";
 
 export interface DrillDownOption {
     id: string;
@@ -22,6 +23,7 @@ interface DrillDownMenuProps {
         series: string;
         tableName?: string;
         secondaryCategory?: string;
+        option?: any;
     };
     onSelect: (prompt: string) => void;
     onClose: () => void;
@@ -39,38 +41,38 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
         {
             id: 'causes',
             label: 'Causas Raíz',
-            icon: <Search className="w-4 h-4 text-blue-500" />,
-            promptTemplate: `🔍 Drill-Down: Analiza las **causas raíz** del desempeño de "${dataContext.category}" en "${dataContext.series}" (Valor: ${dataContext.value}). ¿Qué factores específicos impulsan esto?`
+            icon: <Search className="w-4 h-4 text-muted-foreground" />,
+            promptTemplate: `Drill-Down: Analiza las **causas raíz** del desempeño de "${dataContext.category}" en "${dataContext.series}" (Valor: ${dataContext.value}). ¿Qué factores específicos impulsan esto?`
         },
         {
             id: 'trends',
             label: 'Tendencia Histórica',
             icon: <TrendingUp className="w-4 h-4 text-green-500" />,
-            promptTemplate: `📈 Drill-Down: Muestra la **tendencia histórica** de "${dataContext.category}". ¿El valor actual es una anomalía o sigue un patrón?`
+            promptTemplate: `Drill-Down: Muestra la **tendencia histórica** de "${dataContext.category}". ¿El valor actual es una anomalía o sigue un patrón?`
         },
         {
             id: 'compare',
             label: 'Comparar Mercado',
             icon: <Scale className="w-4 h-4 text-purple-500" />,
-            promptTemplate: `⚖️ Drill-Down: Compara "${dataContext.category}" (Valor: ${dataContext.value}) con el **promedio del mercado**. ¿Rendimiento superior o inferior?`
+            promptTemplate: `Drill-Down: Compara "${dataContext.category}" (Valor: ${dataContext.value}) con el **promedio del mercado**. ¿Rendimiento superior o inferior?`
         },
         {
             id: 'composition',
             label: 'Composición Interna',
             icon: <PieChart className="w-4 h-4 text-orange-500" />,
-            promptTemplate: `🍰 Drill-Down: Desglosa la composición de "${dataContext.category}". ¿Qué sub-elementos lo conforman principalmente?`
+            promptTemplate: `Drill-Down: Desglosa la composición de "${dataContext.category}". ¿Qué sub-elementos lo conforman principalmente?`
         },
         {
             id: 'forecast',
             label: 'Proyección Futura',
             icon: <Target className="w-4 h-4 text-red-500" />,
-            promptTemplate: `🔮 Drill-Down: Realiza una proyección para "${dataContext.category}" basada en "${dataContext.series}". ¿Qué se espera para el próximo periodo?`
+            promptTemplate: `Drill-Down: Realiza una proyección para "${dataContext.category}" basada en "${dataContext.series}". ¿Qué se espera para el próximo periodo?`
         },
         {
             id: 'correlation',
             label: 'Correlaciones',
             icon: <BarChart2 className="w-4 h-4 text-indigo-500" />,
-            promptTemplate: `🔗 Drill-Down: ¿Con qué otras variables se correlaciona "${dataContext.category}"? Busca relaciones ocultas.`
+            promptTemplate: `Drill-Down: ¿Con qué otras variables se correlaciona "${dataContext.category}"? Busca relaciones ocultas.`
         }
     ], [dataContext]);
 
@@ -125,32 +127,31 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                         style={menuStyle}
                         className="flex flex-col"
                     >
-                        <Card className="shadow-2xl border-primary/20 bg-card/95 backdrop-blur-md w-[260px] overflow-hidden rounded-xl ring-1 ring-black/5">
+                        <Card className="shadow-lg border border-border/40 bg-card w-[260px] overflow-hidden rounded-xl">
                             {/* Header */}
-                            <div className="p-2.5 border-b bg-muted/40 flex justify-between items-center">
+                            <div className="p-2.5 border-b border-border/20 bg-muted/30 flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                    <Sparkles className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                                         Sugerencias de Análisis
                                     </span>
                                 </div>
                                 <div className="flex gap-1">
                                     <button
                                         onClick={handleRefresh}
-                                        className="p-1 hover:bg-background rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                        className="p-1 hover:bg-background rounded-md text-muted-foreground hover:text-foreground transition-colors"
                                         title="Nuevas sugerencias"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" />
                                     </button>
                                     <button onClick={onClose} className="p-1 hover:bg-background rounded-md text-muted-foreground hover:text-destructive transition-colors">
-                                        <span className="text-xs font-bold leading-none">✕</span>
+                                        <span className="text-xs leading-none">×</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Content */}
                             <div className="p-2 flex flex-col gap-1">
-                                <div className="px-2 py-1 flex items-center justify-between text-xs font-medium text-foreground border-b border-border/50 mb-1 pb-1.5">
+                                <div className="px-2 py-1 flex items-center justify-between text-xs font-medium text-foreground border-b border-border/20 mb-1 pb-1.5">
                                     <span>Foco: <span className="text-primary truncate max-w-[120px] inline-block align-bottom">{dataContext.category}</span></span>
                                     <span className="text-muted-foreground font-mono">{dataContext.value}</span>
                                 </div>
@@ -161,9 +162,16 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                         <button
                                             onClick={() => {
                                                 const filters: Record<string, string> = {};
+                                                const chartOption = dataContext.option;
+                                                const contractDimension = typeof chartOption?.query_contract?.dimension === 'string'
+                                                    ? chartOption.query_contract.dimension.trim()
+                                                    : '';
 
                                                 if (dataContext.category && dataContext.category !== 'undefined') {
-                                                    filters['global_chart_filter'] = String(dataContext.category);
+                                                    // A chart contract names the physical dimension represented by
+                                                    // its category. Preserve that identity instead of asking DuckDB
+                                                    // to infer a column from a value that may exist in several fields.
+                                                    filters[contractDimension || 'global_chart_filter'] = String(dataContext.category);
                                                 }
 
                                                 if (
@@ -178,15 +186,71 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                                     dataContext.series !== 'valor' &&
                                                     dataContext.series !== String(dataContext.category)
                                                 ) {
-                                                    filters['global_cross_filter'] = String(dataContext.series);
-                                                    console.log("🎯 [Cross-Filter UI] Propagando serie split detectada:", dataContext.series);
+                                                    const chartTitle =
+                                                        chartOption?.title?.text ||
+                                                        chartOption?.visual_source_payload?.title ||
+                                                        '';
+
+                                                    const seriesStr = String(dataContext.series);
+
+                                                    // [FIX 2026-07-28] Validación estructural via _cross_filter_meta.
+                                                    // El backend clasifica series[].name como "metric", "decorative",
+                                                    // o "dimension_value" según el query_contract y title. Esto
+                                                    // elimina la dependencia de heurísticas keyword-based.
+                                                    const crossFilterMeta = chartOption?._cross_filter_meta as {
+                                                        series_kind?: string;
+                                                        series_name?: string;
+                                                        metrics?: string[];
+                                                        dimensions?: string[];
+                                                    } | undefined;
+
+                                                    let isDecorativeSeries = false;
+                                                    let isMetricName = false;
+
+                                                    if (crossFilterMeta) {
+                                                        isDecorativeSeries = crossFilterMeta.series_kind === 'decorative';
+                                                        isMetricName = crossFilterMeta.series_kind === 'metric'
+                                                            || (crossFilterMeta.metrics || []).includes(seriesStr);
+                                                    } else {
+                                                        // Fallback legacy: charts sin _cross_filter_meta
+                                                        isDecorativeSeries = seriesStr === chartTitle;
+                                                        const queryContract = chartOption?.query_contract || {};
+                                                        const colAliases = queryContract?.column_aliases || {};
+                                                        const knownMetrics: string[] = [
+                                                            queryContract.metric,
+                                                            queryContract.plot_metric,
+                                                            queryContract.value_column,
+                                                            ...(queryContract.metrics || []),
+                                                            ...(Object.keys(colAliases)),
+                                                            ...(Object.values(colAliases)),
+                                                        ].filter(Boolean).map((m: string) => String(m).toLowerCase());
+                                                        isMetricName = knownMetrics.includes(seriesStr.toLowerCase());
+                                                    }
+
+                                                    if (isDecorativeSeries) {
+                                                        console.log("🛡️ [Cross-Filter UI] Serie ignorada como filtro — es decorativa:", {
+                                                            series: dataContext.series,
+                                                            chartTitle,
+                                                            seriesKind: crossFilterMeta?.series_kind,
+                                                        });
+                                                    } else if (isMetricName) {
+                                                        console.log("🛡️ [Cross-Filter UI] Serie ignorada como filtro — es nombre de métrica:", {
+                                                            series: dataContext.series,
+                                                            seriesKind: crossFilterMeta?.series_kind,
+                                                        });
+                                                    } else {
+                                                        filters['global_cross_filter'] = String(dataContext.series);
+                                                        console.log("🎯 [Cross-Filter UI] Propagando serie split detectada:", {
+                                                            series: dataContext.series,
+                                                            seriesKind: crossFilterMeta?.series_kind,
+                                                        });
+                                                    }
                                                 }
 
                                                 // [FIX 2026-06-08] Preview los filtros base del chart original
                                                 // (los que el canary executor aplicó para generar este chart).
                                                 // El usuario debe ver explícitamente que estos se combinarán
                                                 // con su clic para producir la tabla resultante.
-                                                const chartOption = (dataContext as any)?.option;
                                                 const baseFilters = chartOption?.chart_base_filters || {};
                                                 const baseFilterKeys = Object.keys(baseFilters);
                                                 const baseFilterHint = baseFilterKeys.length > 0
@@ -203,11 +267,16 @@ export function DrillDownMenu({ isVisible, position, dataContext, onSelect, onCl
                                                 <Zap className="w-4 h-4 text-primary fill-primary/30" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[13px] font-semibold text-primary truncate">⚡ Filtrar aquí</p>
+                                                <p className="text-[13px] font-medium text-primary truncate">Filtrar aquí</p>
                                                 <p className="text-[10px] text-muted-foreground">
                                                     Instantáneo · Sin servidor
                                                     {/* Show base filter count if any exist */}
                                                     <BaseFilterBadge dataContext={dataContext} />
+                                                    {/* F1: procedencia del filtro temporal */}
+                                                    <TemporalProvenanceBadge
+                                                        provenance={dataContext?.option?.temporal_provenance}
+                                                        className="ml-1.5"
+                                                    />
                                                 </p>
                                             </div>
                                         </button>
@@ -259,7 +328,7 @@ function BaseFilterBadge({ dataContext }: { dataContext: any }) {
     }
     const count = Object.keys(baseFilters).length;
     return (
-        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border/50">
             + {count} base
         </span>
     );

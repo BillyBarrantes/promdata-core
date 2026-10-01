@@ -64,7 +64,11 @@ async function assertFilterMatchesLastFocus(page: Page): Promise<void> {
   const activeFilter = page.getByTestId('active-filter');
   const lastFocus = page.getByTestId('last-click-category');
   await expect(activeFilter).not.toHaveText('none');
-  await expect(activeFilter).toHaveText(await lastFocus.textContent());
+  const focusText = await lastFocus.textContent();
+  // [P0-5 FIX] textContent() retorna string | null: fallar explícitamente
+  // si el foco está vacío en vez de propagar null al matcher.
+  expect(focusText).toBeTruthy();
+  await expect(activeFilter).toHaveText(focusText as string);
 }
 
 async function hoverChartSurface(page: Page, testId: string): Promise<void> {

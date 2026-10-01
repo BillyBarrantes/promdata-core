@@ -180,7 +180,11 @@ export default function CrossFilterQAPage() {
   };
 
   const handleCrossFilter = (filters: Record<string, string>) => {
-    const selected = filters.category ? normalizeValue(filters.category) : "";
+    // [QW-2 FIX] El DrillDownMenu emite la clave 'global_chart_filter'
+    // (ver drill-down-menu.tsx), no 'category'. Se conserva 'category'
+    // como fallback de compatibilidad para llamadas legacy.
+    const raw = filters.global_chart_filter ?? filters.category ?? "";
+    const selected = raw ? normalizeValue(raw) : "";
     if (!selected) return;
     setActiveFilter((prev) => (prev === selected ? null : selected));
   };
