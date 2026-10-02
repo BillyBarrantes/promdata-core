@@ -19,6 +19,15 @@ from app.tasks.analysis_pipeline.plan_generator import (
 )
 
 
+def wants_gauge(metric_unit: Any) -> bool:
+    """[H4] Un KPI solo renderiza gauge si su unidad declarada es 'percentage'.
+
+    No se infiere porcentaje por el rango del valor (0..100): un conteo pequeño
+    o un índice no son porcentajes. Ver PUBLIC_V1_ENGINEERING_DESIGN §D.
+    """
+    return metric_unit == 'percentage'
+
+
 def execute_plans(
     *,
     plans_result: list,
@@ -209,14 +218,21 @@ def execute_plans(
                     val = list(metrics_data.values())[0]
                     if isinstance(val, (int, float)):
                         metric_unit = getattr(plan.main_intent, 'metric_unit', None)
-                        is_percentage = metric_unit == 'percentage' or (0 <= val <= 100)
-                        if is_percentage:
+                        if wants_gauge(metric_unit):
                             gauge_opt = ChartFactory.build_gauge_chart(key, val)
                             ibis_response.append({
                                 "type": "configuracion_echarts",
                                 "title": key,
                                 "option": gauge_opt,
                             })
+                        elif 0 <= val <= 100:
+                            emit_structured_log(
+                                "gauge_inference_suppressed",
+                                level="info",
+                                metric=str(key),
+                                value=val,
+                                reason="metric_unit_not_percentage",
+                            )
 
             # ── Narrative generation (extracted) ──
             narrative_items = generate_chart_narrative(

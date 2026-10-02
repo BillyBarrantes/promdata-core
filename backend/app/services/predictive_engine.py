@@ -50,7 +50,9 @@ class PredictiveEngine:
             aggregation_method (str): 'sum' (Ventas/Flujo), 'last' (Stock/Balance), 'mean' (Promedios).
             
         Returns:
-            List[Dict]: Lista de objetos {date, value, type='history'|'forecast', lower_ci, upper_ci}.
+            List[Dict]: Lista de objetos {date, value, type='history'|'forecast'}.
+                Los ítems de pronóstico exponen 'lower_ci'/'upper_ci' en None
+                (sin bandas calibradas) y 'is_experimental'=True.
         """
         if not PredictiveEngine.is_available():
             logger.warning("PredictiveEngine: statsmodels/sklearn no instalados.")
@@ -142,17 +144,18 @@ class PredictiveEngine:
                 })
                 
             # Pronóstico
+            # [H4 / PUBLIC_V1 §F] No se emiten bandas de confianza: Holt-Winters
+            # no calibra intervalos en esta implementación y un intervalo no
+            # estadístico es peor que ninguno.
             is_experimental = len(series) < 12
-            for i, (date, val) in enumerate(forecast.items()):
-                uncertainty = 0.05 * (i + 1)
-                if is_experimental:
-                    uncertainty *= 1.5
+            for date, val in forecast.items():
                 fc_item = {
                     "date": date.strftime("%Y-%m-%d"),
                     "value": round(val, 2),
                     "type": "forecast",
-                    "lower_ci": round(val * (1 - uncertainty), 2),
-                    "upper_ci": round(val * (1 + uncertainty), 2),
+                    "lower_ci": None,
+                    "upper_ci": None,
+                    "interval_estimated": False,
                     "is_experimental": is_experimental,
                     "confidence_level": "baja" if is_experimental else "alta",
                     "method": "Holt-Winters (Exponential Smoothing)",
@@ -161,7 +164,7 @@ class PredictiveEngine:
                 if is_experimental:
                     fc_item["warning"] = "Muestra histórica reducida (< 12 períodos). Pronóstico experimental con alta incertidumbre."
                 output.append(fc_item)
-                
+
             return output
 
         except Exception as e:
@@ -181,6 +184,16 @@ class PredictiveEngine:
 
         try:
             pdf = df.copy()
+
+            # [H4] Guard: solo columnas numéricas con varianza producen detección
+            # confiable. IDs/categóricas y columnas constantes se omiten.
+            if not pd.api.types.is_numeric_dtype(pdf[value_col]):
+                logger.info("PredictiveEngine: columna '%s' no numérica; se omite detección de anomalías.", value_col)
+                return df
+            if pdf[value_col].nunique(dropna=True) <= 1:
+                logger.info("PredictiveEngine: columna '%s' constante; se omite detección de anomalías.", value_col)
+                return df
+
             # Limpieza básica: rellenar nulos con 0 o media
             data_to_fit = pdf[[value_col]].fillna(0)
             
