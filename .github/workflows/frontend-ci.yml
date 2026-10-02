@@ -85,7 +85,7 @@ jobs:
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
       NEXT_PUBLIC_DEBUG_MIDDLEWARE: "0"
       NEXT_TELEMETRY_DISABLED: "1"
-      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
       CI: "1"
     steps:
       - name: Checkout repository
@@ -131,7 +131,7 @@ jobs:
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
       NEXT_PUBLIC_DEBUG_MIDDLEWARE: "0"
       NEXT_TELEMETRY_DISABLED: "1"
-      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
       CI: "1"
     steps:
       - name: Checkout repository
