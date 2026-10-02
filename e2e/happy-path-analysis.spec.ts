@@ -90,7 +90,7 @@ async function installHappyPathMocks(page: Page): Promise<void> {
   let taskPolls = 0;
 
   // Mock Supabase uploaded_files
-  await page.route('https://dxlkejsrvuknuajkltwm.supabase.co/rest/v1/uploaded_files**', async (route) => {
+  await page.route('**/rest/v1/uploaded_files**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -99,7 +99,7 @@ async function installHappyPathMocks(page: Page): Promise<void> {
   });
 
   // Mock all backend API calls
-  await page.route('http://localhost:8000/api/v1/**', async (route) => {
+  await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
@@ -243,7 +243,7 @@ test.describe('Happy Path: Prompt → Chart + Narrative', () => {
     await installMockSession(page);
 
     // Mock API that returns a sanitized 500 error
-    await page.route('http://localhost:8000/api/v1/**', async (route) => {
+    await page.route('**/api/v1/**', async (route) => {
       const method = route.request().method();
 
       if (method === 'OPTIONS') {
