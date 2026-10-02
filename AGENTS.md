@@ -11,14 +11,14 @@
 
 | Layer       | Technology                              | Notes                                              |
 |-------------|-----------------------------------------|----------------------------------------------------|
-| Frontend    | Next.js 14 + TypeScript (App Router)    | Lives at repo root. Deployed as static/Node app.   |
-| Backend API | Python 3.11 + FastAPI + Uvicorn         | Lives in `/backend`. Deployed on Cloud Run.        |
-| Workers     | Celery 5 + Redis broker + Redis backend | `prefork` pool, `--concurrency=2` (production).    |
+| Frontend    | Next.js 16 + TypeScript (App Router)    | Lives at repo root. Node 22 + pnpm; Docker build.  |
+| Backend API | Python 3.11 + FastAPI + Uvicorn         | Lives in `/backend`. Deploy: VPS (Cloud Run legacy). |
+| Workers     | Celery 5 + Redis broker + Redis backend | `prefork` pool; Cloud Run `--concurrency=4`, VPS Compose `8`. |
 | Data        | Ibis + DuckDB (in-process)              | Lazy evaluation; **no** Pandas in hot path.        |
-| LLM         | Vertex AI (`google-genai` SDK)          | Default model `gemini-3.5-flash`.                  |
-| Auth/DB     | Supabase (Postgres + Auth + Storage)    | Multi-tenant via `tenant_id` / `file_id`.          |
-| Cache       | Redis Cloud (Pro 1 plan, 1000 conn / 250MB) | Centralized pool, see §5.                          |
-| CI/CD       | Google Cloud Build                      | `cloudbuild.yaml` (backend) + Cloud Build trigger (frontend) + manual worker deploy.|
+| LLM         | LLM gateway (DeepSeek/Gemini/OpenAI)    | `LLM_PROVIDER=deepseek` (análisis); Gemini para embeddings RAG. |
+| Auth/DB     | Supabase (Postgres + Auth + Storage)    | Aislamiento por `user_id`/`team_id` + `file_id` (B2C: 1 usuario/cuenta). |
+| Cache       | Redis Cloud (Essentials 256 conn / 250MB) | Centralized pool; migración Pro 1 en §4.4b/§12.    |
+| CI/CD       | GitHub Actions (VPS) + Cloud Build (legacy) | `deploy-vps.yml` (SSH al VPS); Cloud Build queda como legado. Ver §2. |
 | Hosting     | Google Cloud Run (`us-east4`)           | 3 services: `promdata-core` (frontend) + `promdata-backend` (FastAPI) + `promdata-worker` (Celery). See §2. |
 
 ---
